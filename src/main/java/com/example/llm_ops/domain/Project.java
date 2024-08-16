@@ -1,29 +1,20 @@
-package com.domain;
+package com.example.llm_ops.domain;
 
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-import java.util.List;
-
 @Entity
-@Table(name = "log_tb")
+@Table(name = "project_tb")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Getter
-public class Log extends TimeStamp{
+public class Project {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "project_id")
-    private Project project;
-
     @Column
-    private String type;
-
-    @Column
-    private String content;
+    private String name;
 }
