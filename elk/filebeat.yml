@@ -8,12 +8,12 @@ filebeat.inputs:
 
 # ERROR와 WARNING 레벨 로그만 Logstash로 전송
 processors:
-  - drop_event.when.not:
-      or:
-        - equals:
-            log.level: "ERROR"
-        - equals:
-            log.level: "WARNING"
+#  - drop_event.when.not:
+#      or:
+#        - equals:
+#            log.level: "ERROR"
+#        - equals:
+#            log.level: "WARNING"
 
 # 수집된 로그 데이터를 어디로 전송할지 정의
 output.logstash:

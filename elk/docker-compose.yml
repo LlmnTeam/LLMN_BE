@@ -5,7 +5,7 @@ services:
     container_name: elasticsearch
     environment:
       - discovery.type=single-node
-      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m -Duser.timezone=Asia/Seoul
     ports:
       - "9200:9200"
     volumes:
@@ -21,18 +21,6 @@ services:
     depends_on:
       - elasticsearch
 
-  kibana:
-    image: docker.elastic.co/kibana/kibana:7.17.3
-    container_name: kibana
-    environment:
-      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
-      - xpack.security.encryptionKey="6f8c9a1b32a94e0d91d12e57f5c0845a"
-      - xpack.encryptedSavedObjects.encryptionKey="9a73bc9d86a24828b4820dc5a156d3fd"
-    ports:
-      - "5601:5601"
-    depends_on:
-      - elasticsearch
-
   filebeat:
     image: docker.elastic.co/beats/filebeat:7.17.3
     container_name: filebeat
@@ -43,6 +31,18 @@ services:
       - ./filebeat.yml:/usr/share/filebeat/filebeat.yml
     depends_on:
       - logstash
+
+  #kibana:
+  #  image: docker.elastic.co/kibana/kibana:7.17.3
+  #  container_name: kibana
+  #  environment:
+  #    - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+  #    - xpack.security.encryptionKey="6f8c9a1b32a94e0d91d12e57f5c0845a"
+  #    - xpack.encryptedSavedObjects.encryptionKey="9a73bc9d86a24828b4820dc5a156d3fd"
+  #  ports:
+  #    - "5601:5601"
+  #  depends_on:
+  #    - elasticsearch
 
 volumes:
   es_data:
