@@ -1,4 +1,4 @@
-package com.example.llmn;
+package com.example.llmn.controller;
 
 import com.example.llmn.core.utils.ApiUtils;
 import com.example.llmn.service.LogDataService;
