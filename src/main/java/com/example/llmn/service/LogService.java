@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -60,12 +61,27 @@ public class LogService {
                 ));
 
         // Elasticsearch에서 쿼리 실행
-        SearchResponse<LogData> response = client.search(searchBuilder.build(), LogData.class);
+        SearchResponse<Map> response = client.search(searchBuilder.build(), Map.class);
 
-        // 검색 결과를 파싱하여 반환
+        // 검색 결과를 LogData로 변환하여 반환
         return response.hits().hits().stream()
-                .map(Hit::source)
+                .map(hit -> convertToLogData(hit.source()))
                 .collect(Collectors.toList());
+    }
+
+    private LogData convertToLogData(Map<String, Object> source) {
+        // "container.name" 추출
+        Map<String, Object> container = (Map<String, Object>) source.get("container");
+        String containerName = container != null ? (String) container.get("name") : null;
+
+        // "@timestamp" 추출
+        String timestampStr = (String) source.get("@timestamp");
+        Instant timestamp = timestampStr != null ? Instant.parse(timestampStr) : null;
+
+        // "message" 추출 (JSON으로 감싸져 있음)
+        String message = (String) source.get("message");
+
+        return new LogData(containerName, timestamp, message);
     }
 
     private String processLogs(SearchResponse searchResponse) {
