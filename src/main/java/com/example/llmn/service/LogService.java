@@ -20,7 +20,7 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class LogDataService {
+public class LogService {
 
     private final ElasticsearchClient client;
     private Instant lastCollectedTime = Instant.now();
@@ -38,14 +38,11 @@ public class LogDataService {
 
         SearchResponse<Object> searchResponse = client.search(searchRequest, Object.class);
 
-        // 새로운 마지막 수집 시점을 업데이트
-        Instant newLastCollectedTime = Instant.now();
-
         // 이전의 데이터 삭제
         //deleteOldLogs(lastCollectedTime);
 
         // 마지막 수집 시점 업데이트
-        lastCollectedTime = newLastCollectedTime;
+        lastCollectedTime = Instant.now();
 
         // 검색된 로그를 처리
         String logs = processLogs(searchResponse);

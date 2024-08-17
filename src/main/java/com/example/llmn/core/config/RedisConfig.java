@@ -1,4 +1,4 @@
-package com.example.llmn.core.errors;
+package com.example.llmn.core.config;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
