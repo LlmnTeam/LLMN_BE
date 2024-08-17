@@ -1,7 +1,7 @@
-package com.example.llm_ops;
+package com.example.llmn;
 
-import com.example.llm_ops.core.utils.ApiUtils;
-import com.example.llm_ops.service.LogDataService;
+import com.example.llmn.core.utils.ApiUtils;
+import com.example.llmn.service.LogDataService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

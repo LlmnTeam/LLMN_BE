@@ -1,4 +1,4 @@
-package com.example.llm_ops.core.config;
+package com.example.llmn.core.config;
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.transport.ElasticsearchTransport;

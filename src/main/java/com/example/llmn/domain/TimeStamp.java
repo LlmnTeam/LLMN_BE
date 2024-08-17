@@ -1,4 +1,4 @@
-package com.example.llm_ops.domain;
+package com.example.llmn.domain;
 
 import jakarta.persistence.EntityListeners;
 import jakarta.persistence.MappedSuperclass;

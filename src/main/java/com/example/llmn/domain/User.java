@@ -1,4 +1,4 @@
-package com.example.llm_ops.domain;
+package com.example.llmn.domain;
 
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -25,13 +25,17 @@ public class User extends TimeStamp {
     @Column
     private String password;
 
+    @Column
+    @Enumerated(EnumType.STRING)
+    private UserRole role;
 
     @Builder
-    public User(Long id, String nickName, String email, String password) {
+    public User(Long id, String nickName, String email, String password, UserRole role) {
         this.id = id;
         this.nickName = nickName;
         this.email = email;
         this.password = password;
+        this.role = role;
     }
 
     public void updatePassword (String password) {

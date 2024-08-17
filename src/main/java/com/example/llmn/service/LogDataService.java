@@ -1,4 +1,4 @@
-package com.example.llm_ops.service;
+package com.example.llmn.service;
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.elasticsearch.core.DeleteByQueryRequest;

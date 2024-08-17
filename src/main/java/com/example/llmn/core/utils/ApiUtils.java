@@ -1,4 +1,4 @@
-package com.example.llm_ops.core.utils;
+package com.example.llmn.core.utils;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;

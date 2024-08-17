@@ -1,4 +1,4 @@
-package com.example.llm_ops;
+package com.example.llmn;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;

@@ -1,4 +1,4 @@
-package com.example.llm_ops.core.security;
+package com.example.llmn.core.security;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;

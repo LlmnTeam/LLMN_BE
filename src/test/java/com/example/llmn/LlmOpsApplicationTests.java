@@ -1,4 +1,4 @@
-package com.example.llm_ops;
+package com.example.llmn;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
