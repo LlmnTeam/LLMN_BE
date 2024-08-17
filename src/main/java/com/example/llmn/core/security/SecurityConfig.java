@@ -72,14 +72,8 @@ public class SecurityConfig {
 
                 // 인증 요구사항 및 권한 설정
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/accounts/profile", "/api/accounts/password/**", "/api/accounts/role", "/api/accounts/withdraw", "/api/shelters/import", "/api/animals/like", "/api/accounts/withdraw/code").authenticated()
-                        .requestMatchers(new AntPathRequestMatcher("/api/animals/*/like")).authenticated()
-                        .requestMatchers(new AntPathRequestMatcher("/api/animals/*/apply")).authenticated()
-                        .requestMatchers(new AntPathRequestMatcher("/api/groups/*/detail")).permitAll()
-                        .requestMatchers(new AntPathRequestMatcher("/api/chat/*/read")).permitAll()
-                        .requestMatchers("/ws/**","/api/auth/**", "/api/accounts/**", "/api/animals/**", "/api/shelters/**",
-                                "/api/groups","/api/groups/local", "/api/groups/new","/api/home", "/api/search/**", "/api/validate/accessToken",
-                                "/api/posts/adoption", "/api/posts/fostering", "/api/posts/question", "/api/posts/popular", "/api/groups/localAndNew").permitAll()
+                        .requestMatchers("/api/accounts/profile", "/api/accounts/password/**", "/api/accounts/role").authenticated()
+                        .requestMatchers("/api/auth/**", "/api/accounts/**", "/api/home", "/api/validate/accessToken").permitAll()
                         .anyRequest().authenticated()
                 )
 
