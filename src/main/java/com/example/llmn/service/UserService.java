@@ -89,4 +89,15 @@ public class UserService {
                 .maxAge(JWTProvider.REFRESH_EXP_SEC)
                 .build().toString();
     }
+
+    private void checkDuplicateNickname(String nickName) {
+        if(userRepository.existsByNickname(nickName))
+            throw new CustomException(ExceptionCode.USER_NICKNAME_EXIST);
+    }
+
+    private void checkAlreadyJoin(String email) {
+        // 로컬 회원 가입을 통해 이미 가입함
+        if(userRepository.existsByEmail(email))
+            throw new CustomException(ExceptionCode.USER_EMAIL_EXIST);
+    }
 }

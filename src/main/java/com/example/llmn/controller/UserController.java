@@ -32,4 +32,10 @@ public class UserController {
                 .header(HttpHeaders.SET_COOKIE, userService.createRefreshTokenCookie(tokens.get("refreshToken")))
                 .body(ApiUtils.success(HttpStatus.OK, new UserResponse.LoginDTO(tokens.get("accessToken"))));
     }
+
+    @PostMapping("/accounts")
+    public ResponseEntity<?> join(@RequestBody @Valid UserRequest.JoinDTO requestDTO){
+        userService.join(requestDTO);
+        return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.CREATED, null));
+    }
 }
