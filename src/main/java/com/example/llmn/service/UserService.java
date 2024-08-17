@@ -5,6 +5,7 @@ import com.example.llmn.core.errors.CustomException;
 import com.example.llmn.core.errors.ExceptionCode;
 import com.example.llmn.core.security.JWTProvider;
 import com.example.llmn.domain.User;
+import com.example.llmn.domain.UserRole;
 import com.example.llmn.repository.UserRepository;
 import jakarta.mail.MessagingException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -38,6 +39,27 @@ public class UserService {
         }
 
         return createToken(user);
+    }
+
+    @Transactional
+    public void join(UserRequest.JoinDTO requestDTO){
+        if (!requestDTO.password().equals(requestDTO.passwordConfirm()))
+            throw new CustomException(ExceptionCode.USER_PASSWORD_WRONG);
+
+        // 이미 가입된 계정인지 체크
+        checkAlreadyJoin(requestDTO.email());
+
+        // 중복된 닉네임 다시 체크 (프론트에서 체크하고 이중 체크)
+        checkDuplicateNickname(requestDTO.nickName());
+
+        User user = User.builder()
+                .nickName(requestDTO.nickName())
+                .email(requestDTO.email())
+                .password(passwordEncoder.encode(requestDTO.password()))
+                .role(UserRole.USER)
+                .build();
+
+        userRepository.save(user);
     }
 
     private Map<String, String> createToken(User user){
