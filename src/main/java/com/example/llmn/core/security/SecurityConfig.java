@@ -1,5 +1,8 @@
 package com.example.llmn.core.security;
 
+import com.example.llmn.core.errors.CustomException;
+import com.example.llmn.core.utils.FilterResponseUtils;
+import com.example.llmn.core.errors.ExceptionCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -22,6 +25,8 @@ import java.util.Arrays;
 @Configuration
 @RequiredArgsConstructor
 public class SecurityConfig {
+
+    private final RedisService redisService;
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -78,7 +83,7 @@ public class SecurityConfig {
                 )
 
                 // 필터 추가
-                .addFilter(new JwtAuthenticationFilter(authenticationManager(http)));
+                .addFilter(new JwtAuthenticationFilter(authenticationManager(http), redisService));
 
         return http.build();
     }

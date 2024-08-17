@@ -1,5 +1,6 @@
 package com.example.llmn.core.errors;
 
+import com.example.llmn.core.utils.ApiUtils;
 import org.springframework.http.HttpStatus;
 
 public class CustomException extends RuntimeException{

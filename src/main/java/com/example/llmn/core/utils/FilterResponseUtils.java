@@ -1,5 +1,6 @@
 package com.example.llmn.core.utils;
 
+import com.example.llmn.core.errors.CustomException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletResponse;
 
