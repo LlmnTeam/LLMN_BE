@@ -21,7 +21,7 @@ public class LogDataService {
     private final ElasticsearchClient client;
     private Instant lastCollectedTime = Instant.now();  // 처음 실행 시 현재 시간을 기준으로 설정
 
-    @Scheduled(fixedRate = 600000)  // 1분마다 실행
+    @Scheduled(fixedRate = 60000)  // 1분마다 실행
     public void fetchLogs() throws IOException {
         // Elasticsearch에서 마지막 수집 시점 이후의 로그만 검색
         SearchRequest searchRequest = SearchRequest.of(s -> s
