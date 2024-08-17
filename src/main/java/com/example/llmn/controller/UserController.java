@@ -1,6 +1,7 @@
 package com.example.llmn.controller;
 
 import com.example.llmn.controller.DTO.UserRequest;
+import com.example.llmn.controller.DTO.UserResponse;
 import com.example.llmn.core.utils.ApiUtils;
 import com.example.llmn.service.UserService;
 import jakarta.mail.MessagingException;
