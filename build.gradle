@@ -58,6 +58,10 @@ dependencies {
 
 	// Elasticsearch High-Level REST Client
 	implementation 'org.elasticsearch.client:elasticsearch-rest-high-level-client:7.17.3'
+
+	// Oauth
+	implementation group: 'com.auth0', name: 'java-jwt', version: '4.3.0'
+	implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
 }
 
 tasks.named('test') {

@@ -3,6 +3,7 @@ package com.example.llmn.core.security;
 import com.example.llmn.core.errors.CustomException;
 import com.example.llmn.core.utils.FilterResponseUtils;
 import com.example.llmn.core.errors.ExceptionCode;
+import com.example.llmn.service.RedisService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
