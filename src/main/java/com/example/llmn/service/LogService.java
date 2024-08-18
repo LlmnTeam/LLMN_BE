@@ -7,6 +7,7 @@ import co.elastic.clients.elasticsearch.core.SearchResponse;
 import co.elastic.clients.elasticsearch.core.search.Hit;
 import co.elastic.clients.json.JsonData;
 import com.example.llmn.controller.DTO.LogData;
+import com.example.llmn.core.utils.LogDataParser;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -26,7 +27,7 @@ public class LogService {
     private final ElasticsearchClient client;
     private Instant lastCollectedTime = Instant.now();
 
-    @Scheduled(fixedRate = 60000)  // 1분마다 실행
+    @Scheduled(fixedRate = 600000)  // 1분마다 실행
     public void fetchLogs() throws IOException {
         // Elasticsearch에서 마지막 수집 시점 이후의 로그만 검색
         SearchRequest searchRequest = SearchRequest.of(s -> s
@@ -47,7 +48,7 @@ public class LogService {
 
         // 검색된 로그를 처리
         String logs = processLogs(searchResponse);
-        System.out.println("=========" + logs + "===============");
+        //System.out.println("=========" + logs + "===============");
     }
 
     public List<LogData> searchLogs(Instant startTime, Instant endTime) throws IOException {
@@ -70,18 +71,16 @@ public class LogService {
     }
 
     private LogData convertToLogData(Map<String, Object> source) {
-        // "container.name" 추출
         Map<String, Object> container = (Map<String, Object>) source.get("container");
         String containerName = container != null ? (String) container.get("name") : null;
 
-        // "@timestamp" 추출
         String timestampStr = (String) source.get("@timestamp");
         Instant timestamp = timestampStr != null ? Instant.parse(timestampStr) : null;
 
-        // "message" 추출 (JSON으로 감싸져 있음)
-        String message = (String) source.get("message");
+        String rawMessage = (String) source.get("message");
+        String formattedMessage = LogDataParser.formatMessage(rawMessage);  // MongoDB 로그와 같은 형식으로 변환
 
-        return new LogData(containerName, timestamp, message);
+        return new LogData(containerName, timestamp, formattedMessage);
     }
 
     private String processLogs(SearchResponse searchResponse) {
