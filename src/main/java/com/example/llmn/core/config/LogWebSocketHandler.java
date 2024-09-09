@@ -1,5 +1,7 @@
 package com.example.llmn.core.config;
 
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
@@ -9,6 +11,7 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+@Configuration
 public class LogWebSocketHandler extends TextWebSocketHandler {
 
     // 각 클라이언트의 세션
