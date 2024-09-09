@@ -2,54 +2,44 @@ package com.example.llmn.service;
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.elasticsearch._types.query_dsl.BoolQuery;
-import co.elastic.clients.elasticsearch.core.DeleteByQueryRequest;
-import co.elastic.clients.elasticsearch.core.SearchRequest;
-import co.elastic.clients.elasticsearch.core.SearchResponse;
-import co.elastic.clients.elasticsearch.core.search.Hit;
+import co.elastic.clients.elasticsearch.core.*;
 import co.elastic.clients.json.JsonData;
 import com.example.llmn.controller.DTO.LogData;
 import com.example.llmn.core.utils.LogDataParser;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 @Transactional(readOnly = true)
 public class LogService {
 
     private final ElasticsearchClient client;
-    private Instant lastCollectedTime = Instant.now();
 
-    @Scheduled(fixedRate = 600000)  // 1분마다 실행
-    public void fetchLogs() throws IOException {
-        // Elasticsearch에서 마지막 수집 시점 이후의 로그만 검색
-        SearchRequest searchRequest = SearchRequest.of(s -> s
-                .index("docker-logs-*")
-                .query(q -> q.range(r -> r
-                        .field("@timestamp")
-                        .gt(JsonData.of(lastCollectedTime.toString()))
-                ))
-        );
+    @Scheduled(fixedRate = 60000)  // 1분마다 실행
+    public void processAndUpdateLogs() throws IOException {
+        // 1. Elasticsearch에서 기존 로그 데이터 조회
+        List<Map<String, Object>> logs = fetchAndProcessLogs();
 
-        SearchResponse<Object> searchResponse = client.search(searchRequest, Object.class);
+        // 2. 조회한 로그 데이터를 가공
+        List<Map<String, Object>> processedLogs = transformLogs(logs);
 
-        // 이전의 데이터 삭제
-        //deleteOldLogs(lastCollectedTime);
+        // 3. 가공된 데이터를 Elasticsearch에서 기존 문서로 업데이트
+        updateProcessedLogs(processedLogs);
 
-        // 마지막 수집 시점 업데이트
-        lastCollectedTime = Instant.now();
-
-        // 검색된 로그를 처리
-        String logs = processLogs(searchResponse);
-        //System.out.println("=========" + logs + "===============");
+        log.info("업데이트 완료");
     }
 
     @Transactional
@@ -58,7 +48,6 @@ public class LogService {
         SearchRequest.Builder searchBuilder = new SearchRequest.Builder()
                 .index("docker-logs-*")
                 .query(q -> {
-                    // BoolQuery Builder 생성
                     BoolQuery.Builder boolQuery = new BoolQuery.Builder();
 
                     // 시간 범위 필터
@@ -118,8 +107,97 @@ public class LogService {
         return new LogData(containerName, timestamp, formattedMessage);
     }
 
-    private String processLogs(SearchResponse searchResponse) {
-        return searchResponse.toString();
+    private List<Map<String, Object>> fetchAndProcessLogs() throws IOException {
+        // 오늘 날짜의 인덱스 이름을 생성하여 사용
+        String indexName = getTodayIndexName();
+
+        // Elasticsearch에서 변환되지 않은 로그 조회 (is_processed가 false 또는 존재하지 않는 로그)
+        SearchRequest searchRequest = new SearchRequest.Builder()
+                .index(indexName)
+                .query(q -> q.bool(b -> b
+                        .should(s -> s.term(t -> t.field("is_processed").value(false)))  // is_processed가 false인 로그
+                        .should(s -> s.bool(bs -> bs.mustNot(mn -> mn.exists(e -> e.field("is_processed")))))  // is_processed 필드가 없는 로그
+                ))
+                .size(1000)  // 최대 1000개의 로그를 가져옴
+                .build();
+
+        SearchResponse<Map> searchResponse = client.search(searchRequest, Map.class);
+
+        // ID와 로그 데이터 둘 다 저장
+        List<Map<String, Object>> logs = searchResponse.hits().hits().stream()
+                .map(hit -> {
+                    Map<String, Object> log = hit.source();
+                    log.put("_id", hit.id());
+                    return log;
+                })
+                .collect(Collectors.toList());
+
+        log.info("로그 데이터 변환 완료. 총 {}개의 로그가 변환됨.", logs.size());
+
+        return logs;
+    }
+
+    private List<Map<String, Object>> transformLogs(List<Map<String, Object>> logs) {
+        return logs.stream()
+                .map(log -> {
+                    // 기존 데이터 가공
+                    Map<String, Object> container = (Map<String, Object>) log.get("container");
+                    String serviceName = container != null ? (String) container.get("name") : "unknown_service";
+                    String message = (String) log.get("message");
+
+                    // 로그 레벨 추출
+                    String logLevel = extractLogLevelFromMessage(message);
+
+                    // 변환된 로그 데이터를 업데이트
+                    log.put("log_level", logLevel);
+                    log.put("service_name", serviceName);
+                    log.put("user_id", "user123");
+                    log.put("is_processed", true);
+                    log.put("message", message != null ? message : "No message");
+
+                    return log;
+                })
+                .collect(Collectors.toList());
+    }
+
+    private void updateProcessedLogs(List<Map<String, Object>> processedLogs) throws IOException {
+        String indexName = getTodayIndexName();
+
+        for (Map<String, Object> log : processedLogs) {
+            String id = (String) log.remove("_id");
+
+            UpdateRequest<Map<String, Object>, Map<String, Object>> updateRequest = new UpdateRequest.Builder<Map<String, Object>, Map<String, Object>>()
+                    .index(indexName)
+                    .id(id)
+                    .doc(log)
+                    .build();
+
+            client.update(updateRequest, Map.class);
+        }
+    }
+
+    // 로그 메시지에서 로그 레벨 추출
+    private String extractLogLevelFromMessage(String message) {
+        if (message == null) {
+            return "UNKNOWN";
+        }
+
+        if (message.contains("INFO")) {
+            return "INFO";
+        } else if (message.contains("ERROR")) {
+            return "ERROR";
+        } else if (message.contains("WARN")) {
+            return "WARN";
+        }
+
+        return "UNKNOWN";
+    }
+
+    // 오늘 날짜를 기반으로 인덱스 이름 생성
+    private String getTodayIndexName() {
+        LocalDate today = LocalDate.now();
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy.MM.dd");
+        return "docker-logs-" + today.format(formatter);
     }
 
     private void deleteOldLogs(Instant lastCollectedTime) throws IOException {

@@ -25,13 +25,13 @@ public class LogDataController {
 
     @PatchMapping("/log")
     public ResponseEntity<?> fetchLogs() throws IOException {
-        logService.fetchLogs();
+        // logService.fetchLogs();
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, null));
     }
 
     @GetMapping("/log")
-    public ResponseEntity<?> searchLogs(@RequestParam Instant startTime, @RequestParam Instant endTime) throws IOException {
-        List<LogData> response = logService.searchLogs(startTime, endTime);
+    public ResponseEntity<?> searchLogs(@RequestParam Instant startTime, @RequestParam Instant endTime, @RequestParam String logLevel, @RequestParam String serviceName, @RequestParam String userId) throws IOException {
+        List<LogData> response = logService.searchLogs(startTime, endTime, logLevel, serviceName, userId);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, response));
     }
 }
