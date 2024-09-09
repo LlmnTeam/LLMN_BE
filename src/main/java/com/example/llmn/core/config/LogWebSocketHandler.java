@@ -1,7 +1,9 @@
 package com.example.llmn.core.config;
 
-import org.springframework.context.annotation.Bean;
+import com.example.llmn.domain.LogEvent;
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.event.EventListener;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
@@ -12,12 +14,12 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Configuration
+@RequiredArgsConstructor
 public class LogWebSocketHandler extends TextWebSocketHandler {
 
-    // 각 클라이언트의 세션
+    // 각 클라이언트의 서비스 구독 상태
     private Map<WebSocketSession, String> sessionServiceMap = new ConcurrentHashMap<>();
 
-    // 클라이언트가 구독할 때
     @Override
     public void handleTextMessage(WebSocketSession session, TextMessage message) throws IOException {
         String payload = message.getPayload();
@@ -36,7 +38,7 @@ public class LogWebSocketHandler extends TextWebSocketHandler {
         sessionServiceMap.forEach((session, subscribedService) -> {
             if (subscribedService.equals(serviceName)) {
                 try {
-                    session.sendMessage(new TextMessage(logMessage));
+                    session.sendMessage(new TextMessage(logMessage));  // 구독된 서비스의 로그만 전송
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -44,13 +46,8 @@ public class LogWebSocketHandler extends TextWebSocketHandler {
         });
     }
 
-    // 구독자가 있는지 확인
-    public boolean hasSubscribers(String serviceName) {
-        return sessionServiceMap.containsValue(serviceName);
-    }
-
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
-        sessionServiceMap.remove(session);  // 연결이 종료되면 구독 상태 제거
+        sessionServiceMap.remove(session);
     }
 }

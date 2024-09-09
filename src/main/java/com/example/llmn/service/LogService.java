@@ -5,6 +5,7 @@ import co.elastic.clients.elasticsearch._types.query_dsl.BoolQuery;
 import co.elastic.clients.elasticsearch.core.*;
 import co.elastic.clients.json.JsonData;
 import com.example.llmn.controller.DTO.LogData;
+import com.example.llmn.core.config.LogWebSocketHandler;
 import com.example.llmn.core.utils.LogDataParser;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
