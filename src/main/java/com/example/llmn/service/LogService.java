@@ -1,6 +1,7 @@
 package com.example.llmn.service;
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
+import co.elastic.clients.elasticsearch._types.query_dsl.BoolQuery;
 import co.elastic.clients.elasticsearch.core.DeleteByQueryRequest;
 import co.elastic.clients.elasticsearch.core.SearchRequest;
 import co.elastic.clients.elasticsearch.core.SearchResponse;
@@ -51,15 +52,49 @@ public class LogService {
         //System.out.println("=========" + logs + "===============");
     }
 
-    public List<LogData> searchLogs(Instant startTime, Instant endTime) throws IOException {
+    @Transactional
+    public List<LogData> searchLogs(Instant startTime, Instant endTime, String logLevel, String serviceName, String userId) throws IOException {
         // Elasticsearch 쿼리 생성
         SearchRequest.Builder searchBuilder = new SearchRequest.Builder()
-                .index("docker-logs-*")  // 인덱스 패턴을 지정
-                .query(q -> q.range(r -> r
-                        .field("@timestamp")
-                        .gte(JsonData.of(startTime.toString()))
-                        .lte(JsonData.of(endTime.toString()))
-                ));
+                .index("docker-logs-*")
+                .query(q -> {
+                    // BoolQuery Builder 생성
+                    BoolQuery.Builder boolQuery = new BoolQuery.Builder();
+
+                    // 시간 범위 필터
+                    boolQuery.must(m -> m.range(r -> r
+                            .field("@timestamp")
+                            .gte(JsonData.of(startTime.toString()))
+                            .lte(JsonData.of(endTime.toString()))
+                    ));
+
+                    // 로그 레벨 필터 (필터 값이 null이 아닐 때만 추가)
+                    if (logLevel != null) {
+                        boolQuery.filter(f -> f.term(t -> t
+                                .field("log_level")
+                                .value(logLevel)
+                        ));
+                    }
+
+                    // 서비스 이름 필터
+                    if (serviceName != null) {
+                        boolQuery.filter(f -> f.term(t -> t
+                                .field("service_name")
+                                .value(serviceName)
+                        ));
+                    }
+
+                    // 사용자 ID 필터
+                    if (userId != null) {
+                        boolQuery.filter(f -> f.term(t -> t
+                                .field("user_id")
+                                .value(userId)
+                        ));
+                    }
+
+                    // BoolQuery를 Query로 변환하여 반환
+                    return q.bool(boolQuery.build());
+                });
 
         // Elasticsearch에서 쿼리 실행
         SearchResponse<Map> response = client.search(searchBuilder.build(), Map.class);
