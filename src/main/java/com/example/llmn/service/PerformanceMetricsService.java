@@ -27,17 +27,39 @@ public class PerformanceMetricsService {
 
     @Scheduled(fixedRate = 1800000)  // 30분 마다 실행
     public void collectMetrics() {
+        Map<String, Object> metrics = gatherMetrics();
+
+        Metric metric = Metric.builder()
+                .cpuUsage((double) metrics.get("cpuUsage"))
+                .totalMemory((long) metrics.get("totalMemory"))
+                .usedMemory((long) metrics.get("usedMemory"))
+                .totalBytesReceived((long) metrics.get("networkReceived"))
+                .totalBytesSent((long) metrics.get("networkSent"))
+                .build();
+
+        metricRepository.save(metric);
+    }
+
+    public Map<String, Object> findCurrentMetric() {
+        return gatherMetrics();
+    }
+
+    private Map<String, Object> gatherMetrics() {
+        Map<String, Object> metrics = new HashMap<>();
         GlobalMemory memory = systemInfo.getHardware().getMemory();
         List<NetworkIF> networkIFs = systemInfo.getHardware().getNetworkIFs();
 
         // CPU 사용량 계산
         long[] newTicks = processor.getSystemCpuLoadTicks();
         double cpuLoad = processor.getSystemCpuLoadBetweenTicks(oldTicks); // 이전 tick 값으로 CPU 로드 계산
-        oldTicks = newTicks;
+        oldTicks = newTicks; // 새로운 tick 값을 저장하여 다음 호출 시 사용
+        metrics.put("cpuUsage", cpuLoad * 100);
 
         // 메모리 사용량 계산
         long totalMemory = memory.getTotal();
         long usedMemory = totalMemory - memory.getAvailable();
+        metrics.put("totalMemory", totalMemory);
+        metrics.put("usedMemory", usedMemory);
 
         // 네트워크 트래픽 계산
         long totalBytesReceived = 0;
@@ -47,15 +69,9 @@ public class PerformanceMetricsService {
             totalBytesReceived += net.getBytesRecv();
             totalBytesSent += net.getBytesSent();
         }
+        metrics.put("networkReceived", totalBytesReceived);
+        metrics.put("networkSent", totalBytesSent);
 
-        Metric metric = Metric.builder()
-                .cpuUsage(cpuLoad * 100)
-                .totalMemory(totalMemory)
-                .usedMemory(usedMemory)
-                .totalBytesReceived(totalBytesReceived)
-                .totalBytesSent(totalBytesSent)
-                .build();
-
-        metricRepository.save(metric);
+        return metrics;
     }
 }
