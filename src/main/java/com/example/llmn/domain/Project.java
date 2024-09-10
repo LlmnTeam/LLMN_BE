@@ -24,12 +24,24 @@ public class Project extends TimeStamp{
     private String serviceName;
 
     @Column
+    private String containerName;
+
+    @Column
     private String description;
 
+    @Column
+    private boolean isWorking;
+
+    @Column
+    private boolean containerWorking;
+
     @Builder
-    public Project(User user, String serviceName, String description) {
+    public Project(User user, String serviceName, String containerName, String description) {
         this.user = user;
         this.serviceName = serviceName;
+        this.containerName = containerName;
         this.description = description;
+        this.isWorking = true;
+        this.containerWorking = false;
     }
 }
