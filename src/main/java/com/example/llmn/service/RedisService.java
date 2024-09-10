@@ -31,6 +31,11 @@ public class RedisService {
         setOps.add(key, String.valueOf(value));
     }
 
+    public void addSetElement(String key, String value) {
+        SetOperations<String, String> setOps = redisTemplate.opsForSet();
+        setOps.add(key, value);
+    }
+
     public void addSetElement(String key, Long value, Long expirationTime) {
         SetOperations<String, String> setOps = redisTemplate.opsForSet();
         setOps.add(key, String.valueOf(value));
@@ -72,6 +77,11 @@ public class RedisService {
     // 데이터 존재 여부
     public boolean isDateExist(String type, String id) {
         return Boolean.TRUE.equals(redisTemplate.hasKey(buildKey(type, id)));
+    }
+
+    public boolean isSetElementExists(String key, String value) {
+        SetOperations<String, String> setOps = redisTemplate.opsForSet();
+        return Boolean.TRUE.equals(setOps.isMember(key, value));
     }
 
     // 저장된 데이터와 일치여부 비교

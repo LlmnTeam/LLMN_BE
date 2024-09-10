@@ -35,6 +35,7 @@ import java.util.stream.Collectors;
 public class LogService {
 
     private final ElasticsearchClient client;
+    private final RedisService redisService;
 
     @Scheduled(fixedRate = 60000)  // 1분마다 실행
     public void processAndUpdateLogs() throws IOException {
@@ -158,6 +159,11 @@ public class LogService {
 
                     // 로그 레벨 추출
                     String logLevel = extractLogLevelFromMessage(message);
+
+                    // 등록 서비스 목록에 추가
+                    if(!redisService.isSetElementExists("service_name", serviceName)){
+                        redisService.addSetElement("service_name", serviceName);
+                    }
 
                     // 변환된 로그 데이터를 업데이트
                     log.put("log_level", logLevel);
