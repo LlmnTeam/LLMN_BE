@@ -13,7 +13,7 @@ public class LogStreamingService {
 
 
     // 주기적으로 로그를 가져와 특정 서비스의 로그만 전송
-    @Scheduled(fixedRate = 5000)
+    @Scheduled(fixedRate = 50000)
     public void streamLogs() {
         String serviceName = "spring";
         String logMessage = "Spring 서비스의 로그 메시지";

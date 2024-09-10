@@ -68,6 +68,9 @@ dependencies {
 
 	// RabbitMQ
 	implementation 'org.springframework.boot:spring-boot-starter-amqp'
+
+	// oshi
+	implementation 'com.github.oshi:oshi-core:6.2.2'
 }
 
 tasks.named('test') {
