@@ -21,7 +21,7 @@ public class UserRequest {
                 @NotBlank(message = "이메일을 입력해주세요.")
                 @Pattern(regexp = "^[\\w._%+-]+@[\\w.-]+\\.[a-zA-Z]{2,6}$", message = "올바른 이메일 형식을 입력해주세요.")
                 String email,
-                @NotBlank(message="닉네을 입력해주세요.")
+                @NotBlank(message="닉네임을 입력해주세요.")
                 @Size(min=2, max=20, message = "닉네임은 2자에서 20자 이내여야 합니다.")
                 String nickName,
                 @NotBlank(message = "비밀번호를 입력해주세요.")
