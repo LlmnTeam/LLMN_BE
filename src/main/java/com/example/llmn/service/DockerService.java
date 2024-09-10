@@ -23,7 +23,7 @@ public class DockerService {
     }
 
     // 도커 컨테이너 이름 목록
-    public List<String> listRunningContainerNames() throws Exception {
+    public List<String> findRunningContainerNameList() throws Exception {
         String command = "docker ps --format \"{{.Names}}\"";
         return executeCommandAndReturnOutput(command);
     }

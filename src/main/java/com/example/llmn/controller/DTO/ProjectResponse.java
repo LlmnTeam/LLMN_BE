@@ -14,4 +14,6 @@ public class ProjectResponse {
             String name,
             String description,
             LocalDateTime updateTime) {}
+
+    public record FindContainerListDTO(List<String> names){}
 }
