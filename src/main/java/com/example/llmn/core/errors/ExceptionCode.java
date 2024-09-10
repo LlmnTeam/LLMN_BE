@@ -8,7 +8,6 @@ import org.springframework.http.HttpStatus;
 @Getter
 public enum ExceptionCode {
     // 사용자 관련 에러
-    // 사용자 관련 에러
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 사용자를 찾을 수 없습니다."),
     USER_EMAIL_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 이메일을 찾을 수 없습니다."),
     USER_EMAIL_EXIST(HttpStatus.BAD_REQUEST, "이미 존재하는 이메일입니다."),

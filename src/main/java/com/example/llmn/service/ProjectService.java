@@ -27,7 +27,7 @@ public class ProjectService {
         User user = entityManager.getReference(User.class, userId);
         Project project = Project.builder()
                 .user(user)
-                .name(requestDTO.name())
+                .serviceName(requestDTO.name())
                 .description(requestDTO.description())
                 .build();
 
@@ -39,7 +39,7 @@ public class ProjectService {
         List<Project> projects = projectRepository.findByUserId(userId);
 
         List<ProjectResponse.ProjectDTO> projectDTOS = projects.stream()
-                .map(project -> new ProjectResponse.ProjectDTO(project.getName(), project.getDescription(), project.getUpdatedDate()))
+                .map(project -> new ProjectResponse.ProjectDTO(project.getServiceName(), project.getDescription(), project.getUpdatedDate()))
                 .toList();
 
         return new ProjectResponse.FindProjectListDTO(projectDTOS);

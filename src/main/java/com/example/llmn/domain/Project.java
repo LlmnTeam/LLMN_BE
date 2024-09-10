@@ -21,15 +21,15 @@ public class Project extends TimeStamp{
     private User user;
 
     @Column
-    private String name;
+    private String serviceName;
 
     @Column
     private String description;
 
     @Builder
-    public Project(User user, String name, String description) {
+    public Project(User user, String serviceName, String description) {
         this.user = user;
-        this.name = name;
+        this.serviceName = serviceName;
         this.description = description;
     }
 }
