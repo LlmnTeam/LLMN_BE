@@ -13,10 +13,17 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.BufferedWriter;
+import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -39,6 +46,9 @@ public class LogService {
 
         // 3. 가공된 데이터를 Elasticsearch에서 기존 문서로 업데이트
         updateProcessedLogs(processedLogs);
+
+        // 4. 텍스트 파일에 로그 기록
+        writeLogsToFile(processedLogs);
 
         log.info("업데이트 완료");
     }
@@ -213,5 +223,65 @@ public class LogService {
 
         // 삭제 요청 실행
         client.deleteByQuery(deleteRequest);
+    }
+
+    private void writeLogsToFile(List<Map<String, Object>> logs) throws IOException {
+        if (logs.isEmpty()) {
+            return;
+        }
+
+        // 1. 서비스별로 로그를 그룹화
+        Map<String, List<Map<String, Object>>> logsByService = logs.stream()
+                .collect(Collectors.groupingBy(log -> (String) log.getOrDefault("service_name", "unknown")));
+
+        // 2. 서비스별로 로그 파일 생성 및 기록
+        for (Map.Entry<String, List<Map<String, Object>>> entry : logsByService.entrySet()) {
+            String serviceName = entry.getKey();
+            List<Map<String, Object>> serviceLogs = entry.getValue();
+
+            // 현재 시간에 따라 파일 이름 생성 (서비스 이름 포함, 시 단위로 설정)
+            String timestamp = new SimpleDateFormat("yyyy-MM-dd_HH").format(new Date()); // 시 단위까지 포함
+            String logFileName = "logs/" + serviceName + "-log-" + timestamp + ".txt";
+
+            // 디렉터리가 존재하는지 확인하고 없으면 생성
+            Path logDirPath = Paths.get("logs");
+            if (!Files.exists(logDirPath)) {
+                Files.createDirectories(logDirPath);
+            }
+
+            // 파일에 기록하기 위한 BufferedWriter 생성 (1시간 동안 같은 파일에 기록)
+            try (BufferedWriter writer = new BufferedWriter(new FileWriter(Paths.get(logFileName).toFile(), true))) {
+                for (Map<String, Object> logEntry : serviceLogs) {
+                    String logMessage = formatLogEntry(logEntry);
+
+                    if (logMessage != null) {
+                        writer.write(logMessage);
+                        writer.newLine();
+                        writer.newLine();  // 가독성을 위해 빈 줄 추가
+                    }
+                }
+            } catch (IOException e) {
+                log.error("로그 파일에 기록하는 중 오류 발생", e);
+                throw e;
+            }
+        }
+    }
+
+    private String formatLogEntry(Map<String, Object> logEntry) {
+        // 필요한 로그 데이터만 추출하여 포맷팅
+        Object timestamp = logEntry.get("@timestamp");
+        Object logLevel = logEntry.get("log_level");
+        Object message = logEntry.get("message");
+
+        // timestamp 또는 message가 없으면 해당 로그는 무시
+        if (timestamp == null || message == null) {
+            return null;
+        }
+
+        // 로그 데이터를 원하는 형식으로 포맷
+        return String.format("[%s] %s: %s",
+                timestamp.toString(),
+                logLevel != null ? logLevel.toString() : "INFO", // log_level이 없으면 기본값으로 INFO 사용
+                message.toString());
     }
 }
