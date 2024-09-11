@@ -20,6 +20,7 @@ import java.util.List;
 @Transactional(readOnly = true)
 public class ProjectService {
 
+    private final DockerService dockerService;
     private final ProjectRepository projectRepository;
     private final EntityManager entityManager;
 
@@ -41,15 +42,29 @@ public class ProjectService {
     }
 
     @Transactional
-    public ProjectResponse.FindProjectListDTO findProjectList(Long userId){
+    public ProjectResponse.FindProjectListDTO findProjectList(Long userId) throws Exception {
         List<Project> projects = projectRepository.findByUserId(userId);
 
+        // 실행중인 컨테이너 목록 조회
+        List<String> runningContainerNames = dockerService.findRunningContainerNameList();
+
         List<ProjectResponse.ProjectDTO> projectDTOS = projects.stream()
-                .map(project -> new ProjectResponse.ProjectDTO(
+                .map(project -> {
+                    ContainerStatus containerStatus = project.getContainerStatus();
+
+                    // 연결된 상태라면 도커 상태 체크
+                    if (containerStatus != ContainerStatus.NOT_CONNECTED) {
+                        containerStatus = runningContainerNames.contains(project.getContainerName())
+                                ? ContainerStatus.WORKING
+                                : ContainerStatus.NOT_WORKING;
+                    }
+
+                    return new ProjectResponse.ProjectDTO(
                         project.getServiceName(),
                         project.getDescription(),
                         project.getUpdatedDate(),
-                        project.getContainerStatus()))
+                        containerStatus);
+                })
                 .toList();
 
         return new ProjectResponse.FindProjectListDTO(projectDTOS);

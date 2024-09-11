@@ -33,7 +33,7 @@ public class ProjectController {
     }
 
     @GetMapping("/repository")
-    public ResponseEntity<?> findProjectList(@AuthenticationPrincipal CustomUserDetails userDetails) {
+    public ResponseEntity<?> findProjectList(@AuthenticationPrincipal CustomUserDetails userDetails) throws Exception {
         ProjectResponse.FindProjectListDTO responseDTO = projectService.findProjectList(userDetails.getUser().getId());
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
