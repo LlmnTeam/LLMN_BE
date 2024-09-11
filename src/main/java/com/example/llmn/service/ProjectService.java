@@ -2,6 +2,7 @@ package com.example.llmn.service;
 
 import com.example.llmn.controller.DTO.ProjectRequest;
 import com.example.llmn.controller.DTO.ProjectResponse;
+import com.example.llmn.domain.ContainerStatus;
 import com.example.llmn.domain.Project;
 import com.example.llmn.domain.User;
 import com.example.llmn.repository.ProjectRepository;
@@ -24,12 +25,16 @@ public class ProjectService {
 
     @Transactional
     public void createProject(ProjectRequest.CreateProjectDTO requestDTO, Long userId){
+        // 컨테이너 이름이 들어오지 않으면 NOT_CONNECTED로 처리
+        ContainerStatus containerStatus = requestDTO.containerName() != null ? ContainerStatus.NOT_WORKING : ContainerStatus.NOT_CONNECTED;
+
         User user = entityManager.getReference(User.class, userId);
         Project project = Project.builder()
                 .user(user)
                 .serviceName(requestDTO.serviceName())
                 .containerName(requestDTO.containerName())
                 .description(requestDTO.description())
+                .containerStatus(containerStatus)
                 .build();
 
         projectRepository.save(project);
@@ -39,13 +44,12 @@ public class ProjectService {
     public ProjectResponse.FindProjectListDTO findProjectList(Long userId){
         List<Project> projects = projectRepository.findByUserId(userId);
 
-
-
         List<ProjectResponse.ProjectDTO> projectDTOS = projects.stream()
                 .map(project -> new ProjectResponse.ProjectDTO(
                         project.getServiceName(),
                         project.getDescription(),
-                        project.getUpdatedDate()))
+                        project.getUpdatedDate(),
+                        project.getContainerStatus()))
                 .toList();
 
         return new ProjectResponse.FindProjectListDTO(projectDTOS);

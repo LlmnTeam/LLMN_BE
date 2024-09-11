@@ -33,15 +33,16 @@ public class Project extends TimeStamp{
     private boolean isWorking;
 
     @Column
-    private boolean containerWorking;
+    @Enumerated(EnumType.STRING)
+    private ContainerStatus containerStatus;
 
     @Builder
-    public Project(User user, String serviceName, String containerName, String description) {
+    public Project(User user, String serviceName, String containerName, String description, ContainerStatus containerStatus) {
         this.user = user;
         this.serviceName = serviceName;
         this.containerName = containerName;
         this.description = description;
         this.isWorking = true;
-        this.containerWorking = false;
+        this.containerStatus = containerStatus;
     }
 }
