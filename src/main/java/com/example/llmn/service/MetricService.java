@@ -26,8 +26,12 @@ public class MetricService {
     private final SystemInfo systemInfo = new SystemInfo();
     private final CentralProcessor processor = systemInfo.getHardware().getProcessor();
 
-    // 첫 번째 호출에서 CPU ticks 값을 저장하기 위한 필드
+    // 첫 번째 호출에서 CPU ticks 값을 저장
     private long[] oldTicks = processor.getSystemCpuLoadTicks();
+
+    // 이전 네트워크 트래픽 값을 저장
+    private long previousBytesReceived = 0;
+    private long previousBytesSent = 0;
 
     @Scheduled(cron = "0 0/10 * * * *")
     public void collectMetrics() {
@@ -100,8 +104,18 @@ public class MetricService {
             totalBytesReceived += net.getBytesRecv();
             totalBytesSent += net.getBytesSent();
         }
-        metrics.put("networkReceived", totalBytesReceived);
-        metrics.put("networkSent", totalBytesSent);
+
+        // 이전에 저장된 값과의 차이로 네트워크 트래픽 계산
+        long bytesReceived = totalBytesReceived - previousBytesReceived;
+        long bytesSent = totalBytesSent - previousBytesSent;
+
+        // 현재 값을 다음 계산에 사용할 수 있도록 저장
+        previousBytesReceived = totalBytesReceived;
+        previousBytesSent = totalBytesSent;
+
+        // 구간 동안의 네트워크 트래픽을 저장
+        metrics.put("networkReceived", bytesReceived);
+        metrics.put("networkSent", bytesSent);
 
         return metrics;
     }
