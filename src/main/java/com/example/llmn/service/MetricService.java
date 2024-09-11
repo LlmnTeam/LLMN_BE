@@ -33,6 +33,10 @@ public class MetricService {
     private long previousBytesReceived = 0;
     private long previousBytesSent = 0;
 
+    // 하루 시작 시점의 네트워크 트래픽 값을 저장
+    private long dailyStartBytesReceived = 0;
+    private long dailyStartBytesSent = 0;
+
     @Scheduled(cron = "0 0/10 * * * *")
     public void collectMetrics() {
         Map<String, Object> metrics = gatherMetrics();
@@ -41,15 +45,24 @@ public class MetricService {
                 .cpuUsage((double) metrics.get("cpuUsage"))
                 .totalMemory((long) metrics.get("totalMemory"))
                 .usedMemory((long) metrics.get("usedMemory"))
-                .totalBytesReceived((long) metrics.get("networkReceived"))
+                .totalBytesReceived((long) metrics.get("networkReceived")) // 10분 간격의 네트워크 트래픽
                 .totalBytesSent((long) metrics.get("networkSent"))
                 .build();
 
         metricRepository.save(metric);
     }
 
-    public Map<String, Object> findCurrentMetric() {
-        return gatherMetrics();
+    public MetricResponse.FindCurrentMetricDTO findCurrentMetric() {
+        Map<String, Object> metrics = gatherMetrics();
+        Map<String, Long> dailyTraffic = getDailyTraffic();
+
+        return new MetricResponse.FindCurrentMetricDTO(
+                (double) metrics.get("cpuUsage"),
+                (long) metrics.get("totalMemory"),
+                (long) metrics.get("usedMemory"),
+                dailyTraffic.get("dailyReceived"), // 하루동안 누적 네트워크 트래픽
+                dailyTraffic.get("dailySent")
+        );
     }
 
     @Transactional(readOnly = true)
@@ -77,6 +90,42 @@ public class MetricService {
                 .toList();
 
         return new MetricResponse.FindMetricHistoryDTO(cpuMetricDTOS, memoryMetricDTOS);
+    }
+
+    // 하루 시작 시점에 네트워크 트래픽 값을 저장 (매일 자정에 실행)
+    @Scheduled(cron = "0 0 0 * * *")
+    public void resetDailyTraffic() {
+        long[] dailyTraffic = getTotalNetworkTraffic();
+        dailyStartBytesReceived = dailyTraffic[0];
+        dailyStartBytesSent = dailyTraffic[1];
+    }
+
+    // 하루 동안의 누적 네트워크 트래픽 계산
+    private Map<String, Long> getDailyTraffic() {
+        long[] currentTraffic = getTotalNetworkTraffic();
+        long dailyReceived = currentTraffic[0] - dailyStartBytesReceived;
+        long dailySent = currentTraffic[1] - dailyStartBytesSent;
+
+        Map<String, Long> dailyTraffic = new HashMap<>();
+        dailyTraffic.put("dailyReceived", dailyReceived);
+        dailyTraffic.put("dailySent", dailySent);
+
+        return dailyTraffic;
+    }
+
+    // 네트워크 트래픽의 수신 및 송신 바이트를 계산
+    private long[] getTotalNetworkTraffic() {
+        List<NetworkIF> networkIFs = systemInfo.getHardware().getNetworkIFs();
+        long totalBytesReceived = 0;
+        long totalBytesSent = 0;
+
+        for (NetworkIF net : networkIFs) {
+            net.updateAttributes();
+            totalBytesReceived += net.getBytesRecv();
+            totalBytesSent += net.getBytesSent();
+        }
+
+        return new long[] { totalBytesReceived, totalBytesSent };
     }
 
     private Map<String, Object> gatherMetrics() {

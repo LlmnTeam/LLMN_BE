@@ -14,7 +14,15 @@ public class MetricResponse {
     public record CpuMetricDTO(
             String time,
             double cpuUsage) {}
+
     public record MemoryMetricDTO(
             String time,
             double usedMemoryPercentage) {}
+
+    public record FindCurrentMetricDTO(
+            double cpuUsage,
+            long totalMemory,
+            long usedMemory,
+            long networkReceived,
+            long networkSent){}
 }
