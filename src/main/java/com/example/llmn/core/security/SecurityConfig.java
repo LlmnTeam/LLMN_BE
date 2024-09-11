@@ -74,7 +74,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/accounts/profile", "/api/accounts/password/**", "/api/accounts/role").authenticated()
                         .requestMatchers("/api/test",  "/api/log","/api/container", "/api/metrics", "/api/auth/**", "/api/accounts/**", "/api/validate/accessToken", "/api/log").permitAll()
-                        .anyRequest().authenticated()
+                        .anyRequest().permitAll()
                 )
 
                 // 필터 추가

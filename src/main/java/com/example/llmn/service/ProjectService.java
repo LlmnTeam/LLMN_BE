@@ -34,6 +34,7 @@ public class ProjectService {
                 .user(user)
                 .projectName(requestDTO.serviceName())
                 .containerName(requestDTO.containerName())
+                .isLocalContainer(requestDTO.isLocalContainer())
                 .description(requestDTO.description())
                 .containerStatus(containerStatus)
                 .build();

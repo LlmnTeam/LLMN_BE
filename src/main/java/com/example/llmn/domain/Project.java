@@ -27,22 +27,26 @@ public class Project extends TimeStamp{
     private String containerName;
 
     @Column
+    @Enumerated(EnumType.STRING)
+    private ContainerStatus containerStatus;
+
+    @Column
+    boolean isLocalContainer;
+
+    @Column
     private String description;
 
     @Column
     private boolean isWorking;
 
-    @Column
-    @Enumerated(EnumType.STRING)
-    private ContainerStatus containerStatus;
-
     @Builder
-    public Project(User user, String projectName, String containerName, String description, ContainerStatus containerStatus) {
+    public Project(User user, String projectName, String containerName, String description, ContainerStatus containerStatus, boolean isLocalContainer) {
         this.user = user;
         this.projectName = projectName;
         this.containerName = containerName;
+        this.containerStatus = containerStatus;
+        this.isLocalContainer = isLocalContainer;
         this.description = description;
         this.isWorking = true;
-        this.containerStatus = containerStatus;
     }
 }
