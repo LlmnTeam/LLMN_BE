@@ -2,6 +2,8 @@ package com.example.llmn.service;
 
 import com.example.llmn.controller.DTO.ProjectRequest;
 import com.example.llmn.controller.DTO.ProjectResponse;
+import com.example.llmn.core.errors.CustomException;
+import com.example.llmn.core.errors.ExceptionCode;
 import com.example.llmn.domain.ContainerStatus;
 import com.example.llmn.domain.Project;
 import com.example.llmn.domain.User;
@@ -12,6 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
@@ -22,6 +25,7 @@ import java.util.Map;
 public class ProjectService {
 
     private final DockerService dockerService;
+    private final LogService logService;
     private final ProjectRepository projectRepository;
     private final EntityManager entityManager;
 
@@ -78,5 +82,16 @@ public class ProjectService {
                 .toList();
 
         return new ProjectResponse.FindProjectListDTO(projectDTOS);
+    }
+
+    public ProjectResponse.FindProjectByIdDTO findProjectById(Long projectId) throws IOException {
+        // 존재하지 않으면 에러
+        Project project = projectRepository.findById(projectId).orElseThrow(
+                () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
+        );
+
+        String recentLog = logService.getRecentLogInStr(project.getContainerName(), 4L);
+
+        return new ProjectResponse.FindProjectByIdDTO(project.getProjectName(), project.getDescription(), "", recentLog);
     }
 }

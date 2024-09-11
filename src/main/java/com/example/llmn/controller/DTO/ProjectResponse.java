@@ -21,4 +21,10 @@ public class ProjectResponse {
             String memoryUsage) {}
 
     public record FindContainerListDTO(List<String> names){}
+
+    public record FindProjectByIdDTO(
+            String name,
+            String description,
+            String summery,
+            String recentLog){}
 }

@@ -17,7 +17,10 @@ public enum ExceptionCode {
     USER_PASSWORD_MATCH_WRONG(HttpStatus.BAD_REQUEST, "비밀번호가 일치하지 않습니다."), // 두 비밀번호 일치 여부 확인
     USER_FORBIDDEN(HttpStatus.FORBIDDEN, "권한이 없습니다."),
     USER_UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "로그인이 되지 않았습니다."),
-    USER_ALREADY_EXIT(HttpStatus.NOT_FOUND, "이미 탈퇴한 계정입니다.");
+    USER_ALREADY_EXIT(HttpStatus.NOT_FOUND, "이미 탈퇴한 계정입니다."),
+
+    // 프로젝트 관련 에러
+    PROJECT_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 프로젝트를 찾을 수 없습니다.");
 
     private final HttpStatus httpStatus;
     private final String message;
