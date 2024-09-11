@@ -19,7 +19,7 @@ import java.util.List;
 @Controller
 @RequiredArgsConstructor
 @RequestMapping("/api")
-public class LogDataController {
+public class LogController {
 
     private final LogService logService;
 

@@ -44,4 +44,10 @@ public class ProjectController {
         ProjectResponse.FindContainerListDTO responseDTO = new ProjectResponse.FindContainerListDTO(runningContainerNameList);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
+
+    @PostMapping("/container/stop")
+    public ResponseEntity<?> stopContainer(@RequestBody ProjectRequest.StopContainerDTO requestDTO, @AuthenticationPrincipal CustomUserDetails userDetails) throws Exception {
+        dockerService.stopContainerByName(requestDTO.name());
+        return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, null));
+    }
 }

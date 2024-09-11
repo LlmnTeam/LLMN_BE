@@ -12,14 +12,18 @@ public class DockerService {
 
     // 도커 컨테이너 종료
     public void stopContainerByName(String containerName) throws Exception {
-        String command = "docker stop " + containerName;
-        executeCommand(command);
+        if(isContainerRunning(containerName)) {
+            String command = "docker stop " + containerName;
+            executeCommand(command);
+        }
     }
 
     // 도커 컨테이너 재시작
     public void restartContainerByName(String containerName) throws Exception {
-        String command = "docker restart " + containerName;
-        executeCommand(command);
+        if(isContainerRunning(containerName)) {
+            String command = "docker restart " + containerName;
+            executeCommand(command);
+        }
     }
 
     // 도커 컨테이너 이름 목록
@@ -32,8 +36,6 @@ public class DockerService {
     public boolean isContainerRunning(String containerName) throws Exception {
         String command = "docker ps --filter \"name=" + containerName + "\" --format \"{{.Names}}\"";
         List<String> output = executeCommandAndReturnOutput(command);
-
-        // 출력 결과에서 정확하게 컨테이너 이름이 일치하는지 확인
         return output.stream().anyMatch(name -> name.equals(containerName));
     }
 

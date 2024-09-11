@@ -138,8 +138,6 @@ public class LogService {
                     .build();
 
             SearchResponse<Map> searchResponse = client.search(searchRequest, Map.class);
-
-            // ID와 로그 데이터 둘 다 저장
             logs = searchResponse.hits().hits().stream()
                     .map(hit -> {
                         Map<String, Object> log = hit.source();
@@ -149,7 +147,6 @@ public class LogService {
                     .collect(Collectors.toList());
 
             log.info("로그 데이터 변환 완료. 총 {}개의 로그가 변환됨.", logs.size());
-
         } catch (ElasticsearchException e) { // 인덱스가 없을 경우 생성
             createIndexIfNotExists(indexName);
         }

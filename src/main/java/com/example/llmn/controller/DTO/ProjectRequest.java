@@ -13,4 +13,6 @@ public class ProjectRequest {
             @NotBlank(message="설명을 입력해주세요.")
             String description
     ){}
+
+    public record StopContainerDTO(String name){}
 }
