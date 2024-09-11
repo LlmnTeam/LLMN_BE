@@ -1,11 +1,12 @@
 package com.example.llmn.service;
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
+import co.elastic.clients.elasticsearch._types.ElasticsearchException;
 import co.elastic.clients.elasticsearch._types.query_dsl.BoolQuery;
 import co.elastic.clients.elasticsearch.core.*;
+import co.elastic.clients.elasticsearch.indices.CreateIndexRequest;
 import co.elastic.clients.json.JsonData;
 import com.example.llmn.controller.DTO.LogData;
-import com.example.llmn.core.config.LogWebSocketHandler;
 import com.example.llmn.core.utils.LogDataParser;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,6 +24,7 @@ import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -122,29 +124,35 @@ public class LogService {
     private List<Map<String, Object>> fetchAndProcessLogs() throws IOException {
         // 오늘 날짜의 인덱스 이름을 생성하여 사용
         String indexName = getTodayIndexName();
+        List<Map<String, Object>> logs = new ArrayList<>();
 
-        // Elasticsearch에서 변환되지 않은 로그 조회 (is_processed가 false 또는 존재하지 않는 로그)
-        SearchRequest searchRequest = new SearchRequest.Builder()
-                .index(indexName)
-                .query(q -> q.bool(b -> b
-                        .should(s -> s.term(t -> t.field("is_processed").value(false)))  // is_processed가 false인 로그
-                        .should(s -> s.bool(bs -> bs.mustNot(mn -> mn.exists(e -> e.field("is_processed")))))  // is_processed 필드가 없는 로그
-                ))
-                .size(1000)  // 최대 1000개의 로그를 가져옴
-                .build();
+        try {
+            // Elasticsearch에서 변환되지 않은 로그 조회 (is_processed가 false 또는 존재하지 않는 로그)
+            SearchRequest searchRequest = new SearchRequest.Builder()
+                    .index(indexName)
+                    .query(q -> q.bool(b -> b
+                            .should(s -> s.term(t -> t.field("is_processed").value(false)))  // is_processed가 false인 로그
+                            .should(s -> s.bool(bs -> bs.mustNot(mn -> mn.exists(e -> e.field("is_processed")))))  // is_processed 필드가 없는 로그
+                    ))
+                    .size(1000)  // 최대 1000개의 로그를 가져옴
+                    .build();
 
-        SearchResponse<Map> searchResponse = client.search(searchRequest, Map.class);
+            SearchResponse<Map> searchResponse = client.search(searchRequest, Map.class);
 
-        // ID와 로그 데이터 둘 다 저장
-        List<Map<String, Object>> logs = searchResponse.hits().hits().stream()
-                .map(hit -> {
-                    Map<String, Object> log = hit.source();
-                    log.put("_id", hit.id());
-                    return log;
-                })
-                .collect(Collectors.toList());
+            // ID와 로그 데이터 둘 다 저장
+            logs = searchResponse.hits().hits().stream()
+                    .map(hit -> {
+                        Map<String, Object> log = hit.source();
+                        log.put("_id", hit.id());
+                        return log;
+                    })
+                    .collect(Collectors.toList());
 
-        log.info("로그 데이터 변환 완료. 총 {}개의 로그가 변환됨.", logs.size());
+            log.info("로그 데이터 변환 완료. 총 {}개의 로그가 변환됨.", logs.size());
+
+        } catch (ElasticsearchException e) { // 인덱스가 없을 경우 생성
+            createIndexIfNotExists(indexName);
+        }
 
         return logs;
     }
@@ -289,5 +297,25 @@ public class LogService {
                 timestamp.toString(),
                 logLevel != null ? logLevel.toString() : "INFO", // log_level이 없으면 기본값으로 INFO 사용
                 message.toString());
+    }
+
+    public void createIndexIfNotExists(String indexName) throws IOException {
+        try {
+            CreateIndexRequest createIndexRequest = new CreateIndexRequest.Builder()
+                    .index(indexName)
+                    .mappings(m -> m // 기본적으로 사용할 필드 매핑 정의
+                            .properties("is_processed", p -> p.boolean_(b -> b))
+                            .properties("@timestamp", p -> p.date(d -> d))
+                            .properties("log_level", p -> p.keyword(k -> k))
+                            .properties("service_name", p -> p.keyword(k -> k))
+                            .properties("message", p -> p.text(t -> t))
+                    )
+                    .build();
+            client.indices().create(createIndexRequest);
+
+            log.info("인덱스 {} 생성 완료", indexName);
+        } catch (ElasticsearchException e) {
+            throw new IOException("Elasticsearch 인덱스 생성 중 오류 발생", e);
+        }
     }
 }
