@@ -143,7 +143,11 @@ public class MetricService {
             totalBytesSent += net.getBytesSent();
         }
 
-        return new MetricDTO.NetworkTraffic(totalBytesReceived, totalBytesSent);
+        // 바이트 → MB 변환 (1024 * 1024)
+        long totalBytesReceivedInMB = totalBytesReceived / (1024 * 1024);
+        long totalBytesSentInMB = totalBytesSent / (1024 * 1024);
+
+        return new MetricDTO.NetworkTraffic(totalBytesReceivedInMB, totalBytesSentInMB);
     }
 
     private Map<String, Object> gatherMetrics() {
