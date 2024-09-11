@@ -1,5 +1,6 @@
 package com.example.llmn.service;
 
+import com.example.llmn.controller.DTO.MetricDTO;
 import com.example.llmn.controller.DTO.MetricResponse;
 import com.example.llmn.domain.Metric;
 import com.example.llmn.repository.MetricRepository;
@@ -23,19 +24,17 @@ import java.util.Map;
 public class MetricService {
 
     private final MetricRepository metricRepository;
+    private final RedisService redisService;
     private final SystemInfo systemInfo = new SystemInfo();
     private final CentralProcessor processor = systemInfo.getHardware().getProcessor();
 
     // 첫 번째 호출에서 CPU ticks 값을 저장
     private long[] oldTicks = processor.getSystemCpuLoadTicks();
-
-    // 이전 네트워크 트래픽 값을 저장
-    private long previousBytesReceived = 0;
-    private long previousBytesSent = 0;
-
-    // 하루 시작 시점의 네트워크 트래픽 값을 저장
-    private long dailyStartBytesReceived = 0;
-    private long dailyStartBytesSent = 0;
+    public static final Long VALID_EXP = 1000L * 60 * 60 * 24 * 7; // 일주일
+    private static final String PREVIOUS_BYTES_RECEIVED = "previousBytesReceived";
+    private static final String PREVIOUS_BYTES_SENT = "previousBytesSent";
+    private static final String DAILY_START_BYTES_RECEIVED = "dailyStartBytesReceived";
+    private static final String DAILY_START_BYTES_SENT = "dailyStartBytesSent";
 
     @Scheduled(cron = "0 0/10 * * * *")
     public void collectMetrics() {
@@ -95,16 +94,20 @@ public class MetricService {
     // 하루 시작 시점에 네트워크 트래픽 값을 저장 (매일 자정에 실행)
     @Scheduled(cron = "0 0 0 * * *")
     public void resetDailyTraffic() {
-        long[] dailyTraffic = getTotalNetworkTraffic();
-        dailyStartBytesReceived = dailyTraffic[0];
-        dailyStartBytesSent = dailyTraffic[1];
+        MetricDTO.NetworkTraffic totalNetworkTraffic = getTotalNetworkTraffic();
+        redisService.storeValue(DAILY_START_BYTES_RECEIVED, String.valueOf(totalNetworkTraffic.bytesReceived()), VALID_EXP);
+        redisService.storeValue(DAILY_START_BYTES_SENT, String.valueOf(totalNetworkTraffic.bytesSent()), VALID_EXP);
     }
 
     // 하루 동안의 누적 네트워크 트래픽 계산
     private Map<String, Long> getDailyTraffic() {
-        long[] currentTraffic = getTotalNetworkTraffic();
-        long dailyReceived = currentTraffic[0] - dailyStartBytesReceived;
-        long dailySent = currentTraffic[1] - dailyStartBytesSent;
+        // 오늘 0시의 네트워크 트래픽값
+        long dailyStartBytesReceived = redisService.getDataInLong(DAILY_START_BYTES_RECEIVED);
+        long dailyStartBytesSent = redisService.getDataInLong(DAILY_START_BYTES_SENT);
+
+        MetricDTO.NetworkTraffic totalNetworkTraffic = getTotalNetworkTraffic();
+        long dailyReceived = totalNetworkTraffic.bytesReceived() - dailyStartBytesReceived;
+        long dailySent = totalNetworkTraffic.bytesSent() - dailyStartBytesSent;
 
         Map<String, Long> dailyTraffic = new HashMap<>();
         dailyTraffic.put("dailyReceived", dailyReceived);
@@ -114,7 +117,7 @@ public class MetricService {
     }
 
     // 네트워크 트래픽의 수신 및 송신 바이트를 계산
-    private long[] getTotalNetworkTraffic() {
+    private MetricDTO.NetworkTraffic getTotalNetworkTraffic() {
         List<NetworkIF> networkIFs = systemInfo.getHardware().getNetworkIFs();
         long totalBytesReceived = 0;
         long totalBytesSent = 0;
@@ -125,13 +128,12 @@ public class MetricService {
             totalBytesSent += net.getBytesSent();
         }
 
-        return new long[] { totalBytesReceived, totalBytesSent };
+        return new MetricDTO.NetworkTraffic(totalBytesReceived, totalBytesSent);
     }
 
     private Map<String, Object> gatherMetrics() {
         Map<String, Object> metrics = new HashMap<>();
         GlobalMemory memory = systemInfo.getHardware().getMemory();
-        List<NetworkIF> networkIFs = systemInfo.getHardware().getNetworkIFs();
 
         // CPU 사용량 계산
         long[] newTicks = processor.getSystemCpuLoadTicks();
@@ -146,21 +148,18 @@ public class MetricService {
         metrics.put("usedMemory", usedMemory);
 
         // 네트워크 트래픽 계산
-        long totalBytesReceived = 0;
-        long totalBytesSent = 0;
-        for (NetworkIF net : networkIFs) {
-            net.updateAttributes();
-            totalBytesReceived += net.getBytesRecv();
-            totalBytesSent += net.getBytesSent();
-        }
+        MetricDTO.NetworkTraffic totalNetworkTraffic = getTotalNetworkTraffic();
 
         // 이전에 저장된 값과의 차이로 네트워크 트래픽 계산
-        long bytesReceived = totalBytesReceived - previousBytesReceived;
-        long bytesSent = totalBytesSent - previousBytesSent;
+        Long previousBytesReceived = redisService.getDataInLong(PREVIOUS_BYTES_RECEIVED);
+        Long previousBytesSent = redisService.getDataInLong(PREVIOUS_BYTES_SENT);
+
+        long bytesReceived = totalNetworkTraffic.bytesReceived() - previousBytesReceived;
+        long bytesSent = totalNetworkTraffic.bytesSent() - previousBytesSent;
 
         // 현재 값을 다음 계산에 사용할 수 있도록 저장
-        previousBytesReceived = totalBytesReceived;
-        previousBytesSent = totalBytesSent;
+        redisService.storeValue(PREVIOUS_BYTES_RECEIVED, String.valueOf(totalNetworkTraffic.bytesReceived()), VALID_EXP);
+        redisService.storeValue(PREVIOUS_BYTES_SENT, String.valueOf(totalNetworkTraffic.bytesSent()), VALID_EXP);
 
         // 구간 동안의 네트워크 트래픽을 저장
         metrics.put("networkReceived", bytesReceived);

@@ -21,6 +21,10 @@ public class RedisService {
         redisTemplate.opsForValue().set(buildKey(type, id), value, expirationTime, TimeUnit.MILLISECONDS);
     }
 
+    public void storeValue(String type, String value, Long expirationTime) {
+        redisTemplate.opsForValue().set(type, value, expirationTime, TimeUnit.MILLISECONDS);
+    }
+
     // 유효 기간 X
     public void storeValue(String type, String id, String value) {
         redisTemplate.opsForValue().set(buildKey(type, id), value);
@@ -102,6 +106,13 @@ public class RedisService {
     // 데이터 반환 - Long 반환
     public Long getDataInLong(String type, String id){
         String value = redisTemplate.opsForValue().get(buildKey(type, id));
+
+        if(value == null) return 0L;
+        return Long.valueOf(value);
+    }
+
+    public Long getDataInLong(String type){
+        String value = redisTemplate.opsForValue().get(type);
 
         if(value == null) return 0L;
         return Long.valueOf(value);
