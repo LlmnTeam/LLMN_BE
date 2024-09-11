@@ -3,7 +3,9 @@ package com.example.llmn.controller.DTO;
 import java.time.Instant;
 
 public record LogData(
-        String containerName,
+        String serviceName,
         Instant timestamp,
-        String message
+        String message,
+        boolean isProcessed,
+        String logLevel
 ) {}

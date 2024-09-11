@@ -102,15 +102,19 @@ public class LogService {
 
     private LogData convertToLogData(Map<String, Object> source) {
         Map<String, Object> container = (Map<String, Object>) source.get("container");
-        String containerName = container != null ? (String) container.get("name") : null;
+        String serviceName = container != null ? (String) container.get("name") : null;
 
         String timestampStr = (String) source.get("@timestamp");
         Instant timestamp = timestampStr != null ? Instant.parse(timestampStr) : null;
 
         String rawMessage = (String) source.get("message");
-        String formattedMessage = LogDataParser.formatMessage(rawMessage);  // MongoDB 로그와 같은 형식으로 변환
+        String formattedMessage = LogDataParser.formatMessage(rawMessage);
 
-        return new LogData(containerName, timestamp, formattedMessage);
+        boolean isProcessed = (boolean) source.get("is_processed");
+
+        String logLevel = source.get("log_level") != null ? (String) source.get("log_level") : "UNKNOWN";
+
+        return new LogData(serviceName, timestamp, formattedMessage, isProcessed, logLevel);
     }
 
     private List<Map<String, Object>> fetchAndProcessLogs() throws IOException {
