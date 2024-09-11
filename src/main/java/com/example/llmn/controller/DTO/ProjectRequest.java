@@ -14,5 +14,5 @@ public class ProjectRequest {
             String description
     ){}
 
-    public record StopContainerDTO(String name){}
+    public record ContainerDTO(String name){}
 }
