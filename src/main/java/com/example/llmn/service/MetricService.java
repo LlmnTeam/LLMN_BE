@@ -72,14 +72,14 @@ public class MetricService {
         // 시간 형식 "HH:mm"
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm");
 
-        // CPU 데이터를 DTO로 변환하여 리스트로 반환
+        // CPU 데이터
         List<MetricResponse.CpuMetricDTO> cpuMetricDTOS = metrics.stream()
                 .map(metric -> new MetricResponse.CpuMetricDTO(
                         metric.getCreatedDate().format(formatter),
                         metric.getCpuUsage()))
                 .toList();
 
-        // 메모리 사용량 퍼센티지로 변환하여 리스트로 반환
+        // 메모리 사용량은 퍼센티지로 변환
         List<MetricResponse.MemoryMetricDTO> memoryMetricDTOS = metrics.stream()
                 .map(metric -> {
                     String time = metric.getCreatedDate().format(formatter);
@@ -88,7 +88,22 @@ public class MetricService {
                 })
                 .toList();
 
-        return new MetricResponse.FindMetricHistoryDTO(cpuMetricDTOS, memoryMetricDTOS);
+        // 네트워크 수신
+        List<MetricResponse.NetworkInMetricDTO> networkInMetricDTOS = metrics.stream()
+                .map(metric -> new MetricResponse.NetworkInMetricDTO(
+                        metric.getCreatedDate().format(formatter),
+                        metric.getTotalBytesReceived()))
+                .toList();
+
+        // 네트워크 송신
+        List<MetricResponse.NetworkOutMetricDTO> networkOutMetricDTOS = metrics.stream()
+                .map(metric -> new MetricResponse.NetworkOutMetricDTO(
+                        metric.getCreatedDate().format(formatter),
+                        metric.getTotalBytesSent()
+                ))
+                .toList();
+
+        return new MetricResponse.FindMetricHistoryDTO(cpuMetricDTOS, memoryMetricDTOS, networkInMetricDTOS, networkOutMetricDTOS);
     }
 
     // 하루 시작 시점에 네트워크 트래픽 값을 저장 (매일 자정에 실행)

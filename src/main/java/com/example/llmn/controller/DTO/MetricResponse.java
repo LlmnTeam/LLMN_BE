@@ -9,7 +9,9 @@ public class MetricResponse {
 
     public record FindMetricHistoryDTO(
             List<CpuMetricDTO> cpuMetrics,
-            List<MemoryMetricDTO> memoryMetrics) {}
+            List<MemoryMetricDTO> memoryMetrics,
+            List<NetworkInMetricDTO> networkInMetrics,
+            List<NetworkOutMetricDTO> networkOutMetrics) {}
 
     public record CpuMetricDTO(
             String time,
@@ -18,6 +20,14 @@ public class MetricResponse {
     public record MemoryMetricDTO(
             String time,
             double usedMemoryPercentage) {}
+
+    public record NetworkInMetricDTO(
+            String time,
+            double networkReceived) {}
+
+    public record NetworkOutMetricDTO(
+            String time,
+            double networkSent) {}
 
     public record FindCurrentMetricDTO(
             double cpuUsage,
