@@ -17,11 +17,10 @@ import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
-public class MetricsService {
+public class MetricService {
 
     private final MetricRepository metricRepository;
     private final SystemInfo systemInfo = new SystemInfo();
@@ -30,7 +29,7 @@ public class MetricsService {
     // 첫 번째 호출에서 CPU ticks 값을 저장하기 위한 필드
     private long[] oldTicks = processor.getSystemCpuLoadTicks();
 
-    @Scheduled(fixedRate = 600000)  // 10분 마다 실행
+    @Scheduled(cron = "0 0/10 * * * *")
     public void collectMetrics() {
         Map<String, Object> metrics = gatherMetrics();
 
@@ -49,7 +48,7 @@ public class MetricsService {
         return gatherMetrics();
     }
 
-    @Transactional
+    @Transactional(readOnly = true)
     public MetricResponse.FindMetricHistoryDTO findMetricHistory(){
         LocalDateTime now = LocalDateTime.now().withMinute(0).withSecond(0).withNano(0);
         List<Metric> metrics = metricRepository.findALlWithinDate(now.minusDays(1));
