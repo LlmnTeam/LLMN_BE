@@ -21,7 +21,7 @@ public class Project extends TimeStamp{
     private User user;
 
     @Column
-    private String serviceName;
+    private String projectName;
 
     @Column
     private String containerName;
@@ -37,9 +37,9 @@ public class Project extends TimeStamp{
     private ContainerStatus containerStatus;
 
     @Builder
-    public Project(User user, String serviceName, String containerName, String description, ContainerStatus containerStatus) {
+    public Project(User user, String projectName, String containerName, String description, ContainerStatus containerStatus) {
         this.user = user;
-        this.serviceName = serviceName;
+        this.projectName = projectName;
         this.containerName = containerName;
         this.description = description;
         this.isWorking = true;

@@ -57,7 +57,7 @@ public class LogService {
     }
 
     @Transactional
-    public List<LogData> searchLogs(Instant startTime, Instant endTime, String logLevel, String serviceName, String userId) throws IOException {
+    public List<LogData> searchLogs(Instant startTime, Instant endTime, String logLevel, String serviceName) throws IOException {
         // Elasticsearch 쿼리 생성
         SearchRequest.Builder searchBuilder = new SearchRequest.Builder()
                 .index("docker-logs-*")
@@ -84,14 +84,6 @@ public class LogService {
                         boolQuery.filter(f -> f.term(t -> t
                                 .field("service_name")
                                 .value(serviceName)
-                        ));
-                    }
-
-                    // 사용자 ID 필터
-                    if (userId != null) {
-                        boolQuery.filter(f -> f.term(t -> t
-                                .field("user_id")
-                                .value(userId)
                         ));
                     }
 
@@ -173,7 +165,6 @@ public class LogService {
                     // 변환된 로그 데이터를 업데이트
                     log.put("log_level", logLevel);
                     log.put("service_name", serviceName);
-                    log.put("user_id", "user123");
                     log.put("is_processed", true);
                     log.put("message", message != null ? message : "No message");
 

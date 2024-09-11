@@ -32,7 +32,7 @@ public class ProjectService {
         User user = entityManager.getReference(User.class, userId);
         Project project = Project.builder()
                 .user(user)
-                .serviceName(requestDTO.serviceName())
+                .projectName(requestDTO.serviceName())
                 .containerName(requestDTO.containerName())
                 .description(requestDTO.description())
                 .containerStatus(containerStatus)
@@ -60,7 +60,7 @@ public class ProjectService {
                     }
 
                     return new ProjectResponse.ProjectDTO(
-                        project.getServiceName(),
+                        project.getProjectName(),
                         project.getDescription(),
                         project.getUpdatedDate(),
                         containerStatus);

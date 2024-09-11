@@ -73,7 +73,7 @@ public class SecurityConfig {
                 // 인증 요구사항 및 권한 설정
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/accounts/profile", "/api/accounts/password/**", "/api/accounts/role").authenticated()
-                        .requestMatchers("/api/container", "/api/metrics", "/api/auth/**", "/api/accounts/**", "/api/validate/accessToken", "/api/log").permitAll()
+                        .requestMatchers("/api/test",  "/api/log","/api/container", "/api/metrics", "/api/auth/**", "/api/accounts/**", "/api/validate/accessToken", "/api/log").permitAll()
                         .anyRequest().authenticated()
                 )
 
