@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -27,7 +28,9 @@ public class ProjectService {
     @Transactional
     public void createProject(ProjectRequest.CreateProjectDTO requestDTO, Long userId){
         // 컨테이너 이름이 들어오지 않으면 NOT_CONNECTED로 처리
-        ContainerStatus containerStatus = requestDTO.containerName() != null ? ContainerStatus.NOT_WORKING : ContainerStatus.NOT_CONNECTED;
+        ContainerStatus containerStatus = requestDTO.containerName() != null
+                ? ContainerStatus.NOT_WORKING
+                : ContainerStatus.NOT_CONNECTED;
 
         User user = entityManager.getReference(User.class, userId);
         Project project = Project.builder()
@@ -49,6 +52,9 @@ public class ProjectService {
         // 실행중인 컨테이너 목록 조회
         List<String> runningContainerNames = dockerService.findRunningContainerNameList();
 
+        // 컨테이너 리소스 조회
+        Map<String, Map<String, String>> containersResourceUsageMap = dockerService.findAllContainersResourceUsage();
+
         List<ProjectResponse.ProjectDTO> projectDTOS = projects.stream()
                 .map(project -> {
                     ContainerStatus containerStatus = project.getContainerStatus();
@@ -61,10 +67,13 @@ public class ProjectService {
                     }
 
                     return new ProjectResponse.ProjectDTO(
+                        project.isWorking(),
                         project.getProjectName(),
                         project.getDescription(),
                         project.getUpdatedDate(),
-                        containerStatus);
+                        containerStatus,
+                        containersResourceUsageMap.get(project.getContainerName()).get("CPU"),
+                        containersResourceUsageMap.get(project.getContainerName()).get("Memory"));
                 })
                 .toList();
 

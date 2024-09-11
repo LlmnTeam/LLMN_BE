@@ -12,10 +12,13 @@ public class ProjectResponse {
     public record FindProjectListDTO(List<ProjectDTO> projects){}
 
     public record ProjectDTO(
+            boolean isWorking,
             String name,
             String description,
             LocalDateTime updateTime,
-            ContainerStatus containerStatus) {}
+            ContainerStatus containerStatus,
+            String cpuUsage,
+            String memoryUsage) {}
 
     public record FindContainerListDTO(List<String> names){}
 }

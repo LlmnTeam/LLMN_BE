@@ -42,7 +42,7 @@ public class DockerService {
     }
 
     // 컨테이너의 사용 리소스 조회
-    public Map<String, Map<String, String>> getAllContainersResourceUsage() throws Exception {
+    public Map<String, Map<String, String>> findAllContainersResourceUsage() throws Exception {
         // docker stats 명령어로 모든 실행 중인 컨테이너의 CPU, 메모리 사용량 가져오기
         String command = "docker stats --no-stream --format \"{{.Name}}:{{.CPUPerc}}:{{.MemUsage}}\"";
         List<String> outputLines = executeCommandAndReturnOutput(command);

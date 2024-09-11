@@ -26,13 +26,13 @@ public class ProjectController {
     private final ProjectService projectService;
     private final DockerService dockerService;
 
-    @PostMapping("/repository")
+    @PostMapping("/project")
     public ResponseEntity<?> createProject(@RequestBody ProjectRequest.CreateProjectDTO requestDTO, @AuthenticationPrincipal CustomUserDetails userDetails) {
         projectService.createProject(requestDTO, userDetails.getUser().getId());
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, null));
     }
 
-    @GetMapping("/repository")
+    @GetMapping("/project")
     public ResponseEntity<?> findProjectList(@AuthenticationPrincipal CustomUserDetails userDetails) throws Exception {
         ProjectResponse.FindProjectListDTO responseDTO = projectService.findProjectList(userDetails.getUser().getId());
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
