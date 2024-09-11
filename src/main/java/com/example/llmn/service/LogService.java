@@ -2,6 +2,7 @@ package com.example.llmn.service;
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.elasticsearch._types.ElasticsearchException;
+import co.elastic.clients.elasticsearch._types.SortOrder;
 import co.elastic.clients.elasticsearch._types.query_dsl.BoolQuery;
 import co.elastic.clients.elasticsearch.core.*;
 import co.elastic.clients.elasticsearch.indices.CreateIndexRequest;
@@ -24,10 +25,7 @@ import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -56,8 +54,7 @@ public class LogService {
         log.info("업데이트 완료");
     }
 
-    @Transactional
-    public List<LogData> searchLogs(Instant startTime, Instant endTime, String logLevel, String serviceName) throws IOException {
+    public List<LogData> searchLogList(Instant startTime, Instant endTime, String logLevel, String serviceName) throws IOException {
         // Elasticsearch 쿼리 생성
         SearchRequest.Builder searchBuilder = new SearchRequest.Builder()
                 .index("docker-logs-*")
@@ -100,6 +97,37 @@ public class LogService {
                 .collect(Collectors.toList());
     }
 
+    public String getRecentLogInStr(String serviceName, Long cnt) throws IOException {
+        // Elasticsearch 쿼리 생성
+        SearchRequest.Builder searchBuilder = new SearchRequest.Builder()
+                .index("docker-logs-*")
+                .query(q -> q.bool(b -> b
+                        .filter(f -> f.term(t -> t
+                                .field("service_name")
+                                .value(serviceName)
+                        ))
+                ))
+                .sort(s -> s
+                        .field(f -> f
+                                .field("@timestamp")  // 타임스탬프 기준으로 정렬
+                                .order(SortOrder.Desc)  // 가장 최근 순으로 정렬 (내림차순)
+                        )
+                )
+                .size(cnt.intValue()); // 최대 cnt 개만큼의 로그를 가져옴
+
+        SearchResponse<Map> response = client.search(searchBuilder.build(), Map.class);
+
+        // 검색 결과를 LogData로 변환한 후 역순으로 정렬하여 반환
+        List<String> messages = response.hits().hits().stream()
+                .map(hit -> convertToString(hit.source()))
+                .collect(Collectors.toList());
+
+        // 내림차순으로 받아온 데이터를 다시 역순으로 뒤집어 가장 오래된 로그가 먼저 오도록 함
+        Collections.reverse(messages);
+
+        return String.join("\n", messages);  // 각 로그 사이에 줄 바꿈 추가
+    }
+
     private LogData convertToLogData(Map<String, Object> source) {
         Map<String, Object> container = (Map<String, Object>) source.get("container");
         String serviceName = container != null ? (String) container.get("name") : null;
@@ -108,13 +136,18 @@ public class LogService {
         Instant timestamp = timestampStr != null ? Instant.parse(timestampStr) : null;
 
         String rawMessage = (String) source.get("message");
-        String formattedMessage = LogDataParser.formatMessage(rawMessage);
+        String formattedMessage = rawMessage != null ? LogDataParser.formatMessage(rawMessage) : "";
 
         boolean isProcessed = (boolean) source.get("is_processed");
 
         String logLevel = source.get("log_level") != null ? (String) source.get("log_level") : "UNKNOWN";
 
         return new LogData(serviceName, timestamp, formattedMessage, isProcessed, logLevel);
+    }
+
+    private String convertToString(Map<String, Object> source) {
+        String rawMessage = (String) source.get("message");
+        return rawMessage != null ? LogDataParser.formatMessage(rawMessage) : "";
     }
 
     private List<Map<String, Object>> fetchAndProcessLogs() throws IOException {
