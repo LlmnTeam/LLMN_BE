@@ -1,22 +1,27 @@
 package com.example.llmn.service;
 
+import com.example.llmn.controller.DTO.MetricResponse;
 import com.example.llmn.domain.Metric;
 import com.example.llmn.repository.MetricRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import oshi.SystemInfo;
 import oshi.hardware.CentralProcessor;
 import oshi.hardware.GlobalMemory;
 import oshi.hardware.NetworkIF;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
-public class PerformanceMetricsService {
+public class MetricsService {
 
     private final MetricRepository metricRepository;
     private final SystemInfo systemInfo = new SystemInfo();
@@ -25,7 +30,7 @@ public class PerformanceMetricsService {
     // 첫 번째 호출에서 CPU ticks 값을 저장하기 위한 필드
     private long[] oldTicks = processor.getSystemCpuLoadTicks();
 
-    @Scheduled(fixedRate = 1800000)  // 30분 마다 실행
+    @Scheduled(fixedRate = 600000)  // 10분 마다 실행
     public void collectMetrics() {
         Map<String, Object> metrics = gatherMetrics();
 
@@ -42,6 +47,33 @@ public class PerformanceMetricsService {
 
     public Map<String, Object> findCurrentMetric() {
         return gatherMetrics();
+    }
+
+    @Transactional
+    public MetricResponse.FindMetricHistoryDTO findMetricHistory(){
+        LocalDateTime now = LocalDateTime.now().withMinute(0).withSecond(0).withNano(0);
+        List<Metric> metrics = metricRepository.findALlWithinDate(now.minusDays(1));
+
+        // 시간 형식 "HH:mm"
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm");
+
+        // CPU 데이터를 DTO로 변환하여 리스트로 반환
+        List<MetricResponse.CpuMetricDTO> cpuMetricDTOS = metrics.stream()
+                .map(metric -> new MetricResponse.CpuMetricDTO(
+                        metric.getCreatedDate().format(formatter),
+                        metric.getCpuUsage()))
+                .toList();
+
+        // 메모리 사용량 퍼센티지로 변환하여 리스트로 반환
+        List<MetricResponse.MemoryMetricDTO> memoryMetricDTOS = metrics.stream()
+                .map(metric -> {
+                    String time = metric.getCreatedDate().format(formatter);
+                    double usedMemoryPercentage = ((double) metric.getUsedMemory() / metric.getTotalMemory()) * 100;
+                    return new MetricResponse.MemoryMetricDTO(time, usedMemoryPercentage);
+                })
+                .toList();
+
+        return new MetricResponse.FindMetricHistoryDTO(cpuMetricDTOS, memoryMetricDTOS);
     }
 
     private Map<String, Object> gatherMetrics() {
