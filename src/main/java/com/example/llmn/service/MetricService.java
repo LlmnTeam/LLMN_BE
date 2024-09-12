@@ -83,8 +83,8 @@ public class MetricService {
         List<MetricResponse.MemoryMetricDTO> memoryMetricDTOS = metrics.stream()
                 .map(metric -> {
                     String time = metric.getCreatedDate().format(formatter);
-                    double usedMemoryPercentage = ((double) metric.getUsedMemory() / metric.getTotalMemory()) * 100;
-                    return new MetricResponse.MemoryMetricDTO(time, usedMemoryPercentage);
+                    long memoryUsage = metric.getUsedMemory() / (1024 * 1024);
+                    return new MetricResponse.MemoryMetricDTO(time, memoryUsage);
                 })
                 .toList();
 

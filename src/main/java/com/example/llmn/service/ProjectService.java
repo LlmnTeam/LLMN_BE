@@ -17,7 +17,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -92,7 +91,7 @@ public class ProjectService {
                 () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
         );
 
-        String recentLog = logService.findRecentLogInStr(project.getContainerName(), 2L);
+        String recentLog = logService.searchRecentLogInStr(project.getContainerName(), 2L);
 
         return new ProjectResponse.FindProjectByIdDTO(project.getProjectName(), project.getDescription(), "", recentLog);
     }

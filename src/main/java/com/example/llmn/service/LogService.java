@@ -103,7 +103,43 @@ public class LogService {
                 .collect(Collectors.toList());
     }
 
-    public String findRecentLogInStr(String serviceName, Long cnt) throws IOException {
+    public String searchLogInStr(Instant startTime, Instant endTime, String serviceName) throws IOException {
+        // Elasticsearch 쿼리 생성
+        SearchRequest.Builder searchBuilder = new SearchRequest.Builder()
+                .index("docker-logs-*")
+                .query(q -> {
+                    BoolQuery.Builder boolQuery = new BoolQuery.Builder();
+
+                    // 시간 범위 필터
+                    boolQuery.must(m -> m.range(r -> r
+                            .field("@timestamp")
+                            .gte(JsonData.of(startTime.toString()))
+                            .lte(JsonData.of(endTime.toString()))
+                    ));
+
+                    // 서비스 이름 필터
+                    if (serviceName != null) {
+                        boolQuery.filter(f -> f.term(t -> t
+                                .field("service_name")
+                                .value(serviceName)
+                        ));
+                    }
+
+                    // BoolQuery를 Query로 변환하여 반환
+                    return q.bool(boolQuery.build());
+                });
+
+        // Elasticsearch에서 쿼리 실행
+        SearchResponse<Map> response = client.search(searchBuilder.build(), Map.class);
+
+        List<String> messages = response.hits().hits().stream()
+                .map(hit -> convertToString(hit.source()))
+                .toList();
+
+        return String.join("\n", messages);  // 각 로그 사이에 줄 바꿈 추가
+    }
+
+    public String searchRecentLogInStr(String serviceName, Long cnt) throws IOException {
         // Elasticsearch 쿼리 생성
         SearchRequest.Builder searchBuilder = new SearchRequest.Builder()
                 .index("docker-logs-*")

@@ -7,10 +7,10 @@ import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
-public class LogStreamingService {
+public class LlmService {
 
+    private final LogService logService;
     private final LogWebSocketHandler logWebSocketHandler;
-
 
     // 주기적으로 로그를 가져와 특정 서비스의 로그만 전송
     @Scheduled(fixedRate = 50000)
