@@ -14,6 +14,8 @@ import com.example.llmn.repository.SummaryRepository;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -93,15 +95,33 @@ public class ProjectService {
         return new ProjectResponse.FindProjectListDTO(projectDTOS);
     }
 
+    @Transactional(readOnly = true)
     public ProjectResponse.FindProjectByIdDTO findProjectById(Long projectId) throws IOException {
         // 존재하지 않으면 에러
         Project project = projectRepository.findById(projectId).orElseThrow(
                 () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
         );
 
+        // 최신 요약은 MySQL에서 가져옴
+        Pageable pageable = PageRequest.of(0, 1);
+        String recentSummary = summaryRepository.findLatestSummaryByProject(project, pageable).getContent().get(0);
+
+        if(recentSummary.isEmpty()){
+            recentSummary = "로그 요약본이 존재하지 않습니다.";
+        }
+
+        // 최신 로그는 ElasticSearch에서 가져옴
         String recentLog = logService.searchRecentLogInStr(project.getContainerName(), 2L);
 
-        return new ProjectResponse.FindProjectByIdDTO(project.getProjectName(), project.getDescription(), "", recentLog);
+        if (recentLog.isEmpty()) {
+            recentLog = "로그값이 존재하지 않습니다";
+        }
+
+        return new ProjectResponse.FindProjectByIdDTO(
+                project.getProjectName(),
+                project.getDescription(),
+                recentSummary,
+                recentLog);
     }
 
     @Transactional(readOnly = true)

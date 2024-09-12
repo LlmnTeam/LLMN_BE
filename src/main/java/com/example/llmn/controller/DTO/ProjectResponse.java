@@ -26,7 +26,7 @@ public class ProjectResponse {
     public record FindProjectByIdDTO(
             String name,
             String description,
-            String summery,
+            String summary,
             String recentLog){}
 
     public record FindProjectLogListDTO(List<String> files){}

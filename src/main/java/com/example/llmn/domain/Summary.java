@@ -10,7 +10,7 @@ import lombok.NoArgsConstructor;
 @Table(name = "summary_tb")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Getter
-public class Summary {
+public class Summary extends TimeStamp{
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
