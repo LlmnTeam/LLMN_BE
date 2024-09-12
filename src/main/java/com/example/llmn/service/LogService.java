@@ -147,7 +147,7 @@ public class LogService {
 
     private String convertToString(Map<String, Object> source) {
         String rawMessage = (String) source.get("message");
-        return rawMessage != null ? LogDataParser.formatMessage(rawMessage) : "";
+        return rawMessage != null ? rawMessage : "";
     }
 
     private List<Map<String, Object>> fetchAndProcessLogs() throws IOException {

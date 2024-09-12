@@ -12,6 +12,7 @@ public class ProjectResponse {
     public record FindProjectListDTO(List<ProjectDTO> projects){}
 
     public record ProjectDTO(
+            Long id,
             boolean isWorking,
             String name,
             String description,
