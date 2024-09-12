@@ -19,6 +19,9 @@ public enum ExceptionCode {
     USER_UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "로그인이 되지 않았습니다."),
     USER_ALREADY_EXIT(HttpStatus.NOT_FOUND, "이미 탈퇴한 계정입니다."),
 
+    // 로그 파일 관련 에러
+    LOG_FILE_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 로그 파일이 존재하지 않습니다."),
+
     // 프로젝트 관련 에러
     PROJECT_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 프로젝트를 찾을 수 없습니다.");
 

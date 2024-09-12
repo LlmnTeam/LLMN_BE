@@ -8,9 +8,13 @@ import co.elastic.clients.elasticsearch.core.*;
 import co.elastic.clients.elasticsearch.indices.CreateIndexRequest;
 import co.elastic.clients.json.JsonData;
 import com.example.llmn.controller.DTO.LogData;
+import com.example.llmn.core.errors.CustomException;
+import com.example.llmn.core.errors.ExceptionCode;
 import com.example.llmn.core.utils.LogDataParser;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,6 +41,7 @@ public class LogService {
 
     private final ElasticsearchClient client;
     private final RedisService redisService;
+    private static final String LOGS_DIRECTORY = "logs";
 
     @Scheduled(fixedRate = 60000)  // 1분마다 실행
     public void processAndUpdateLogs() throws IOException {
@@ -153,7 +158,7 @@ public class LogService {
 
     public String readLogFile(String fileName) throws IOException {
         // 로그 파일은 logs 디렉토리에 위치
-        Path logFilePath = Paths.get("logs", fileName);
+        Path logFilePath = Paths.get(LOGS_DIRECTORY, fileName);
 
         // 파일이 존재하는지 확인
         if (!Files.exists(logFilePath)) {
@@ -168,6 +173,18 @@ public class LogService {
             log.error("로그 파일을 읽는 중 오류 발생: " + fileName, e);
             throw e;
         }
+    }
+
+    public Resource getLogFileAsResource(String fileName) throws IOException {
+        Path logFilePath = Paths.get(LOGS_DIRECTORY, fileName);
+
+        // 파일이 존재하는지 확인
+        if (!Files.exists(logFilePath)) {
+            throw new CustomException(ExceptionCode.LOG_FILE_NOT_FOUND);
+        }
+
+        // 파일을 Resource 객체로 변환
+        return new UrlResource(logFilePath.toUri());
     }
 
     private LogData convertToLogData(Map<String, Object> source) {
