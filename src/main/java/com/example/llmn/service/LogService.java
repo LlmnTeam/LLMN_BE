@@ -167,7 +167,7 @@ public class LogService {
         // 내림차순으로 받아온 데이터를 다시 역순으로 뒤집어 가장 오래된 로그가 먼저 오도록 함
         Collections.reverse(messages);
 
-        return String.join("\n", messages);  // 각 로그 사이에 줄 바꿈 추가
+        return String.join("\n\n", messages);  // 각 로그 사이에 줄 바꿈 추가
     }
 
     public List<String> findLogFileList() {
@@ -203,7 +203,7 @@ public class LogService {
         // 파일 내용을 읽어서 하나의 문자열로 변환
         try {
             List<String> lines = Files.readAllLines(logFilePath);  // 파일의 모든 줄을 읽음
-            return String.join("\n", lines);  // 줄 단위로 합쳐서 하나의 문자열로 반환 (각 줄을 \n으로 구분)
+            return String.join("\n\n", lines);  // 줄 단위로 합쳐서 하나의 문자열로 반환 (각 줄을 \n으로 구분)
         } catch (IOException e) {
             throw new CustomException(ExceptionCode.LOG_FILE_READ_FAIL);
         }

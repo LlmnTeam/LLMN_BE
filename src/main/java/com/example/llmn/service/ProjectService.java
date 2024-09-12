@@ -21,6 +21,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -129,7 +131,9 @@ public class ProjectService {
                 () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
         );
 
-        List<String> summaries = summaryRepository.findSummaryById(projectId, pageable).getContent();
+        // 최신순으로 페이지네이션 => 한 페이지 내의 정렬은 오래된 순이라 뒤집기
+        List<String> summaries = new ArrayList<>(summaryRepository.findSummaryById(projectId, pageable).getContent());
+        Collections.reverse(summaries);
         String summary = String.join("\n\n", summaries);
 
         return new ProjectResponse.FindProjectSummaryDTO(

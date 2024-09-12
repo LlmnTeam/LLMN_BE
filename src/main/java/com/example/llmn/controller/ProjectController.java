@@ -7,6 +7,9 @@ import com.example.llmn.core.utils.ApiUtils;
 import com.example.llmn.service.DockerService;
 import com.example.llmn.service.ProjectService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -22,6 +25,7 @@ public class ProjectController {
 
     private final ProjectService projectService;
     private final DockerService dockerService;
+    private static final String SORT_BY_ID = "id";
 
     @PostMapping("/project")
     public ResponseEntity<?> createProject(@RequestBody ProjectRequest.CreateProjectDTO requestDTO, @AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -36,13 +40,20 @@ public class ProjectController {
     }
 
     @GetMapping("/project/{projectId}")
-    public ResponseEntity<?> findProjectById(@PathVariable Long projectId, @AuthenticationPrincipal CustomUserDetails userDetails) throws Exception {
+    public ResponseEntity<?> findProjectById(@PathVariable Long projectId) throws Exception {
         ProjectResponse.FindProjectByIdDTO responseDTO = projectService.findProjectById(projectId);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 
+    @GetMapping("/project/{projectId}/summaries")
+    public ResponseEntity<?> findProjectSummary(@PathVariable Long projectId,
+                                                @PageableDefault(size = 5, sort = SORT_BY_ID, direction = Sort.Direction.DESC) Pageable pageable){
+        ProjectResponse.FindProjectSummaryDTO responseDTO = projectService.findProjectSummary(projectId, pageable);
+        return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
+    }
+
     @GetMapping("/project/{projectId}/logs")
-    public ResponseEntity<?> findProjectLogList(@PathVariable Long projectId, @AuthenticationPrincipal CustomUserDetails userDetails) throws Exception {
+    public ResponseEntity<?> findProjectLogList(@PathVariable Long projectId) throws Exception {
         ProjectResponse.FindProjectLogListDTO responseDTO = projectService.findProjectLogList(projectId);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
