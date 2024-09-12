@@ -28,4 +28,6 @@ public class ProjectResponse {
             String description,
             String summery,
             String recentLog){}
+
+    public record FindProjectLogListDTO(List<String> files){}
 }

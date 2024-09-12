@@ -7,10 +7,14 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface ProjectRepository extends JpaRepository<Project, Long> {
 
     @Query("SELECT p FROM Project p WHERE p.user.id = :userId")
     List<Project> findByUserId(@Param("userId") Long userId);
+
+    @Query("SELECT p.containerName FROM Project p WHERE p.id = :projectId")
+    Optional<String> findContainerNameById(@Param("projectId") Long projectId);
 }

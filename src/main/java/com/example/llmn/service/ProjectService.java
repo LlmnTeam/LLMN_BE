@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -28,6 +29,7 @@ public class ProjectService {
     private final LogService logService;
     private final ProjectRepository projectRepository;
     private final EntityManager entityManager;
+    private static final String LOGS_DIRECTORY = "logs";
 
     @Transactional
     public void createProject(ProjectRequest.CreateProjectDTO requestDTO, Long userId){
@@ -95,4 +97,23 @@ public class ProjectService {
 
         return new ProjectResponse.FindProjectByIdDTO(project.getProjectName(), project.getDescription(), "", recentLog);
     }
+
+    @Transactional(readOnly = true)
+    public ProjectResponse.FindProjectLogListDTO findProjectLogList(Long projectId){
+        // projectId를 사용하여 containerName을 가져옴
+        String containerName = projectRepository.findContainerNameById(projectId).orElseThrow(
+                () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
+        );
+
+        // 로그 파일 목록을 가져옴
+        List<String> logFiles = logService.findLogFileList();
+
+        // containerName과 일치하는 파일만 필터링
+        List<String> filteredLogFiles = logFiles.stream()
+                .filter(logFile -> logFile.startsWith(containerName + "-log"))
+                .toList();
+
+        return new ProjectResponse.FindProjectLogListDTO(filteredLogFiles);
+    }
+
 }

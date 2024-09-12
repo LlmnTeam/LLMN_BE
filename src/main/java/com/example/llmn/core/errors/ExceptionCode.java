@@ -20,7 +20,10 @@ public enum ExceptionCode {
     USER_ALREADY_EXIT(HttpStatus.NOT_FOUND, "이미 탈퇴한 계정입니다."),
 
     // 로그 파일 관련 에러
+    LOG_DIRECTORY_NOT_FOUND(HttpStatus.NOT_FOUND, "로그 디렉토리가 존재하지 않거나 디렉토리가 아닙니다."),
     LOG_FILE_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 로그 파일이 존재하지 않습니다."),
+    LOG_FILE_READ_FAIL(HttpStatus.BAD_REQUEST, "로그 파일을 읽는 중 오류 발생했습니다."),
+    LOG_FILE_LIST_READ_FAIL(HttpStatus.BAD_REQUEST, "로그 파일 목록을 가져오는 중 오류 발생했습니다."),
 
     // 프로젝트 관련 에러
     PROJECT_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 프로젝트를 찾을 수 없습니다.");
