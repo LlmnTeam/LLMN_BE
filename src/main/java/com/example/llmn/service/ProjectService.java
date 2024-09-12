@@ -29,7 +29,6 @@ public class ProjectService {
     private final LogService logService;
     private final ProjectRepository projectRepository;
     private final EntityManager entityManager;
-    private static final String LOGS_DIRECTORY = "logs";
 
     @Transactional
     public void createProject(ProjectRequest.CreateProjectDTO requestDTO, Long userId){

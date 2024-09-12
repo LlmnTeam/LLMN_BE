@@ -41,6 +41,12 @@ public class ProjectController {
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 
+    @GetMapping("/project/{projectId}/logs")
+    public ResponseEntity<?> findProjectLogList(@PathVariable Long projectId, @AuthenticationPrincipal CustomUserDetails userDetails) throws Exception {
+        ProjectResponse.FindProjectLogListDTO responseDTO = projectService.findProjectLogList(projectId);
+        return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
+    }
+
     @GetMapping("/container")
     public ResponseEntity<?> findContainerList() throws Exception {
         List<String> runningContainerNameList = dockerService.findRunningContainerNameList();
