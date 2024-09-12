@@ -1,7 +1,9 @@
 package com.example.llmn.controller;
 
+import com.example.llmn.controller.DTO.LogDTO;
 import com.example.llmn.controller.DTO.LogData;
 import com.example.llmn.core.utils.ApiUtils;
+import com.example.llmn.service.LlmService;
 import com.example.llmn.service.LogService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.Resource;
@@ -25,6 +27,7 @@ import java.util.List;
 public class LogController {
 
     private final LogService logService;
+    private final LlmService llmService;
 
     @PatchMapping("/log")
     public ResponseEntity<?> fetchLogs() throws IOException {
@@ -34,8 +37,8 @@ public class LogController {
 
     @GetMapping("/log")
     public ResponseEntity<?> searchLogs(@RequestParam Instant startTime, @RequestParam Instant endTime, @RequestParam(required = false) String logLevel, @RequestParam(required = false) String serviceName) throws IOException {
-        List<LogData> response = logService.searchLogList(startTime, endTime, logLevel, serviceName);
-        return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, response));
+        List<LogData> responseDTO = logService.searchLogList(startTime, endTime, logLevel, serviceName);
+        return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 
     @GetMapping("/log/download")

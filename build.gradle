@@ -36,9 +36,6 @@ dependencies {
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
 	testImplementation 'org.springframework.security:spring-security-test'
 
-	// mongoDB
-	implementation 'org.springframework.boot:spring-boot-starter-data-mongodb'
-
 	// MySQL
 	implementation 'mysql:mysql-connector-java:8.0.33'
 
@@ -63,11 +60,11 @@ dependencies {
 	implementation group: 'com.auth0', name: 'java-jwt', version: '4.3.0'
 	implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
 
+	// Webflux
+	implementation 'org.springframework.boot:spring-boot-starter-webflux'
+
 	// WebSocket
 	implementation 'org.springframework.boot:spring-boot-starter-websocket'
-
-	// RabbitMQ
-	implementation 'org.springframework.boot:spring-boot-starter-amqp'
 
 	// oshi
 	implementation 'com.github.oshi:oshi-core:6.2.2'
