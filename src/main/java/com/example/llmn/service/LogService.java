@@ -27,6 +27,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
@@ -126,6 +127,28 @@ public class LogService {
         Collections.reverse(messages);
 
         return String.join("\n", messages);  // 각 로그 사이에 줄 바꿈 추가
+    }
+
+    public List<String> getLogFilesList(String directoryPath) throws IOException {
+        // logs 디렉토리 경로
+        Path logDirPath = Paths.get(directoryPath);
+
+        // 로그 파일들이 저장된 디렉토리가 존재하는지 확인
+        if (!Files.exists(logDirPath) || !Files.isDirectory(logDirPath)) {
+            throw new IOException("로그 디렉토리가 존재하지 않거나 디렉토리가 아닙니다: " + directoryPath);
+        }
+
+        // 디렉토리 내의 모든 파일 목록을 가져오고, ".txt" 확장자를 가진 파일들만 필터링
+        try (Stream<Path> filePathStream = Files.list(logDirPath)) {
+            return filePathStream
+                    .filter(Files::isRegularFile) // 일반 파일만 필터링
+                    .filter(path -> path.toString().endsWith(".txt")) // .txt 파일만 가져옴
+                    .map(path -> path.getFileName().toString()) // 파일 이름만 가져옴
+                    .collect(Collectors.toList());
+        } catch (IOException e) {
+            log.error("로그 파일 목록을 가져오는 중 오류 발생", e);
+            throw e;
+        }
     }
 
     private LogData convertToLogData(Map<String, Object> source) {
@@ -324,7 +347,7 @@ public class LogService {
                 message.toString());
     }
 
-    public void createIndexIfNotExists(String indexName) throws IOException {
+    private void createIndexIfNotExists(String indexName) throws IOException {
         try {
             CreateIndexRequest createIndexRequest = new CreateIndexRequest.Builder()
                     .index(indexName)
