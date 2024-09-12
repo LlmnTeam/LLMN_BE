@@ -115,4 +115,19 @@ public class ProjectService {
         return new ProjectResponse.FindProjectLogListDTO(filteredLogFiles);
     }
 
+    @Transactional(readOnly = true)
+    public ProjectResponse.FindProjectLogByNameDTO findProjectLogByName(Long projectId, String fileName){
+        Project project = projectRepository.findById(projectId).orElseThrow(
+                () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
+        );
+
+        String logMessage = logService.readLogFile(fileName);
+
+        return new ProjectResponse.FindProjectLogByNameDTO(
+                project.getProjectName(),
+                project.getDescription(),
+                fileName,
+                logMessage
+        );
+    }
 }

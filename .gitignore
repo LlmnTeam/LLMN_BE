@@ -36,3 +36,6 @@ volume/
 
 # ENV
 .env
+
+# LOG
+logs/

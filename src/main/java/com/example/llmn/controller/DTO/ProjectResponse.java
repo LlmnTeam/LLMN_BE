@@ -30,4 +30,10 @@ public class ProjectResponse {
             String recentLog){}
 
     public record FindProjectLogListDTO(List<String> files){}
+
+    public record FindProjectLogByNameDTO(
+            String projectName,
+            String description,
+            String fileName,
+            String logMessage){}
 }
