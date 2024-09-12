@@ -8,8 +8,17 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
+
 public interface SummaryRepository extends JpaRepository<Summary, Long> {
 
-    @Query("SELECT s.content FROM Summary s WHERE s.project = :project ORDER BY s.id DESC")
+    @Query("SELECT s.content FROM Summary s " +
+            "JOIN s.project p " +
+            "WHERE p = :project ORDER BY s.id DESC")
     Page<String> findLatestSummaryByProject(@Param("project") Project project, Pageable pageable);
+
+    @Query("SELECT s.content FROM Summary s " +
+            "JOIN s.project p " +
+            "WHERE p.id = :id ORDER BY s.id ASC")
+    Page<String> findSummaryById(@Param("id") Long id, Pageable pageable);
 }

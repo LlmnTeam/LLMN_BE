@@ -11,6 +11,7 @@ import com.example.llmn.repository.SummaryRepository;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -122,6 +123,22 @@ public class ProjectService {
     }
 
     @Transactional(readOnly = true)
+    public ProjectResponse.FindProjectSummaryDTO findProjectSummary(Long projectId, Pageable pageable){
+        // 존재하지 않으면 에러
+        Project project = projectRepository.findById(projectId).orElseThrow(
+                () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
+        );
+
+        List<String> summaries = summaryRepository.findSummaryById(projectId, pageable).getContent();
+        String summary = String.join("\n\n", summaries);
+
+        return new ProjectResponse.FindProjectSummaryDTO(
+                project.getProjectName(),
+                project.getDescription(),
+                summary);
+    }
+
+    @Transactional(readOnly = true)
     public ProjectResponse.FindProjectLogListDTO findProjectLogList(Long projectId){
         // projectId를 사용하여 containerName을 가져옴
         String containerName = projectRepository.findContainerNameById(projectId).orElseThrow(
@@ -160,7 +177,6 @@ public class ProjectService {
     public void summaryLog(){
         List<Project> projects = projectRepository.findAll();
 
-        // 혐재 시간과 30분 전
         Instant endTime = Instant.now();
         Instant startTime = endTime.minus(30, ChronoUnit.MINUTES);
 

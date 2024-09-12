@@ -32,8 +32,13 @@ public class ProjectResponse {
     public record FindProjectLogListDTO(List<String> files){}
 
     public record FindProjectLogByNameDTO(
-            String projectName,
+            String name,
             String description,
             String fileName,
             String logMessage){}
+
+    public record FindProjectSummaryDTO(
+            String name,
+            String description,
+            String summary){}
 }
