@@ -19,6 +19,9 @@ public enum ExceptionCode {
     USER_UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "로그인이 되지 않았습니다."),
     USER_ALREADY_EXIT(HttpStatus.NOT_FOUND, "이미 탈퇴한 계정입니다."),
 
+    // ElasticSearch 오류
+    ELASTIC_SEARCH_ERROR(HttpStatus.NOT_FOUND, "ElasticSearch에 문제가 발생했습니다."),
+
     // 로그 파일 관련 에러
     LOG_DIRECTORY_NOT_FOUND(HttpStatus.NOT_FOUND, "로그 디렉토리가 존재하지 않거나 디렉토리가 아닙니다."),
     LOG_FILE_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 로그 파일이 존재하지 않습니다."),

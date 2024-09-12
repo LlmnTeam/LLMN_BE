@@ -1,20 +1,26 @@
 package com.example.llmn.service;
 
+import com.example.llmn.controller.DTO.LogDTO;
 import com.example.llmn.controller.DTO.ProjectRequest;
 import com.example.llmn.controller.DTO.ProjectResponse;
 import com.example.llmn.core.errors.CustomException;
 import com.example.llmn.core.errors.ExceptionCode;
 import com.example.llmn.domain.ContainerStatus;
 import com.example.llmn.domain.Project;
+import com.example.llmn.domain.Summary;
 import com.example.llmn.domain.User;
 import com.example.llmn.repository.ProjectRepository;
+import com.example.llmn.repository.SummaryRepository;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 
@@ -26,7 +32,9 @@ public class ProjectService {
 
     private final DockerService dockerService;
     private final LogService logService;
+    private final LlmService llmService;
     private final ProjectRepository projectRepository;
+    private final SummaryRepository summaryRepository;
     private final EntityManager entityManager;
 
     @Transactional
@@ -128,5 +136,31 @@ public class ProjectService {
                 fileName,
                 logMessage
         );
+    }
+
+    @Transactional
+    @Scheduled(cron = "0 0,30 * * * *")
+    public void summaryLog(){
+        List<Project> projects = projectRepository.findAll();
+
+        // 혐재 시간과 30분 전
+        Instant endTime = Instant.now();
+        Instant startTime = endTime.minus(30, ChronoUnit.MINUTES);
+
+        projects.stream()
+                .filter(project -> !project.getContainerStatus().equals(ContainerStatus.NOT_CONNECTED))
+                .forEach(project -> {
+                    LogDTO.SummaryResponseDTO summaryDTO = llmService.fetchLogSummary(startTime, endTime, project.getContainerName());
+
+                    // 검색 결과가 빈 값이라 요약 값이 없는 경우
+                    if(summaryDTO == null){
+                        return;
+                    }
+
+                    Summary generalSummary = new Summary(project, summaryDTO.generalSummary());
+                    summaryRepository.save(generalSummary);
+                    Summary anomalySummary = new Summary(project, summaryDTO.anomalySummary());
+                    summaryRepository.save(anomalySummary);
+                });
     }
 }

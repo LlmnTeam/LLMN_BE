@@ -2,6 +2,8 @@ package com.example.llmn.service;
 
 import com.example.llmn.controller.DTO.LogDTO;
 import com.example.llmn.core.config.LogWebSocketHandler;
+import com.example.llmn.core.errors.CustomException;
+import com.example.llmn.core.errors.ExceptionCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -31,13 +33,22 @@ public class LlmService {
         logWebSocketHandler.sendLog(serviceName, logMessage);
     }
 
-    public LogDTO.SummaryResponseDTO summaryLog(Instant startTime, Instant endTime, String serviceName) throws IOException {
-        // 로그 메시지를 가져오기 위한 로직
-        String logMessage = logService.searchLogInStr(startTime, endTime, serviceName);
-        URI uri = buildURI(REQUEST_SUMMERY_URI);
+    public LogDTO.SummaryResponseDTO fetchLogSummary(Instant startTime, Instant endTime, String serviceName) {
+        // 로그 메시지는 ElasticSearch에서 가져온다
+        String logMessage;
+        try {
+            logMessage = logService.searchLogInStr(startTime, endTime, serviceName);
+        } catch (IOException e) {
+            throw new CustomException(ExceptionCode.ELASTIC_SEARCH_ERROR);
+        }
+
+        // 검색 결과가 빈 값이면 null을 반환
+        if (logMessage == null || logMessage.isEmpty()) {
+            return null;
+        }
 
         return webClient.post()
-                .uri(uri)
+                .uri(buildURI(REQUEST_SUMMERY_URI))
                 .bodyValue(new LogDTO.SummaryRequestDTO(logMessage))
                 .retrieve()
                 .bodyToMono(LogDTO.SummaryResponseDTO.class)
