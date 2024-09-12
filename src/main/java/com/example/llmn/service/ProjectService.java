@@ -91,7 +91,7 @@ public class ProjectService {
                 () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
         );
 
-        String recentLog = logService.getRecentLogInStr(project.getContainerName(), 2L);
+        String recentLog = logService.findRecentLogInStr(project.getContainerName(), 2L);
 
         return new ProjectResponse.FindProjectByIdDTO(project.getProjectName(), project.getDescription(), "", recentLog);
     }

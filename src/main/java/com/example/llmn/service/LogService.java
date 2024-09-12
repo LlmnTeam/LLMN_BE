@@ -98,7 +98,7 @@ public class LogService {
                 .collect(Collectors.toList());
     }
 
-    public String getRecentLogInStr(String serviceName, Long cnt) throws IOException {
+    public String findRecentLogInStr(String serviceName, Long cnt) throws IOException {
         // Elasticsearch 쿼리 생성
         SearchRequest.Builder searchBuilder = new SearchRequest.Builder()
                 .index("docker-logs-*")
@@ -129,7 +129,7 @@ public class LogService {
         return String.join("\n", messages);  // 각 로그 사이에 줄 바꿈 추가
     }
 
-    public List<String> getLogFilesList(String directoryPath) throws IOException {
+    public List<String> findLogFilesList(String directoryPath) throws IOException {
         // logs 디렉토리 경로
         Path logDirPath = Paths.get(directoryPath);
 
@@ -147,6 +147,25 @@ public class LogService {
                     .collect(Collectors.toList());
         } catch (IOException e) {
             log.error("로그 파일 목록을 가져오는 중 오류 발생", e);
+            throw e;
+        }
+    }
+
+    public String readLogFile(String fileName) throws IOException {
+        // 로그 파일은 logs 디렉토리에 위치
+        Path logFilePath = Paths.get("logs", fileName);
+
+        // 파일이 존재하는지 확인
+        if (!Files.exists(logFilePath)) {
+            throw new IOException("해당 로그 파일이 존재하지 않습니다: " + fileName);
+        }
+
+        // 파일 내용을 읽어서 하나의 문자열로 변환
+        try {
+            List<String> lines = Files.readAllLines(logFilePath);  // 파일의 모든 줄을 읽음
+            return String.join("\n", lines);  // 줄 단위로 합쳐서 하나의 문자열로 반환 (각 줄을 \n으로 구분)
+        } catch (IOException e) {
+            log.error("로그 파일을 읽는 중 오류 발생: " + fileName, e);
             throw e;
         }
     }
