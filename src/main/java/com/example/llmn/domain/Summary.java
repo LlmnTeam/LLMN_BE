@@ -20,12 +20,17 @@ public class Summary extends TimeStamp{
     @JoinColumn(name = "project_id")
     private Project project;
 
+    @Column
+    @Enumerated(EnumType.STRING)
+    private SummaryType summaryType;
+
     @Column(columnDefinition="TEXT")
     private String content;
 
     @Builder
-    public Summary(Project project, String content) {
+    public Summary(Project project, SummaryType summaryType, String content) {
         this.project = project;
+        this.summaryType = summaryType;
         this.content = content;
     }
 }

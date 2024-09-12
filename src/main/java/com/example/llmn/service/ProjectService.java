@@ -5,10 +5,7 @@ import com.example.llmn.controller.DTO.ProjectRequest;
 import com.example.llmn.controller.DTO.ProjectResponse;
 import com.example.llmn.core.errors.CustomException;
 import com.example.llmn.core.errors.ExceptionCode;
-import com.example.llmn.domain.ContainerStatus;
-import com.example.llmn.domain.Project;
-import com.example.llmn.domain.Summary;
-import com.example.llmn.domain.User;
+import com.example.llmn.domain.*;
 import com.example.llmn.repository.ProjectRepository;
 import com.example.llmn.repository.SummaryRepository;
 import jakarta.persistence.EntityManager;
@@ -172,14 +169,24 @@ public class ProjectService {
                 .forEach(project -> {
                     LogDTO.SummaryResponseDTO summaryDTO = llmService.fetchLogSummary(startTime, endTime, project.getContainerName());
 
-                    // 검색 결과가 빈 값이라 요약 값이 없는 경우
                     if(summaryDTO == null){
                         return;
                     }
 
-                    Summary generalSummary = new Summary(project, summaryDTO.generalSummary());
+                    // 일반 요약 저장
+                    Summary generalSummary = Summary.builder()
+                            .project(project)
+                            .content(summaryDTO.generalSummary())
+                            .summaryType(SummaryType.GENERAL)
+                            .build();
                     summaryRepository.save(generalSummary);
-                    Summary anomalySummary = new Summary(project, summaryDTO.anomalySummary());
+
+                    // 비정상 패턴 요약 저장
+                    Summary anomalySummary = Summary.builder()
+                            .project(project)
+                            .content(summaryDTO.anomalySummary())
+                            .summaryType(SummaryType.ANOMALY)
+                            .build();
                     summaryRepository.save(anomalySummary);
                 });
     }
