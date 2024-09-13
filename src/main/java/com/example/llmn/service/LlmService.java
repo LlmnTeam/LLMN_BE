@@ -53,6 +53,47 @@ public class LlmService {
                 .block();
     }
 
+    public LogDTO.SummaryResponseDTO fetchMetricSummary(){
+        MetricResponse.FindMetricHistoryDTO metricHistory = metricService.findMetricHistory(METRIC_HISTORY_PREVIOUS_HOUR);
+
+        // StringBuilder를 사용하여 메트릭 정보를 문자열로 변환
+        StringBuilder logMessageBuilder = new StringBuilder();
+
+        // CPU 메트릭 정보를 추가
+        logMessageBuilder.append("CPU Metrics:\n");
+        for (MetricResponse.CpuMetricDTO cpuMetric : metricHistory.cpuMetrics()) {
+            logMessageBuilder.append(String.format("- Time: %s, CPU Usage: %.2f%%\n", cpuMetric.time(), cpuMetric.cpuUsage()));
+        }
+
+        // 메모리 메트릭 정보를 추가
+        logMessageBuilder.append("\nMemory Metrics:\n");
+        for (MetricResponse.MemoryMetricDTO memoryMetric : metricHistory.memoryMetrics()) {
+            logMessageBuilder.append(String.format("- Time: %s, Memory Usage: %d MB\n", memoryMetric.time(), memoryMetric.memoryUsage()));
+        }
+
+        // 네트워크 In 메트릭 정보를 추가
+        logMessageBuilder.append("\nNetwork In Metrics:\n");
+        for (MetricResponse.NetworkInMetricDTO networkInMetric : metricHistory.networkInMetrics()) {
+            logMessageBuilder.append(String.format("- Time: %s, Network Received: %.2f MB\n", networkInMetric.time(), networkInMetric.networkReceived()));
+        }
+
+        // 네트워크 Out 메트릭 정보를 추가
+        logMessageBuilder.append("\nNetwork Out Metrics:\n");
+        for (MetricResponse.NetworkOutMetricDTO networkOutMetric : metricHistory.networkOutMetrics()) {
+            logMessageBuilder.append(String.format("- Time: %s, Network Sent: %.2f MB\n", networkOutMetric.time(), networkOutMetric.networkSent()));
+        }
+
+        // logMessage 문자열로 변환
+        String logMessage = logMessageBuilder.toString();
+
+        return webClient.post()
+                .uri(buildURI(REQUEST_SUMMERY_URI))
+                .bodyValue(new LogDTO.SummaryRequestDTO(logMessage))
+                .retrieve()
+                .bodyToMono(LogDTO.SummaryResponseDTO.class)
+                .block();
+    }
+
     private URI buildURI(String uri) {
         UriComponentsBuilder uriBuilder = UriComponentsBuilder.fromHttpUrl(uri);
         return uriBuilder.build().encode().toUri();
