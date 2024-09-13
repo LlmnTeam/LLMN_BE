@@ -27,7 +27,6 @@ import java.util.List;
 public class LogController {
 
     private final LogService logService;
-    private final LlmService llmService;
 
     @PatchMapping("/log")
     public ResponseEntity<?> fetchLogs() throws IOException {

@@ -32,7 +32,6 @@ public class ProjectService {
 
     private final DockerService dockerService;
     private final LogService logService;
-    private final LlmService llmService;
     private final ProjectRepository projectRepository;
     private final SummaryRepository summaryRepository;
     private final EntityManager entityManager;
@@ -166,7 +165,7 @@ public class ProjectService {
         );
 
         // 최신순으로 페이지네이션
-        List<Summary> summaries = summaryRepository.findSummaryById(projectId, pageable).getContent();
+        List<Summary> summaries = summaryRepository.findSummaryByProjectId(projectId, pageable).getContent();
         List<ProjectResponse.SummaryDTO> summaryDTOS = summaries.stream()
                 .map(summary -> new ProjectResponse.SummaryDTO(formatLocalDateTime(summary.getCreatedDate()), summary.getContent()))
                 .toList();
@@ -209,41 +208,6 @@ public class ProjectService {
                 fileName,
                 logMessage
         );
-    }
-
-    @Transactional
-    @Scheduled(cron = "0 0,30 * * * *")
-    public void summaryLog(){
-        List<Project> projects = projectRepository.findAll();
-
-        Instant endTime = Instant.now();
-        Instant startTime = endTime.minus(30, ChronoUnit.MINUTES);
-
-        projects.stream()
-                .filter(project -> !project.getContainerStatus().equals(ContainerStatus.NOT_CONNECTED))
-                .forEach(project -> {
-                    LogDTO.SummaryResponseDTO summaryDTO = llmService.fetchLogSummary(startTime, endTime, project.getContainerName());
-
-                    if(summaryDTO == null){
-                        return;
-                    }
-
-                    // 일반 요약 저장
-                    Summary generalSummary = Summary.builder()
-                            .project(project)
-                            .content(summaryDTO.generalSummary())
-                            .summaryType(SummaryType.GENERAL)
-                            .build();
-                    summaryRepository.save(generalSummary);
-
-                    // 비정상 패턴 요약 저장
-                    Summary anomalySummary = Summary.builder()
-                            .project(project)
-                            .content(summaryDTO.anomalySummary())
-                            .summaryType(SummaryType.ANOMALY)
-                            .build();
-                    summaryRepository.save(anomalySummary);
-                });
     }
 
     public static String formatLocalDateTime(LocalDateTime localDateTime) {

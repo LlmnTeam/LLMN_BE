@@ -8,7 +8,8 @@ import lombok.Getter;
 public enum SummaryType {
 
     GENERAL("일반요약"),
-    ANOMALY("비정상");
+    ANOMALY("비정상"),
+    PERFORMANCE("성능");
 
     private String value;
 }

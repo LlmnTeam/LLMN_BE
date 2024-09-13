@@ -23,10 +23,10 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class LogRequest(BaseModel):
-    logMessage: str
+    cotent: str
 
 # LLM 요약을 생성하는 함수
-async def generate_log_summary(logMessage: str):    
+async def generate_log_summary(cotent: str):    
     prompt = (
         "### Persona ###\n"
         "You are an expert system log analyst. Your task is to summarize and detect anomalies in the following system logs.\n"
@@ -36,7 +36,7 @@ async def generate_log_summary(logMessage: str):
         "Use icons or emojis to enhance readability and highlight key sections.\n"
         "\n"
         "### Log Data ###\n"
-        f"{logMessage}\n"
+        f"{cotent}\n"
         "\n"
         "### General Summary ###\n"
         "1. Summarize the key events from the log data.\n"
@@ -92,7 +92,7 @@ async def generate_log_summary(logMessage: str):
 
     return general_summary, anomaly_summary
 
-async def generate_performance_summary(performanceMetrics: str):    
+async def generate_performance_summary(cotent: str):    
     prompt = (
         "### Persona ###\n"
         "You are an expert system performance analyst. Your task is to summarize and identify abnormal patterns in the following performance metrics.\n"
@@ -102,7 +102,7 @@ async def generate_performance_summary(performanceMetrics: str):
         "Use icons or emojis to enhance readability and highlight key sections.\n"
         "\n"
         "### Performance Data ###\n"
-        f"{performanceMetrics}\n"
+        f"{cotent}\n"
         "\n"
         "### Performance Summary ###\n"
         "1. Format the response in the following structure with icons or emojis to improve readability:\n"
@@ -146,14 +146,14 @@ async def generate_performance_summary(performanceMetrics: str):
     formatted_prompt = prompt_template.format(prompt=prompt)
 
     response = chatmodel.invoke(formatted_prompt)
-    metric_summary = response.content  
+    performance_summary = response.content  
 
-    return metric_summary
+    return performance_summary
 
 # FastAPI 엔드포인트
 @app.post("/process/logSummary")
-async def process_logs(request: LogRequest):
-    general_summary, anomaly_summary = await generate_log_summary(request.logMessage)
+async def process_log_summary(request: LogRequest):
+    general_summary, anomaly_summary = await generate_log_summary(request.cotent)
     
     # 결과를 JSON으로 반환
     return {
@@ -161,10 +161,10 @@ async def process_logs(request: LogRequest):
         "anomalySummary": anomaly_summary
     }
 
-@app.post("/process/metricSummary")
-async def process_logs(request: LogRequest):
-    metric_summary = await generate_performance_summary(request.logMessage)
+@app.post("/process/performanceSummary")
+async def process_performance_summary(request: LogRequest):
+    performance_summary = await generate_performance_summary(request.cotent)
     
     return {
-        "metricSummary": metric_summary
+        "performance_summary": performance_summary
     }

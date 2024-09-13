@@ -2,7 +2,7 @@ package com.example.llmn.controller.DTO;
 
 public class LogDTO {
 
-    public record SummaryRequestDTO(String logMessage){}
+    public record SummaryRequestDTO(String cotent){}
 
     public record SummaryResponseDTO(String generalSummary, String anomalySummary){}
 

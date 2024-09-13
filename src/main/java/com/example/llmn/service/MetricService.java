@@ -1,9 +1,13 @@
 package com.example.llmn.service;
 
+import com.example.llmn.controller.DTO.LogDTO;
 import com.example.llmn.controller.DTO.MetricDTO;
 import com.example.llmn.controller.DTO.MetricResponse;
 import com.example.llmn.domain.Metric;
+import com.example.llmn.domain.Summary;
+import com.example.llmn.domain.SummaryType;
 import com.example.llmn.repository.MetricRepository;
+import com.example.llmn.repository.SummaryRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
