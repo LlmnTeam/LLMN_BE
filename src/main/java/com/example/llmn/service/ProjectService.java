@@ -11,18 +11,16 @@ import com.example.llmn.repository.SummaryRepository;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.io.IOException;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -170,7 +168,7 @@ public class ProjectService {
         // 최신순으로 페이지네이션
         List<Summary> summaries = summaryRepository.findSummaryById(projectId, pageable).getContent();
         List<ProjectResponse.SummaryDTO> summaryDTOS = summaries.stream()
-                .map(summary -> new ProjectResponse.SummaryDTO(summary.getCreatedDate(), summary.getContent()))
+                .map(summary -> new ProjectResponse.SummaryDTO(formatLocalDateTime(summary.getCreatedDate()), summary.getContent()))
                 .toList();
 
         return new ProjectResponse.FindProjectSummaryDTO(
@@ -246,5 +244,10 @@ public class ProjectService {
                             .build();
                     summaryRepository.save(anomalySummary);
                 });
+    }
+
+    public static String formatLocalDateTime(LocalDateTime localDateTime) {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+        return localDateTime.format(formatter);
     }
 }

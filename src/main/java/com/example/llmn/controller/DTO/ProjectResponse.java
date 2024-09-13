@@ -50,5 +50,5 @@ public class ProjectResponse {
             String description,
             List<SummaryDTO> summaries){}
 
-    public record SummaryDTO(LocalDateTime time, String content){}
+    public record SummaryDTO(String time, String content){}
 }

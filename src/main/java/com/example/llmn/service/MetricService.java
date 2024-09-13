@@ -65,9 +65,9 @@ public class MetricService {
     }
 
     @Transactional(readOnly = true)
-    public MetricResponse.FindMetricHistoryDTO findMetricHistory(){
+    public MetricResponse.FindMetricHistoryDTO findMetricHistory(int minusHour){
         LocalDateTime now = LocalDateTime.now().withMinute(0).withSecond(0).withNano(0);
-        List<Metric> metrics = metricRepository.findALlWithinDate(now.minusDays(1));
+        List<Metric> metrics = metricRepository.findALlWithinDate(now.minusHours(minusHour));
 
         // 시간 형식 "HH:mm"
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm");

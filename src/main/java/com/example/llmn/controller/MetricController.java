@@ -19,10 +19,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 public class MetricController {
 
     private final MetricService metricService;
+    private static final int METRIC_HISTORY_PREVIOUS_HOUR = 24;
 
     @GetMapping("/metrics")
     public ResponseEntity<?> findProjectList() {
-        MetricResponse.FindMetricHistoryDTO responseDTO = metricService.findMetricHistory();
+        MetricResponse.FindMetricHistoryDTO responseDTO = metricService.findMetricHistory(METRIC_HISTORY_PREVIOUS_HOUR);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 }

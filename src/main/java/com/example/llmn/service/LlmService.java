@@ -1,6 +1,7 @@
 package com.example.llmn.service;
 
 import com.example.llmn.controller.DTO.LogDTO;
+import com.example.llmn.controller.DTO.MetricResponse;
 import com.example.llmn.core.config.LogWebSocketHandler;
 import com.example.llmn.core.errors.CustomException;
 import com.example.llmn.core.errors.ExceptionCode;
@@ -19,9 +20,11 @@ import java.time.Instant;
 public class LlmService {
 
     private final LogService logService;
+    private final MetricService metricService;
     private final LogWebSocketHandler logWebSocketHandler;
     private final WebClient webClient;
     private static final String REQUEST_SUMMERY_URI = "http://localhost:8000/process_logs";
+    private static final int METRIC_HISTORY_PREVIOUS_HOUR = 1;
 
     // 주기적으로 로그를 가져와 특정 서비스의 로그만 전송
     @Scheduled(fixedRate = 50000)
