@@ -33,6 +33,12 @@ public class ProjectController {
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 
+    @GetMapping("/project/{projectId}/info")
+    public ResponseEntity<?> findProjectInfoById(@PathVariable Long projectId) {
+        ProjectResponse.FindProjectInfoByIdDTO responseDTO = projectService.findProjectInfoById(projectId);
+        return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
+    }
+
     @PatchMapping("/project/{projectId}")
     public ResponseEntity<?> updateProject(@RequestBody ProjectRequest.UpdateProjectDTO requestDTO,
                                            @PathVariable Long projectId, @AuthenticationPrincipal CustomUserDetails userDetails) {
