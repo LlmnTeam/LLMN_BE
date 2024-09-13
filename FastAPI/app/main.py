@@ -92,7 +92,7 @@ async def generate_log_summary(logMessage: str):
 
     return general_summary, anomaly_summary
 
-async def generate_performance_metric_summary(performanceMetrics: str):    
+async def generate_performance_summary(performanceMetrics: str):    
     prompt = (
         "### Persona ###\n"
         "You are an expert system performance analyst. Your task is to summarize and identify abnormal patterns in the following performance metrics.\n"
@@ -145,14 +145,13 @@ async def generate_performance_metric_summary(performanceMetrics: str):
     prompt_template = PromptTemplate(input_variables=["prompt"], template="{prompt}")
     formatted_prompt = prompt_template.format(prompt=prompt)
 
-    # Chat 모델 호출하여 응답 받기
     response = chatmodel.invoke(formatted_prompt)
     metric_summary = response.content  
 
     return metric_summary
 
 # FastAPI 엔드포인트
-@app.post("/process_logs")
+@app.post("/process/logSummary")
 async def process_logs(request: LogRequest):
     general_summary, anomaly_summary = await generate_log_summary(request.logMessage)
     
@@ -160,4 +159,12 @@ async def process_logs(request: LogRequest):
     return {
         "generalSummary": general_summary,
         "anomalySummary": anomaly_summary
+    }
+
+@app.post("/process/metricSummary")
+async def process_logs(request: LogRequest):
+    metric_summary = await generate_performance_summary(request.logMessage)
+    
+    return {
+        "metricSummary": metric_summary
     }

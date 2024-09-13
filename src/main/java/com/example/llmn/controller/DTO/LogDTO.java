@@ -5,4 +5,6 @@ public class LogDTO {
     public record SummaryRequestDTO(String logMessage){}
 
     public record SummaryResponseDTO(String generalSummary, String anomalySummary){}
+
+    public record PerformanceSummaryResponseDTO(String performanceSummary){}
 }

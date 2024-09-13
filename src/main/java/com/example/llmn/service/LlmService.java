@@ -23,7 +23,7 @@ public class LlmService {
     private final MetricService metricService;
     private final LogWebSocketHandler logWebSocketHandler;
     private final WebClient webClient;
-    private static final String REQUEST_SUMMERY_URI = "http://localhost:8000/process_logs";
+    private static final String REQUEST_SUMMERY_URI = "http://localhost:8000/process/logSummary";
     private static final int METRIC_HISTORY_PREVIOUS_HOUR = 1;
 
     // 주기적으로 로그를 가져와 특정 서비스의 로그만 전송
@@ -53,7 +53,7 @@ public class LlmService {
                 .block();
     }
 
-    public LogDTO.SummaryResponseDTO fetchMetricSummary(){
+    public LogDTO.PerformanceSummaryResponseDTO fetchMetricSummary(){
         MetricResponse.FindMetricHistoryDTO metricHistory = metricService.findMetricHistory(METRIC_HISTORY_PREVIOUS_HOUR);
 
         // StringBuilder를 사용하여 메트릭 정보를 문자열로 변환
@@ -90,7 +90,7 @@ public class LlmService {
                 .uri(buildURI(REQUEST_SUMMERY_URI))
                 .bodyValue(new LogDTO.SummaryRequestDTO(logMessage))
                 .retrieve()
-                .bodyToMono(LogDTO.SummaryResponseDTO.class)
+                .bodyToMono(LogDTO.PerformanceSummaryResponseDTO.class)
                 .block();
     }
 
