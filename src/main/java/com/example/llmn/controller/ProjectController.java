@@ -33,6 +33,13 @@ public class ProjectController {
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 
+    @PatchMapping("/project/{projectId}")
+    public ResponseEntity<?> updateProject(@RequestBody ProjectRequest.UpdateProjectDTO requestDTO,
+                                           @PathVariable Long projectId, @AuthenticationPrincipal CustomUserDetails userDetails) {
+        projectService.updateProject(requestDTO, projectId, userDetails.getUser().getId());
+        return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, null));
+    }
+
     @GetMapping("/project")
     public ResponseEntity<?> findProjectList(@AuthenticationPrincipal CustomUserDetails userDetails) throws Exception {
         ProjectResponse.FindProjectListDTO responseDTO = projectService.findProjectList(userDetails.getUser().getId());
