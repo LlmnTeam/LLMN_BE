@@ -96,7 +96,7 @@ public class ProjectService {
     }
 
     @Transactional(readOnly = true)
-    public ProjectResponse.FindProjectByIdDTO findProjectById(Long projectId) throws IOException {
+    public ProjectResponse.FindProjectByIdDTO findProjectById(Long projectId) {
         // 존재하지 않으면 에러
         Project project = projectRepository.findById(projectId).orElseThrow(
                 () -> new CustomException(ExceptionCode.USER_NOT_FOUND)

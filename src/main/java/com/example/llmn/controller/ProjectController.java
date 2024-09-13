@@ -40,7 +40,7 @@ public class ProjectController {
     }
 
     @GetMapping("/project/{projectId}")
-    public ResponseEntity<?> findProjectById(@PathVariable Long projectId) throws Exception {
+    public ResponseEntity<?> findProjectById(@PathVariable Long projectId) {
         ProjectResponse.FindProjectByIdDTO responseDTO = projectService.findProjectById(projectId);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
@@ -53,7 +53,7 @@ public class ProjectController {
     }
 
     @GetMapping("/project/{projectId}/logs")
-    public ResponseEntity<?> findProjectLogList(@PathVariable Long projectId) throws Exception {
+    public ResponseEntity<?> findProjectLogList(@PathVariable Long projectId) {
         ProjectResponse.FindProjectLogListDTO responseDTO = projectService.findProjectLogList(projectId);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }

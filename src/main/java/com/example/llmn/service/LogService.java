@@ -60,114 +60,126 @@ public class LogService {
         log.info("업데이트 완료");
     }
 
-    public List<LogData> searchLogList(Instant startTime, Instant endTime, String logLevel, String serviceName) throws IOException {
-        // Elasticsearch 쿼리 생성
-        SearchRequest.Builder searchBuilder = new SearchRequest.Builder()
-                .index("docker-logs-*")
-                .query(q -> {
-                    BoolQuery.Builder boolQuery = new BoolQuery.Builder();
+    public List<LogData> searchLogList(Instant startTime, Instant endTime, String logLevel, String serviceName) {
+        try {
+            // Elasticsearch 쿼리 생성
+            SearchRequest.Builder searchBuilder = new SearchRequest.Builder()
+                    .index("docker-logs-*")
+                    .query(q -> {
+                        BoolQuery.Builder boolQuery = new BoolQuery.Builder();
 
-                    // 시간 범위 필터
-                    boolQuery.must(m -> m.range(r -> r
-                            .field("@timestamp")
-                            .gte(JsonData.of(startTime.toString()))
-                            .lte(JsonData.of(endTime.toString()))
-                    ));
-
-                    // 로그 레벨 필터 (필터 값이 null이 아닐 때만 추가)
-                    if (logLevel != null) {
-                        boolQuery.filter(f -> f.term(t -> t
-                                .field("log_level")
-                                .value(logLevel)
+                        // 시간 범위 필터
+                        boolQuery.must(m -> m.range(r -> r
+                                .field("@timestamp")
+                                .gte(JsonData.of(startTime.toString()))
+                                .lte(JsonData.of(endTime.toString()))
                         ));
-                    }
 
-                    // 서비스 이름 필터
-                    if (serviceName != null) {
-                        boolQuery.filter(f -> f.term(t -> t
-                                .field("service_name")
-                                .value(serviceName)
-                        ));
-                    }
+                        // 로그 레벨 필터 (필터 값이 null이 아닐 때만 추가)
+                        if (logLevel != null) {
+                            boolQuery.filter(f -> f.term(t -> t
+                                    .field("log_level")
+                                    .value(logLevel)
+                            ));
+                        }
 
-                    // BoolQuery를 Query로 변환하여 반환
-                    return q.bool(boolQuery.build());
-                });
+                        // 서비스 이름 필터
+                        if (serviceName != null) {
+                            boolQuery.filter(f -> f.term(t -> t
+                                    .field("service_name")
+                                    .value(serviceName)
+                            ));
+                        }
 
-        // Elasticsearch에서 쿼리 실행
-        SearchResponse<Map> response = client.search(searchBuilder.build(), Map.class);
+                        // BoolQuery를 Query로 변환하여 반환
+                        return q.bool(boolQuery.build());
+                    });
 
-        // 검색 결과를 LogData로 변환하여 반환
-        return response.hits().hits().stream()
-                .map(hit -> convertToLogData(hit.source()))
-                .collect(Collectors.toList());
+            // Elasticsearch에서 쿼리 실행
+            SearchResponse<Map> response = client.search(searchBuilder.build(), Map.class);
+
+            // 검색 결과를 LogData로 변환하여 반환
+            return response.hits().hits().stream()
+                    .map(hit -> convertToLogData(hit.source()))
+                    .collect(Collectors.toList());
+        } catch (IOException e) {
+            throw new CustomException(ExceptionCode.ELASTIC_SEARCH_ERROR);
+        }
     }
 
-    public String searchLogInStr(Instant startTime, Instant endTime, String serviceName) throws IOException {
-        // Elasticsearch 쿼리 생성
-        SearchRequest.Builder searchBuilder = new SearchRequest.Builder()
-                .index("docker-logs-*")
-                .query(q -> {
-                    BoolQuery.Builder boolQuery = new BoolQuery.Builder();
+    public String searchLogInStr(Instant startTime, Instant endTime, String serviceName) {
+        try {
+            // Elasticsearch 쿼리 생성
+            SearchRequest.Builder searchBuilder = new SearchRequest.Builder()
+                    .index("docker-logs-*")
+                    .query(q -> {
+                        BoolQuery.Builder boolQuery = new BoolQuery.Builder();
 
-                    // 시간 범위 필터
-                    boolQuery.must(m -> m.range(r -> r
-                            .field("@timestamp")
-                            .gte(JsonData.of(startTime.toString()))
-                            .lte(JsonData.of(endTime.toString()))
-                    ));
-
-                    // 서비스 이름 필터
-                    if (serviceName != null) {
-                        boolQuery.filter(f -> f.term(t -> t
-                                .field("service_name")
-                                .value(serviceName)
+                        // 시간 범위 필터
+                        boolQuery.must(m -> m.range(r -> r
+                                .field("@timestamp")
+                                .gte(JsonData.of(startTime.toString()))
+                                .lte(JsonData.of(endTime.toString()))
                         ));
-                    }
 
-                    // BoolQuery를 Query로 변환하여 반환
-                    return q.bool(boolQuery.build());
-                });
+                        // 서비스 이름 필터
+                        if (serviceName != null) {
+                            boolQuery.filter(f -> f.term(t -> t
+                                    .field("service_name")
+                                    .value(serviceName)
+                            ));
+                        }
 
-        // Elasticsearch에서 쿼리 실행
-        SearchResponse<Map> response = client.search(searchBuilder.build(), Map.class);
+                        // BoolQuery를 Query로 변환하여 반환
+                        return q.bool(boolQuery.build());
+                    });
 
-        List<String> messages = response.hits().hits().stream()
-                .map(hit -> convertToString(hit.source()))
-                .toList();
+            // Elasticsearch에서 쿼리 실행
+            SearchResponse<Map> response = client.search(searchBuilder.build(), Map.class);
 
-        return String.join("\n", messages);  // 각 로그 사이에 줄 바꿈 추가
+            List<String> messages = response.hits().hits().stream()
+                    .map(hit -> convertToString(hit.source()))
+                    .toList();
+
+            return String.join("\n", messages);  // 각 로그 사이에 줄 바꿈 추가
+        } catch (IOException e) {
+            throw new CustomException(ExceptionCode.ELASTIC_SEARCH_ERROR);
+        }
     }
 
-    public String searchRecentLogInStr(String serviceName, Long cnt) throws IOException {
-        // Elasticsearch 쿼리 생성
-        SearchRequest.Builder searchBuilder = new SearchRequest.Builder()
-                .index("docker-logs-*")
-                .query(q -> q.bool(b -> b
-                        .filter(f -> f.term(t -> t
-                                .field("service_name")
-                                .value(serviceName)
-                        ))
-                ))
-                .sort(s -> s
-                        .field(f -> f
-                                .field("@timestamp")  // 타임스탬프 기준으로 정렬
-                                .order(SortOrder.Desc)  // 가장 최근 순으로 정렬 (내림차순)
-                        )
-                )
-                .size(cnt.intValue()); // 최대 cnt 개만큼의 로그를 가져옴
+    public String searchRecentLogInStr(String serviceName, Long cnt) {
+        try {
+            // Elasticsearch 쿼리 생성
+            SearchRequest.Builder searchBuilder = new SearchRequest.Builder()
+                    .index("docker-logs-*")
+                    .query(q -> q.bool(b -> b
+                            .filter(f -> f.term(t -> t
+                                    .field("service_name")
+                                    .value(serviceName)
+                            ))
+                    ))
+                    .sort(s -> s
+                            .field(f -> f
+                                    .field("@timestamp")  // 타임스탬프 기준으로 정렬
+                                    .order(SortOrder.Desc)  // 가장 최근 순으로 정렬 (내림차순)
+                            )
+                    )
+                    .size(cnt.intValue()); // 최대 cnt 개만큼의 로그를 가져옴
 
-        SearchResponse<Map> response = client.search(searchBuilder.build(), Map.class);
+            SearchResponse<Map> response = client.search(searchBuilder.build(), Map.class);
 
-        // 검색 결과를 LogData로 변환한 후 역순으로 정렬하여 반환
-        List<String> messages = response.hits().hits().stream()
-                .map(hit -> convertToString(hit.source()))
-                .collect(Collectors.toList());
+            // 검색 결과를 LogData로 변환한 후 역순으로 정렬하여 반환
+            List<String> messages = response.hits().hits().stream()
+                    .map(hit -> convertToString(hit.source()))
+                    .collect(Collectors.toList());
 
-        // 내림차순으로 받아온 데이터를 다시 역순으로 뒤집어 가장 오래된 로그가 먼저 오도록 함
-        Collections.reverse(messages);
+            // 내림차순으로 받아온 데이터를 다시 역순으로 뒤집어 가장 오래된 로그가 먼저 오도록 함
+            Collections.reverse(messages);
 
-        return String.join("\n\n", messages);  // 각 로그 사이에 줄 바꿈 추가
+            return String.join("\n\n", messages);  // 각 로그 사이에 줄 바꿈 추가
+        } catch (IOException e) {
+            throw new CustomException(ExceptionCode.ELASTIC_SEARCH_ERROR);
+        }
     }
 
     public List<String> findLogFileList() {

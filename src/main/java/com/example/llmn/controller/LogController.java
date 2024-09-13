@@ -36,7 +36,10 @@ public class LogController {
     }
 
     @GetMapping("/log")
-    public ResponseEntity<?> searchLogs(@RequestParam Instant startTime, @RequestParam Instant endTime, @RequestParam(required = false) String logLevel, @RequestParam(required = false) String serviceName) throws IOException {
+    public ResponseEntity<?> searchLogs(@RequestParam Instant startTime,
+                                        @RequestParam Instant endTime,
+                                        @RequestParam(required = false) String logLevel,
+                                        @RequestParam(required = false) String serviceName) {
         List<LogData> responseDTO = logService.searchLogList(startTime, endTime, logLevel, serviceName);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
