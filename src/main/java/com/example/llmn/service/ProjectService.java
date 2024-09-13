@@ -167,15 +167,16 @@ public class ProjectService {
                 () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
         );
 
-        // 최신순으로 페이지네이션 => 한 페이지 내의 정렬은 오래된 순이라 뒤집기
-        List<String> summaries = new ArrayList<>(summaryRepository.findSummaryById(projectId, pageable).getContent());
-        Collections.reverse(summaries);
-        String summary = String.join("\n\n", summaries);
+        // 최신순으로 페이지네이션
+        List<Summary> summaries = summaryRepository.findSummaryById(projectId, pageable).getContent();
+        List<ProjectResponse.SummaryDTO> summaryDTOS = summaries.stream()
+                .map(summary -> new ProjectResponse.SummaryDTO(summary.getCreatedDate(), summary.getContent()))
+                .toList();
 
         return new ProjectResponse.FindProjectSummaryDTO(
                 project.getProjectName(),
                 project.getDescription(),
-                summary);
+                summaryDTOS);
     }
 
     @Transactional(readOnly = true)

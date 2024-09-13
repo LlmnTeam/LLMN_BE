@@ -25,7 +25,7 @@ public class ProjectController {
 
     private final ProjectService projectService;
     private final DockerService dockerService;
-    private static final String SORT_BY_ID = "id";
+    private static final String SORT_BY_DATE = "createdDate";
 
     @PostMapping("/project")
     public ResponseEntity<?> createProject(@RequestBody ProjectRequest.CreateProjectDTO requestDTO, @AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -60,7 +60,7 @@ public class ProjectController {
 
     @GetMapping("/project/{projectId}/summaries")
     public ResponseEntity<?> findProjectSummary(@PathVariable Long projectId,
-                                                @PageableDefault(size = 5, sort = SORT_BY_ID, direction = Sort.Direction.DESC) Pageable pageable){
+                                                @PageableDefault(size = 5, sort = SORT_BY_DATE, direction = Sort.Direction.DESC) Pageable pageable){
         ProjectResponse.FindProjectSummaryDTO responseDTO = projectService.findProjectSummary(projectId, pageable);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }

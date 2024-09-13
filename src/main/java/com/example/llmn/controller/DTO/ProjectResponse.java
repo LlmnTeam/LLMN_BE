@@ -48,5 +48,7 @@ public class ProjectResponse {
     public record FindProjectSummaryDTO(
             String name,
             String description,
-            String summary){}
+            List<SummaryDTO> summaries){}
+
+    public record SummaryDTO(LocalDateTime time, String content){}
 }
