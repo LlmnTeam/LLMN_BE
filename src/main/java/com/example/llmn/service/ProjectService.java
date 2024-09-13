@@ -61,6 +61,21 @@ public class ProjectService {
         return new ProjectResponse.CreateProjectDTO(project.getId());
     }
 
+    // 수정 시 사용할 API
+    @Transactional(readOnly = true)
+    public ProjectResponse.FindProjectInfoByIdDTO findProjectInfoById(Long projectId){
+        // 존재하지 않으면 에러
+        Project project = projectRepository.findById(projectId).orElseThrow(
+                () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
+        );
+
+        return new ProjectResponse.FindProjectInfoByIdDTO(
+                project.getProjectName(),
+                project.getContainerName(),
+                project.isLocalContainer(),
+                project.getDescription());
+    }
+
     @Transactional
     public void updateProject(ProjectRequest.UpdateProjectDTO requestDTO, Long projectId, Long userId){
         // 존재하지 않으면 에러

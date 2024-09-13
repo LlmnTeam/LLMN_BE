@@ -12,8 +12,7 @@ public class ProjectRequest {
             String containerName,
             boolean isLocalContainer,
             @NotBlank(message="설명을 입력해주세요.")
-            String description
-    ){}
+            String description){}
 
     public record UpdateProjectDTO(
             @NotBlank(message="서비스 이름을 입력해주세요.")
@@ -22,8 +21,7 @@ public class ProjectRequest {
             String containerName,
             boolean isLocalContainer,
             @NotBlank(message="설명을 입력해주세요.")
-            String description
-    ){}
+            String description){}
 
 
     public record ContainerDTO(String name){}
