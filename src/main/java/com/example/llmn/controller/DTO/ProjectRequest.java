@@ -8,12 +8,23 @@ public class ProjectRequest {
     public record CreateProjectDTO(
             @NotBlank(message="서비스 이름을 입력해주세요.")
             @Size(min=2, max=20, message = "서비스 이름은 2자에서 20자 이내여야 합니다.")
-            String serviceName,
+            String projectName,
             String containerName,
             boolean isLocalContainer,
             @NotBlank(message="설명을 입력해주세요.")
             String description
     ){}
+
+    public record UpdateProjectDTO(
+            @NotBlank(message="서비스 이름을 입력해주세요.")
+            @Size(min=2, max=20, message = "서비스 이름은 2자에서 20자 이내여야 합니다.")
+            String projectName,
+            String containerName,
+            boolean isLocalContainer,
+            @NotBlank(message="설명을 입력해주세요.")
+            String description
+    ){}
+
 
     public record ContainerDTO(String name){}
 }

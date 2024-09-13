@@ -9,6 +9,8 @@ import java.util.List;
 
 public class ProjectResponse {
 
+    public record CreateProjectDTO(Long id){}
+
     public record FindProjectListDTO(List<ProjectDTO> projects){}
 
     public record ProjectDTO(

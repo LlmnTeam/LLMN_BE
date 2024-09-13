@@ -40,7 +40,7 @@ public class ProjectService {
     private final EntityManager entityManager;
 
     @Transactional
-    public void createProject(ProjectRequest.CreateProjectDTO requestDTO, Long userId){
+    public ProjectResponse.CreateProjectDTO createProject(ProjectRequest.CreateProjectDTO requestDTO, Long userId){
         // 컨테이너 이름이 들어오지 않으면 NOT_CONNECTED로 처리
         ContainerStatus containerStatus = requestDTO.containerName() != null
                 ? ContainerStatus.NOT_WORKING
@@ -49,7 +49,7 @@ public class ProjectService {
         User user = entityManager.getReference(User.class, userId);
         Project project = Project.builder()
                 .user(user)
-                .projectName(requestDTO.serviceName())
+                .projectName(requestDTO.projectName())
                 .containerName(requestDTO.containerName())
                 .isLocalContainer(requestDTO.isLocalContainer())
                 .description(requestDTO.description())
@@ -57,6 +57,27 @@ public class ProjectService {
                 .build();
 
         projectRepository.save(project);
+
+        return new ProjectResponse.CreateProjectDTO(project.getId());
+    }
+
+    @Transactional
+    public void updateProject(ProjectRequest.UpdateProjectDTO requestDTO, Long projectId, Long userId){
+        // 존재하지 않으면 에러
+        Project project = projectRepository.findById(projectId).orElseThrow(
+                () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
+        );
+
+        // 권한 체크
+        if(project.getUser().getId().equals(userId)){
+            throw new CustomException(ExceptionCode.USER_FORBIDDEN);
+        }
+
+        ContainerStatus containerStatus = requestDTO.containerName() != null
+                ? ContainerStatus.NOT_WORKING
+                : project.getContainerStatus();
+
+        project.updateProject(requestDTO.projectName(), requestDTO.containerName(), requestDTO.description(), requestDTO.isLocalContainer(), containerStatus);
     }
 
     @Transactional

@@ -49,4 +49,12 @@ public class Project extends TimeStamp{
         this.description = description;
         this.isWorking = true;
     }
+
+    public void updateProject(String projectName, String containerName, String description, boolean isLocalContainer, ContainerStatus containerStatus){
+        this.projectName = projectName;
+        this.containerName = containerName;
+        this.description = description;
+        this.isLocalContainer = isLocalContainer;
+        this.containerStatus = containerStatus;
+    }
 }

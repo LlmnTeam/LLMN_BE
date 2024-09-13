@@ -29,8 +29,8 @@ public class ProjectController {
 
     @PostMapping("/project")
     public ResponseEntity<?> createProject(@RequestBody ProjectRequest.CreateProjectDTO requestDTO, @AuthenticationPrincipal CustomUserDetails userDetails) {
-        projectService.createProject(requestDTO, userDetails.getUser().getId());
-        return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, null));
+        ProjectResponse.CreateProjectDTO responseDTO = projectService.createProject(requestDTO, userDetails.getUser().getId());
+        return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 
     @GetMapping("/project")
