@@ -20,7 +20,7 @@ public class Summary extends TimeStamp{
     @JoinColumn(name = "project_id")
     private Project project;
 
-    @Column
+    @Column(length = 50)
     @Enumerated(EnumType.STRING)
     private SummaryType summaryType;
 
