@@ -27,4 +27,8 @@ public interface SummaryRepository extends JpaRepository<Summary, Long> {
             "WHERE s.summaryType IN :types " +
             "AND s.id = (SELECT MAX(subS.id) FROM Summary subS WHERE subS.summaryType = s.summaryType)")
     List<Summary> findLatestSummariesByTypes(@Param("types") List<SummaryType> types);
+
+    @Query("SELECT s FROM Summary s " +
+            "WHERE s.summaryType = :type")
+    Page<Summary> findSummaryByType(@Param("type") SummaryType type, Pageable pageable);
 }

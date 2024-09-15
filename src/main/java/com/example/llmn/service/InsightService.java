@@ -5,6 +5,7 @@ import com.example.llmn.domain.Summary;
 import com.example.llmn.domain.SummaryType;
 import com.example.llmn.repository.SummaryRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,7 +19,7 @@ public class InsightService {
 
     private final SummaryRepository summaryRepository;
 
-    @Transactional
+    @Transactional(readOnly = true)
     public InsightResponse.FindInsightHomeDTO findInsightHome() {
         List<SummaryType> types = List.of(SummaryType.PERFORMANCE, SummaryType.DAILY, SummaryType.TEND, SummaryType.RECOMMENDATION);
         List<Summary> latestSummaries = summaryRepository.findLatestSummariesByTypes(types);
@@ -33,5 +34,19 @@ public class InsightService {
                 summaryMap.getOrDefault(SummaryType.TEND, null),
                 summaryMap.getOrDefault(SummaryType.RECOMMENDATION, null)
         );
+    }
+
+    @Transactional(readOnly = true)
+    public InsightResponse.FindPerformanceSummaryDTO findPerformanceSummary(Pageable pageable){
+        List<Summary> performanceSummaries = summaryRepository.findSummaryByType(SummaryType.PERFORMANCE, pageable).getContent();
+
+        List<InsightResponse.PerformanceSummaryDTO> performanceSummaryDTOS = performanceSummaries.stream()
+                .map(summary -> new InsightResponse.PerformanceSummaryDTO(
+                        summary.getCreatedDate(),
+                        summary.getContent()
+                ))
+                .toList();
+
+        return new InsightResponse.FindPerformanceSummaryDTO(performanceSummaryDTOS);
     }
 }
