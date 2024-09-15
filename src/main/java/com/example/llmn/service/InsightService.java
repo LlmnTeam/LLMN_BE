@@ -9,8 +9,11 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -24,15 +27,25 @@ public class InsightService {
         List<SummaryType> types = List.of(SummaryType.PERFORMANCE, SummaryType.DAILY, SummaryType.TEND, SummaryType.RECOMMENDATION);
         List<Summary> latestSummaries = summaryRepository.findLatestSummariesByTypes(types);
 
-        // SummaryType을 키로 하고 Summary의 content를 값으로 하는 Map 생성
-        Map<SummaryType, String> summaryMap = latestSummaries.stream()
-                .collect(Collectors.toMap(Summary::getSummaryType, Summary::getContent));
+        // SummaryType을 키로 하고 Summary의 content를 값으로 하는 Map
+        Map<SummaryType, Summary> summaryMap = latestSummaries.stream()
+                .collect(Collectors.toMap(Summary::getSummaryType, summary -> summary));
+
+        Function<SummaryType, String> getContent = type -> Optional.ofNullable(summaryMap.get(type))
+                .map(Summary::getContent).orElse(null);
+
+        Function<SummaryType, LocalDateTime> getUpdatedDate = type -> Optional.ofNullable(summaryMap.get(type))
+                .map(Summary::getUpdatedDate).orElse(null);
 
         return new InsightResponse.FindInsightHomeDTO(
-                summaryMap.getOrDefault(SummaryType.PERFORMANCE, null),
-                summaryMap.getOrDefault(SummaryType.DAILY, null),
-                summaryMap.getOrDefault(SummaryType.TEND, null),
-                summaryMap.getOrDefault(SummaryType.RECOMMENDATION, null)
+                getContent.apply(SummaryType.PERFORMANCE),
+                getUpdatedDate.apply(SummaryType.PERFORMANCE),
+                getContent.apply(SummaryType.DAILY),
+                getUpdatedDate.apply(SummaryType.DAILY),
+                getContent.apply(SummaryType.TEND),
+                getUpdatedDate.apply(SummaryType.TEND),
+                getContent.apply(SummaryType.RECOMMENDATION),
+                getUpdatedDate.apply(SummaryType.RECOMMENDATION)
         );
     }
 
