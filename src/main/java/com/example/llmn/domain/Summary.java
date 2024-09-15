@@ -27,10 +27,14 @@ public class Summary extends TimeStamp{
     @Column(columnDefinition="TEXT")
     private String content;
 
+    @Column
+    private boolean isChecked;
+
     @Builder
     public Summary(Project project, SummaryType summaryType, String content) {
         this.project = project;
         this.summaryType = summaryType;
         this.content = content;
+        this.isChecked = false;
     }
 }

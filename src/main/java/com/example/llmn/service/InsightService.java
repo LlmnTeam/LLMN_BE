@@ -56,8 +56,10 @@ public class InsightService {
 
         List<InsightResponse.SummaryDTO> summaryDTOS = performanceSummaries.stream()
                 .map(summary -> new InsightResponse.SummaryDTO(
+                        summary.getId(),
                         formatLocalDateTime(summary.getCreatedDate()),
-                        summary.getContent()
+                        summary.getContent(),
+                        summary.isChecked()
                 ))
                 .toList();
 

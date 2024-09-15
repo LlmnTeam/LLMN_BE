@@ -167,7 +167,11 @@ public class ProjectService {
         // 최신순으로 페이지네이션
         List<Summary> summaries = summaryRepository.findSummaryByProjectId(projectId, pageable).getContent();
         List<ProjectResponse.SummaryDTO> summaryDTOS = summaries.stream()
-                .map(summary -> new ProjectResponse.SummaryDTO(formatLocalDateTime(summary.getCreatedDate()), summary.getContent()))
+                .map(summary -> new ProjectResponse.SummaryDTO(
+                        summary.getId(),
+                        formatLocalDateTime(summary.getCreatedDate()),
+                        summary.getContent(),
+                        summary.isChecked()))
                 .toList();
 
         return new ProjectResponse.FindProjectSummaryDTO(

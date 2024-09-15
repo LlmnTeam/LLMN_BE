@@ -17,5 +17,5 @@ public class InsightResponse {
 
     public record FindSummaryDTO(List<SummaryDTO> summaries){}
 
-    public record SummaryDTO(String time, String content){}
+    public record SummaryDTO(Long id, String time, String content, boolean isChecked){}
 }
