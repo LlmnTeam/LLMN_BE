@@ -33,4 +33,10 @@ public class InsightController {
         InsightResponse.FindPerformanceSummaryDTO responseDTO = insightService.findPerformanceSummary(pageable);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
+
+    @GetMapping("/insight/daily")
+    public ResponseEntity<?> findDailySummary(@PageableDefault(size = 5, sort = SORT_BY_DATE, direction = Sort.Direction.DESC)Pageable pageable) {
+        InsightResponse.FindDailySummaryDTO responseDTO = insightService.findDailySummary(pageable);
+        return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
+    }
 }
