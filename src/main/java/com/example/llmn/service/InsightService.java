@@ -1,6 +1,8 @@
 package com.example.llmn.service;
 
 import com.example.llmn.controller.DTO.InsightResponse;
+import com.example.llmn.core.errors.CustomException;
+import com.example.llmn.core.errors.ExceptionCode;
 import com.example.llmn.domain.Summary;
 import com.example.llmn.domain.SummaryType;
 import com.example.llmn.repository.SummaryRepository;
@@ -64,6 +66,15 @@ public class InsightService {
                 .toList();
 
         return summaryDTOS;
+    }
+
+    @Transactional
+    public void checkSummary(Long summaryId){
+        Summary summary = summaryRepository.findById(summaryId).orElseThrow(
+                () -> new CustomException(ExceptionCode.SUMMARY_NOT_FOUND)
+        );
+
+        summary.updateIsChecked(!summary.isChecked());
     }
 
     public static String formatLocalDateTime(LocalDateTime localDateTime) {
