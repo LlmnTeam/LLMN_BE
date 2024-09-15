@@ -12,6 +12,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 import java.util.List;
@@ -56,5 +57,11 @@ public class InsightController {
         List<InsightResponse.SummaryDTO> summaryDTOS = insightService.findSummaryByType(SummaryType.RECOMMENDATION, pageable);
         InsightResponse.FindSummaryDTO responseDTO = new InsightResponse.FindSummaryDTO(summaryDTOS);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
+    }
+
+    @GetMapping("/summary/{summaryId}/check")
+    public ResponseEntity<?> checkSummary(@PathVariable Long summaryId){
+        insightService.checkSummary(summaryId);
+        return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, null));
     }
 }
