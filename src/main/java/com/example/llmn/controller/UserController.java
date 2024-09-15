@@ -11,11 +11,14 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Map;
 
 @RestController
@@ -24,6 +27,7 @@ import java.util.Map;
 public class UserController {
 
     private final UserService userService;
+    private static final String UPLOAD_DIR = "ssh";
 
     @PostMapping("/auth/login")
     public ResponseEntity<?> login(@RequestBody @Valid UserRequest.LoginDTO requestDTO, HttpServletRequest request) throws MessagingException {
@@ -37,5 +41,36 @@ public class UserController {
     public ResponseEntity<?> join(@RequestBody @Valid UserRequest.JoinDTO requestDTO){
         userService.join(requestDTO);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.CREATED, null));
+    }
+
+    @PostMapping("/upload")
+    public ResponseEntity<?> uploadSSHKey(@RequestParam("file") MultipartFile file) {
+        // 파일이 빈 경우 오류 처리
+        if (file.isEmpty()) {
+            return ResponseEntity.ok().body(ApiUtils.error("파일이 없습니다.", HttpStatus.BAD_REQUEST));
+        }
+
+        try {
+            // 디렉토리가 없으면 생성
+            Path uploadPath = Paths.get(UPLOAD_DIR);
+            if (!Files.exists(uploadPath)) {
+                Files.createDirectories(uploadPath); // 디렉토리가 없으면 생성
+            }
+
+            String fileName = file.getOriginalFilename();
+            Path path = Paths.get(UPLOAD_DIR + File.separator + fileName);
+
+            // 파일이 이미 존재하는지 확인
+            if (Files.exists(path)) {
+                return ResponseEntity.ok().body(ApiUtils.error("파일이 이미 존재합니다.", HttpStatus.CONFLICT));
+            }
+
+            Files.write(path, file.getBytes());
+
+            return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.CREATED, path));
+        } catch (IOException e) {
+            e.printStackTrace();
+            return ResponseEntity.ok().body(ApiUtils.error("파일 업로드 중 오류가 발생했습니다.", HttpStatus.INTERNAL_SERVER_ERROR));
+        }
     }
 }
