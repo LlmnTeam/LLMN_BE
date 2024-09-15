@@ -50,4 +50,11 @@ public class InsightController {
         InsightResponse.FindSummaryDTO responseDTO = new InsightResponse.FindSummaryDTO(summaryDTOS);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
+
+    @GetMapping("/insight/recommendation")
+    public ResponseEntity<?> findRecommendation(@PageableDefault(size = 5, sort = SORT_BY_DATE, direction = Sort.Direction.DESC)Pageable pageable) {
+        List<InsightResponse.SummaryDTO> summaryDTOS = insightService.findSummaryByType(SummaryType.RECOMMENDATION, pageable);
+        InsightResponse.FindSummaryDTO responseDTO = new InsightResponse.FindSummaryDTO(summaryDTOS);
+        return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
+    }
 }
