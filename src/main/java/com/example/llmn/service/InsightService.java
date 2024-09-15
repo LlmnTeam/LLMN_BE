@@ -51,8 +51,8 @@ public class InsightService {
     }
 
     @Transactional(readOnly = true)
-    public InsightResponse.FindPerformanceSummaryDTO findPerformanceSummary(Pageable pageable){
-        List<Summary> performanceSummaries = summaryRepository.findSummaryByType(SummaryType.PERFORMANCE, pageable).getContent();
+    public List<InsightResponse.SummaryDTO> findSummaryByType(SummaryType type, Pageable pageable){
+        List<Summary> performanceSummaries = summaryRepository.findSummaryByType(type, pageable).getContent();
 
         List<InsightResponse.SummaryDTO> summaryDTOS = performanceSummaries.stream()
                 .map(summary -> new InsightResponse.SummaryDTO(
@@ -61,21 +61,7 @@ public class InsightService {
                 ))
                 .toList();
 
-        return new InsightResponse.FindPerformanceSummaryDTO(summaryDTOS);
-    }
-
-    @Transactional(readOnly = true)
-    public InsightResponse.FindDailySummaryDTO findDailySummary(Pageable pageable){
-        List<Summary> performanceSummaries = summaryRepository.findSummaryByType(SummaryType.DAILY, pageable).getContent();
-
-        List<InsightResponse.SummaryDTO> summaryDTOS = performanceSummaries.stream()
-                .map(summary -> new InsightResponse.SummaryDTO(
-                        formatLocalDateTime(summary.getCreatedDate()),
-                        summary.getContent()
-                ))
-                .toList();
-
-        return new InsightResponse.FindDailySummaryDTO(summaryDTOS);
+        return summaryDTOS;
     }
 
     public static String formatLocalDateTime(LocalDateTime localDateTime) {
