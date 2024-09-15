@@ -15,9 +15,7 @@ public class InsightResponse {
             String recommendation,
             LocalDateTime recommendUpdateTime){}
 
-    public record FindPerformanceSummaryDTO(List<SummaryDTO> summaries){}
-
-    public record FindDailySummaryDTO(List<SummaryDTO> summaries){}
+    public record FindSummaryDTO(List<SummaryDTO> summaries){}
 
     public record SummaryDTO(String time, String content){}
 }

@@ -1,7 +1,6 @@
 package com.example.llmn.controller;
 
 import com.example.llmn.controller.DTO.InsightResponse;
-import com.example.llmn.controller.DTO.MetricResponse;
 import com.example.llmn.core.utils.ApiUtils;
 import com.example.llmn.domain.SummaryType;
 import com.example.llmn.service.InsightService;
@@ -34,14 +33,21 @@ public class InsightController {
     @GetMapping("/insight/performance")
     public ResponseEntity<?> findPerformanceSummary(@PageableDefault(size = 5, sort = SORT_BY_DATE, direction = Sort.Direction.DESC)Pageable pageable) {
         List<InsightResponse.SummaryDTO> summaryDTOS = insightService.findSummaryByType(SummaryType.PERFORMANCE, pageable);
-        InsightResponse.FindPerformanceSummaryDTO responseDTO = new InsightResponse.FindPerformanceSummaryDTO(summaryDTOS);
+        InsightResponse.FindSummaryDTO responseDTO = new InsightResponse.FindSummaryDTO(summaryDTOS);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 
     @GetMapping("/insight/daily")
     public ResponseEntity<?> findDailySummary(@PageableDefault(size = 5, sort = SORT_BY_DATE, direction = Sort.Direction.DESC)Pageable pageable) {
         List<InsightResponse.SummaryDTO> summaryDTOS = insightService.findSummaryByType(SummaryType.DAILY, pageable);
-        InsightResponse.FindDailySummaryDTO responseDTO = new InsightResponse.FindDailySummaryDTO(summaryDTOS);
+        InsightResponse.FindSummaryDTO responseDTO = new InsightResponse.FindSummaryDTO(summaryDTOS);
+        return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
+    }
+
+    @GetMapping("/insight/trend")
+    public ResponseEntity<?> findTrendSummary(@PageableDefault(size = 5, sort = SORT_BY_DATE, direction = Sort.Direction.DESC)Pageable pageable) {
+        List<InsightResponse.SummaryDTO> summaryDTOS = insightService.findSummaryByType(SummaryType.TEND, pageable);
+        InsightResponse.FindSummaryDTO responseDTO = new InsightResponse.FindSummaryDTO(summaryDTOS);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 }
