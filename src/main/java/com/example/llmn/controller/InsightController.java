@@ -22,6 +22,12 @@ public class InsightController {
     private final InsightService insightService;
     private static final String SORT_BY_DATE = "createdDate";
 
+    @GetMapping("/insight")
+    public ResponseEntity<?> findInsightList() {
+        InsightResponse.FindInsightHomeDTO responseDTO = insightService.findInsightList();
+        return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
+    }
+
     @GetMapping("/insight/performance")
     public ResponseEntity<?> findPerformanceSummary(@PageableDefault(size = 5, sort = SORT_BY_DATE, direction = Sort.Direction.DESC)Pageable pageable) {
         InsightResponse.FindPerformanceSummaryDTO responseDTO = insightService.findPerformanceSummary(pageable);

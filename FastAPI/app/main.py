@@ -166,5 +166,5 @@ async def process_performance_summary(request: LogRequest):
     performance_summary = await generate_performance_summary(request.cotent)
     
     return {
-        "performance_summary": performance_summary
+        "performanceSummary": performance_summary
     }

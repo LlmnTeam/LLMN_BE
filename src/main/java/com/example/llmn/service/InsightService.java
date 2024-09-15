@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -23,7 +24,7 @@ public class InsightService {
     private final SummaryRepository summaryRepository;
 
     @Transactional(readOnly = true)
-    public InsightResponse.FindInsightHomeDTO findInsightHome() {
+    public InsightResponse.FindInsightHomeDTO findInsightList() {
         List<SummaryType> types = List.of(SummaryType.PERFORMANCE, SummaryType.DAILY, SummaryType.TEND, SummaryType.RECOMMENDATION);
         List<Summary> latestSummaries = summaryRepository.findLatestSummariesByTypes(types);
 
@@ -55,11 +56,16 @@ public class InsightService {
 
         List<InsightResponse.PerformanceSummaryDTO> performanceSummaryDTOS = performanceSummaries.stream()
                 .map(summary -> new InsightResponse.PerformanceSummaryDTO(
-                        summary.getCreatedDate(),
+                        formatLocalDateTime(summary.getCreatedDate()),
                         summary.getContent()
                 ))
                 .toList();
 
         return new InsightResponse.FindPerformanceSummaryDTO(performanceSummaryDTOS);
+    }
+
+    public static String formatLocalDateTime(LocalDateTime localDateTime) {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+        return localDateTime.format(formatter);
     }
 }

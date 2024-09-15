@@ -17,5 +17,5 @@ public class InsightResponse {
 
     public record FindPerformanceSummaryDTO(List<PerformanceSummaryDTO> performanceSummaries){}
 
-    public record PerformanceSummaryDTO(LocalDateTime time, String content){}
+    public record PerformanceSummaryDTO(String time, String content){}
 }
