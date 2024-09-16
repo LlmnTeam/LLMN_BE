@@ -57,6 +57,11 @@ public class UserService {
                 .email(requestDTO.email())
                 .password(passwordEncoder.encode(requestDTO.password()))
                 .role(UserRole.USER)
+                .isLocal(requestDTO.isLocal())
+                .remoteName(requestDTO.remoteName())
+                .remoteHost(requestDTO.remoteHost())
+                .remotePort(requestDTO.remotePort())
+                .remoteKeyPath(requestDTO.remoteKeyPath())
                 .build();
 
         userRepository.save(user);

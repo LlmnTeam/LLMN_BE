@@ -29,5 +29,10 @@ public class UserRequest {
                 @Pattern(regexp = "^(?=.*[a-zA-Z])(?=.*\\d)(?=.*[@#$%^&+=!~`<>,./?;:'\"\\[\\]{}\\\\()|_-])\\S*$", message = "올바른 비밀번호 형식을 입력해주세요.")
                 String password,
                 @NotBlank(message = "비밀번호를 입력해주세요.")
-                String passwordConfirm) {}
+                String passwordConfirm,
+                boolean isLocal,
+                String remoteName,
+                String remoteHost,
+                String remotePort,
+                String remoteKeyPath) {}
 }
