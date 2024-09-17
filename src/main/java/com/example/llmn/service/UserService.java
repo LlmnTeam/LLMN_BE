@@ -4,8 +4,10 @@ import com.example.llmn.controller.DTO.UserRequest;
 import com.example.llmn.core.errors.CustomException;
 import com.example.llmn.core.errors.ExceptionCode;
 import com.example.llmn.core.security.JWTProvider;
+import com.example.llmn.domain.SshInfo;
 import com.example.llmn.domain.User;
 import com.example.llmn.domain.UserRole;
+import com.example.llmn.repository.SshInfoRepository;
 import com.example.llmn.repository.UserRepository;
 import jakarta.mail.MessagingException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -25,6 +27,7 @@ public class UserService {
 
     private final PasswordEncoder passwordEncoder;
     private final UserRepository userRepository;
+    private final SshInfoRepository sshInfoRepository;
     private final RedisService redisService;
 
     @Transactional
@@ -52,16 +55,22 @@ public class UserService {
         // 중복된 닉네임 다시 체크 (프론트에서 체크하고 이중 체크)
         checkDuplicateNickname(requestDTO.nickName());
 
-        User user = User.builder()
-                .nickName(requestDTO.nickName())
-                .email(requestDTO.email())
-                .password(passwordEncoder.encode(requestDTO.password()))
-                .role(UserRole.USER)
+        SshInfo sshInfo = SshInfo.builder()
                 .isLocal(requestDTO.isLocal())
                 .remoteName(requestDTO.remoteName())
                 .remoteHost(requestDTO.remoteHost())
                 .remotePort(requestDTO.remotePort())
                 .remoteKeyPath(requestDTO.remoteKeyPath())
+                .build();
+
+        sshInfoRepository.save(sshInfo);
+
+        User user = User.builder()
+                .nickName(requestDTO.nickName())
+                .email(requestDTO.email())
+                .password(passwordEncoder.encode(requestDTO.password()))
+                .role(UserRole.USER)
+                .sshInfo(sshInfo)
                 .build();
 
         userRepository.save(user);

@@ -29,33 +29,18 @@ public class User extends TimeStamp {
     @Enumerated(EnumType.STRING)
     private UserRole role;
 
-    @Column
-    private boolean isLocal;
-
-    @Column
-    private String remoteName;
-
-    @Column
-    private String remoteHost;
-
-    @Column
-    private String remotePort;
-
-    @Column
-    private String remoteKeyPath;
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "ssh_id")
+    private SshInfo sshInfo;
 
     @Builder
-    public User(Long id, String nickName, String email, String password, UserRole role, boolean isLocal, String remoteName, String remoteHost, String remotePort, String remoteKeyPath) {
+    public User(Long id, String nickName, String email, String password, UserRole role, SshInfo sshInfo) {
         this.id = id;
         this.nickName = nickName;
         this.email = email;
         this.password = password;
         this.role = role;
-        this.isLocal = isLocal;
-        this.remoteName = remoteName;
-        this.remoteHost = remoteHost;
-        this.remotePort = remotePort;
-        this.remoteKeyPath = remoteKeyPath;
+        this.sshInfo = sshInfo;
     }
 
     public void updatePassword (String password) {
