@@ -4,10 +4,13 @@ import com.example.llmn.controller.DTO.LogDTO;
 import com.example.llmn.controller.DTO.MetricDTO;
 import com.example.llmn.controller.DTO.MetricResponse;
 import com.example.llmn.domain.Metric;
-import com.example.llmn.domain.Summary;
+
 import com.example.llmn.domain.SummaryType;
 import com.example.llmn.repository.MetricRepository;
 import com.example.llmn.repository.SummaryRepository;
+import com.jcraft.jsch.ChannelExec;
+import com.jcraft.jsch.JSch;
+import com.jcraft.jsch.Session;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -17,6 +20,8 @@ import oshi.hardware.CentralProcessor;
 import oshi.hardware.GlobalMemory;
 import oshi.hardware.NetworkIF;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
@@ -53,6 +58,41 @@ public class MetricService {
                 .build();
 
         metricRepository.save(metric);
+    }
+
+    public Map<String, Object> gatherRemoteMetrics(String privateKey, String host, String username, int port) {
+        Map<String, Object> metrics = new HashMap<>();
+
+        try {
+            JSch jsch = new JSch();
+            jsch.addIdentity(privateKey);
+            Session session = jsch.getSession(username, host, port);
+
+            // 호스트 키 검증을 비활성화 (실제 환경에서는 안전한 방법으로 변경해야 함)
+            session.setConfig("StrictHostKeyChecking", "no");
+            session.connect();
+
+            // CPU 사용량 가져오기
+            String cpuCommand = "top -bn1 | grep 'Cpu(s)'";
+            String cpuUsage = executeRemoteCommand(session, cpuCommand);
+            metrics.put("cpuUsage", parseCpuUsage(cpuUsage));
+
+            // 메모리 사용량 가져오기
+            String memoryCommand = "free -m";
+            String memoryUsage = executeRemoteCommand(session, memoryCommand);
+            metrics.put("memoryUsage", parseMemoryUsage(memoryUsage));
+
+            // 네트워크 트래픽 가져오기
+            String networkCommand = "ifconfig";
+            String networkUsage = executeRemoteCommand(session, networkCommand);
+            metrics.put("networkUsage", parseNetworkUsage(networkUsage));
+
+            session.disconnect();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return metrics;
     }
 
     public MetricResponse.FindCurrentMetricDTO findCurrentMetric() {
@@ -189,5 +229,48 @@ public class MetricService {
         metrics.put("networkSent", bytesSent);
 
         return metrics;
+    }
+
+    private String executeRemoteCommand(Session session, String command) throws Exception {
+        ChannelExec channelExec = (ChannelExec) session.openChannel("exec");
+        channelExec.setCommand(command);
+
+        BufferedReader reader = new BufferedReader(new InputStreamReader(channelExec.getInputStream()));
+        channelExec.connect();
+
+        StringBuilder outputBuffer = new StringBuilder();
+        String line;
+        while ((line = reader.readLine()) != null) {
+            outputBuffer.append(line).append("\n");
+        }
+
+        channelExec.disconnect();
+        return outputBuffer.toString();
+    }
+
+    private double parseCpuUsage(String cpuUsageOutput) {
+        // CPU 사용량 데이터를 파싱
+        String[] split = cpuUsageOutput.split(",");
+        String usage = split[0].split(":")[1].trim().replace("%us", "");
+        return Double.parseDouble(usage);
+    }
+
+    private long parseMemoryUsage(String memoryUsageOutput) {
+        // 메모리 사용량 데이터를 파싱
+        String[] lines = memoryUsageOutput.split("\n");
+        String[] memoryData = lines[1].split("\\s+");
+        return Long.parseLong(memoryData[2]); // 사용 중인 메모리 값 (MB 단위)
+    }
+
+    private long parseNetworkUsage(String networkUsageOutput) {
+        // 네트워크 트래픽 데이터를 파싱
+        String[] lines = networkUsageOutput.split("\n");
+        for (String line : lines) {
+            if (line.contains("RX bytes")) {
+                String[] parts = line.split(" ");
+                return Long.parseLong(parts[2].replace("bytes:", ""));
+            }
+        }
+        return 0;
     }
 }
