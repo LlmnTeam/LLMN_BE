@@ -2,7 +2,6 @@ package com.example.llmn.service;
 
 import com.example.llmn.controller.DTO.LogDTO;
 import com.example.llmn.controller.DTO.MetricResponse;
-import com.example.llmn.core.config.LogWebSocketHandler;
 import com.example.llmn.domain.ContainerStatus;
 import com.example.llmn.domain.Project;
 import com.example.llmn.domain.Summary;

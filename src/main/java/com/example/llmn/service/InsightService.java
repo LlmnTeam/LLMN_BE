@@ -68,15 +68,6 @@ public class InsightService {
         return summaryDTOS;
     }
 
-    @Transactional
-    public void checkSummary(Long summaryId){
-        Summary summary = summaryRepository.findById(summaryId).orElseThrow(
-                () -> new CustomException(ExceptionCode.SUMMARY_NOT_FOUND)
-        );
-
-        summary.updateIsChecked(!summary.isChecked());
-    }
-
     public static String formatLocalDateTime(LocalDateTime localDateTime) {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
         return localDateTime.format(formatter);

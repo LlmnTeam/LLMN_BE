@@ -102,4 +102,10 @@ public class ProjectController {
         projectService.deleteProjectById(userDetails.getUser().getId(), projectId);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, null));
     }
+
+    @GetMapping("/summaries/{summaryId}/check")
+    public ResponseEntity<?> checkSummary(@PathVariable Long summaryId){
+        projectService.checkSummary(summaryId);
+        return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, null));
+    }
 }

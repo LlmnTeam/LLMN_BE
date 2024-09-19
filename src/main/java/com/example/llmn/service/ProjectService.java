@@ -220,6 +220,7 @@ public class ProjectService {
         );
     }
 
+    // 로그 파일 삭제하는 로직 추후 추가해야함
     @Transactional
     public void deleteProjectById(Long userId, Long projectId){
         Project project = projectRepository.findById(projectId).orElseThrow(
@@ -232,6 +233,15 @@ public class ProjectService {
         }
 
         projectRepository.delete(project);
+    }
+
+    @Transactional
+    public void checkSummary(Long summaryId){
+        Summary summary = summaryRepository.findById(summaryId).orElseThrow(
+                () -> new CustomException(ExceptionCode.SUMMARY_NOT_FOUND)
+        );
+
+        summary.updateIsChecked(!summary.isChecked());
     }
 
     private String formatLocalDateTime(LocalDateTime localDateTime) {

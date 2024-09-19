@@ -11,6 +11,7 @@ import org.apache.sshd.common.config.keys.loader.KeyPairResourceParser;
 import org.apache.sshd.common.session.SessionContext;
 import org.apache.sshd.common.util.GenericUtils;
 import org.apache.sshd.common.util.security.SecurityUtils;
+import redis.clients.jedis.Jedis;
 
 import java.io.*;
 import java.net.URI;

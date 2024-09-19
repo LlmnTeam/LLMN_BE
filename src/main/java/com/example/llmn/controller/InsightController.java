@@ -58,10 +58,4 @@ public class InsightController {
         InsightResponse.FindSummaryDTO responseDTO = new InsightResponse.FindSummaryDTO(summaryDTOS);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
-
-    @GetMapping("/summary/{summaryId}/check")
-    public ResponseEntity<?> checkSummary(@PathVariable Long summaryId){
-        insightService.checkSummary(summaryId);
-        return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, null));
-    }
 }
