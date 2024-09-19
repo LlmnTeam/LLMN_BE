@@ -69,8 +69,8 @@ dependencies {
 	// oshi
 	implementation 'com.github.oshi:oshi-core:6.2.2'
 
-	// jsch
-	implementation 'com.jcraft:jsch:0.1.55'
+	// sshd
+	implementation 'org.apache.sshd:sshd-core:2.9.3'
 }
 
 tasks.named('test') {

@@ -1,17 +1,22 @@
 package com.example.llmn.service;
 
-import com.example.llmn.controller.DTO.LogDTO;
 import com.example.llmn.controller.DTO.MetricDTO;
 import com.example.llmn.controller.DTO.MetricResponse;
 import com.example.llmn.domain.Metric;
 
-import com.example.llmn.domain.SummaryType;
 import com.example.llmn.repository.MetricRepository;
-import com.example.llmn.repository.SummaryRepository;
-import com.jcraft.jsch.ChannelExec;
-import com.jcraft.jsch.JSch;
-import com.jcraft.jsch.Session;
 import lombok.RequiredArgsConstructor;
+import org.apache.sshd.client.SshClient;
+import org.apache.sshd.client.channel.ClientChannel;
+import org.apache.sshd.client.channel.ClientChannelEvent;
+import org.apache.sshd.client.future.ConnectFuture;
+import org.apache.sshd.client.session.ClientSession;
+import org.apache.sshd.common.NamedResource;
+import org.apache.sshd.common.config.keys.FilePasswordProvider;
+import org.apache.sshd.common.config.keys.loader.KeyPairResourceParser;
+import org.apache.sshd.common.session.SessionContext;
+import org.apache.sshd.common.util.GenericUtils;
+import org.apache.sshd.common.util.security.SecurityUtils;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,13 +25,18 @@ import oshi.hardware.CentralProcessor;
 import oshi.hardware.GlobalMemory;
 import oshi.hardware.NetworkIF;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
+import java.io.*;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Paths;
+import java.security.GeneralSecurityException;
+import java.security.KeyPair;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.concurrent.TimeUnit;
+
+import static org.apache.sshd.common.util.security.bouncycastle.BouncyCastleKeyPairResourceParser.loadKeyPair;
 
 @Service
 @RequiredArgsConstructor
@@ -44,6 +54,7 @@ public class MetricService {
     private static final String PREVIOUS_BYTES_SENT = "previousBytesSent";
     private static final String DAILY_START_BYTES_RECEIVED = "dailyStartBytesReceived";
     private static final String DAILY_START_BYTES_SENT = "dailyStartBytesSent";
+    private static final int SSH_PORT_NUM = 22;
 
     @Scheduled(cron = "0 0/10 * * * *")
     public void collectMetrics() {
@@ -60,36 +71,49 @@ public class MetricService {
         metricRepository.save(metric);
     }
 
-    public Map<String, Object> gatherRemoteMetrics(String privateKey, String host, String username, int port) {
+    public Map<String, Object> collectRemoteMetrics(String privateKeyPath, String host, String username) {
         Map<String, Object> metrics = new HashMap<>();
+        SshClient client = null;
+        ClientSession session = null;
 
         try {
-            JSch jsch = new JSch();
-            jsch.addIdentity(privateKey);
-            Session session = jsch.getSession(username, host, port);
+            // SSH 클라이언트 생성
+            client = SshClient.setUpDefaultClient();
+            client.start();
 
-            // 호스트 키 검증을 비활성화 (실제 환경에서는 안전한 방법으로 변경해야 함)
-            session.setConfig("StrictHostKeyChecking", "no");
-            session.connect();
+            // 파일 경로 설정 (file:// 경로 지원)
+            if (privateKeyPath.startsWith("file://")) {
+                privateKeyPath = Paths.get(URI.create(privateKeyPath)).toString();
+            }
+
+            // 클라이언트 세션 생성
+            ConnectFuture connectFuture = client.connect(username, host, SSH_PORT_NUM);
+            session = connectFuture.verify(10, TimeUnit.SECONDS).getSession();
+
+            // 키 파일로 인증 설정
+            KeyPair keyPair = loadKeyPair(privateKeyPath);
+            session.addPublicKeyIdentity(keyPair);
+
+            // 연결
+            session.auth().verify(10, TimeUnit.SECONDS);
 
             // CPU 사용량 가져오기
-            String cpuCommand = "top -bn1 | grep 'Cpu(s)'";
-            String cpuUsage = executeRemoteCommand(session, cpuCommand);
+            String cpuUsage = executeRemoteCommand(session, "top -bn1 | grep 'Cpu(s)'");
             metrics.put("cpuUsage", parseCpuUsage(cpuUsage));
 
             // 메모리 사용량 가져오기
-            String memoryCommand = "free -m";
-            String memoryUsage = executeRemoteCommand(session, memoryCommand);
+            String memoryUsage = executeRemoteCommand(session, "free -m");
             metrics.put("memoryUsage", parseMemoryUsage(memoryUsage));
 
-            // 네트워크 트래픽 가져오기
-            String networkCommand = "ifconfig";
-            String networkUsage = executeRemoteCommand(session, networkCommand);
-            metrics.put("networkUsage", parseNetworkUsage(networkUsage));
-
-            session.disconnect();
         } catch (Exception e) {
             e.printStackTrace();
+        } finally {
+            if (session != null) {
+                session.close(false);
+            }
+            if (client != null) {
+                client.stop();
+            }
         }
 
         return metrics;
@@ -231,28 +255,36 @@ public class MetricService {
         return metrics;
     }
 
-    private String executeRemoteCommand(Session session, String command) throws Exception {
-        ChannelExec channelExec = (ChannelExec) session.openChannel("exec");
-        channelExec.setCommand(command);
+    private String executeRemoteCommand(ClientSession session, String command) throws Exception {
+        ByteArrayOutputStream responseStream = new ByteArrayOutputStream();
 
-        BufferedReader reader = new BufferedReader(new InputStreamReader(channelExec.getInputStream()));
-        channelExec.connect();
+        try (ClientChannel channel = session.createExecChannel(command)) {
+            channel.setOut(responseStream);
+            channel.open().verify(5, TimeUnit.SECONDS);
 
-        StringBuilder outputBuffer = new StringBuilder();
-        String line;
-        while ((line = reader.readLine()) != null) {
-            outputBuffer.append(line).append("\n");
+            // ClientChannelEvent.CLOSED 및 ClientChannelEvent.EOF를 기다림
+            Set<ClientChannelEvent> events = channel.waitFor(EnumSet.of(ClientChannelEvent.CLOSED, ClientChannelEvent.EOF), TimeUnit.SECONDS.toMillis(5));
+
+            if (events.contains(ClientChannelEvent.TIMEOUT)) {
+                throw new Exception("Command execution timed out");
+            }
         }
 
-        channelExec.disconnect();
-        return outputBuffer.toString();
+        return new String(responseStream.toByteArray(), StandardCharsets.UTF_8);
     }
 
     private double parseCpuUsage(String cpuUsageOutput) {
-        // CPU 사용량 데이터를 파싱
         String[] split = cpuUsageOutput.split(",");
-        String usage = split[0].split(":")[1].trim().replace("%us", "");
-        return Double.parseDouble(usage);
+
+        double us = Double.parseDouble(split[0].split(":")[1].trim().replace("us", "").trim()); // 사용자 영역
+        double sy = Double.parseDouble(split[1].trim().replace("sy", "").trim()); // 시스템 영역
+        double ni = Double.parseDouble(split[2].trim().replace("ni", "").trim()); // nice 프로세스
+        double wa = Double.parseDouble(split[4].trim().replace("wa", "").trim()); // IO 대기
+        double hi = Double.parseDouble(split[5].trim().replace("hi", "").trim()); // 하드웨어 인터럽트
+        double si = Double.parseDouble(split[6].trim().replace("si", "").trim()); // 소프트웨어 인터럽트
+
+        // 전체 CPU 사용량은 각 항목들의 합
+        return us + sy + ni + wa + hi + si;
     }
 
     private long parseMemoryUsage(String memoryUsageOutput) {
@@ -272,5 +304,42 @@ public class MetricService {
             }
         }
         return 0;
+    }
+
+    private KeyPair loadKeyPair(String privateKeyPath) throws IOException, GeneralSecurityException {
+        // privateKeyPath에 해당하는 파일 객체 생성
+        File privateKeyFile = new File(privateKeyPath);
+
+        if (!privateKeyFile.exists()) {
+            throw new IOException("Pem 키 파일이 존재하지 않음: " + privateKeyPath);
+        }
+
+        // 파일 입력 스트림을 열어 키 파일을 읽어들임
+        try (InputStream inputStream = new FileInputStream(privateKeyFile)) {
+            // NamedResource는 SSHD 라이브러리에서 파일의 이름을 나타내는 인터페이스
+            NamedResource resourceKey = new NamedResource() {
+                @Override
+                public String getName() {
+                    return privateKeyFile.getName();
+                }
+            };
+
+            FilePasswordProvider provider = FilePasswordProvider.EMPTY; // 패스프레이즈 없는 경우
+            SessionContext session = null; // 특정 세션이 필요하지 않아서 null로 설정
+
+            // SecurityUtils를 통해 등록된 KeyPairResourceParser를 가져옴
+            KeyPairResourceParser parser = SecurityUtils.getKeyPairResourceParser();
+            if (parser == null) {
+                throw new GeneralSecurityException("등록된 key-pair 파서가 존재하지 않음.");
+            }
+
+            // 키 파일을 읽어 KeyPair 객체들을 로드
+            Collection<KeyPair> keyPairs = parser.loadKeyPairs(session, resourceKey, provider, inputStream);
+            if (GenericUtils.isEmpty(keyPairs)) {
+                throw new IOException("keyPair 로드 실패: " + privateKeyPath);
+            }
+
+            return keyPairs.iterator().next(); // 첫 번째 KeyPair 반환
+        }
     }
 }
