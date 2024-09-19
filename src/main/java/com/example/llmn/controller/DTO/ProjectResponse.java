@@ -34,6 +34,7 @@ public class ProjectResponse {
             String name,
             String description,
             String summary,
+            String updateDate,
             String recentLog){}
 
     public record FindProjectLogListDTO(List<String> files){}

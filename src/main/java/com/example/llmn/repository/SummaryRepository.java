@@ -13,10 +13,10 @@ import java.util.List;
 
 public interface SummaryRepository extends JpaRepository<Summary, Long> {
 
-    @Query("SELECT s.content FROM Summary s " +
+    @Query("SELECT s FROM Summary s " +
             "JOIN s.project p " +
             "WHERE p = :project")
-    Page<String> findLatestSummaryByProject(@Param("project") Project project, Pageable pageable);
+    Page<Summary> findLatestSummaryByProject(@Param("project") Project project, Pageable pageable);
 
     @Query("SELECT s FROM Summary s " +
             "JOIN s.project p " +

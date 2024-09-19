@@ -25,21 +25,16 @@ public class User extends TimeStamp {
     @Column
     private String password;
 
-    @Column
-    @Enumerated(EnumType.STRING)
-    private UserRole role;
-
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "ssh_id")
     private SshInfo sshInfo;
 
     @Builder
-    public User(Long id, String nickName, String email, String password, UserRole role, SshInfo sshInfo) {
+    public User(Long id, String nickName, String email, String password, SshInfo sshInfo) {
         this.id = id;
         this.nickName = nickName;
         this.email = email;
         this.password = password;
-        this.role = role;
         this.sshInfo = sshInfo;
     }
 

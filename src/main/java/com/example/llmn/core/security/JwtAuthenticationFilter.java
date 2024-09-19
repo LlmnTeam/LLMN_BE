@@ -6,7 +6,6 @@ import com.auth0.jwt.exceptions.TokenExpiredException;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import com.example.llmn.core.utils.CookieUtils;
 import com.example.llmn.domain.User;
-import com.example.llmn.domain.UserRole;
 import com.example.llmn.service.RedisService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -102,9 +101,8 @@ public class JwtAuthenticationFilter extends BasicAuthenticationFilter {
         try {
             DecodedJWT decodedJWT = JWTProvider.verify(token);
             Long id = decodedJWT.getClaim("id").asLong();
-            UserRole userRole = decodedJWT.getClaim("role").as(UserRole.class);
             String nickName = decodedJWT.getClaim("nickName").asString();
-            return User.builder().id(id).role(userRole).nickName(nickName).build();
+            return User.builder().id(id).nickName(nickName).build();
         } catch (SignatureVerificationException sve) {
             log.error("토큰 검증 실패");
         } catch (TokenExpiredException tee) {

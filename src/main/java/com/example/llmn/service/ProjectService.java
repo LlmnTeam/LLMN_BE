@@ -23,6 +23,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -133,13 +134,19 @@ public class ProjectService {
                 () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
         );
 
-        // 최신 요약은 MySQL에서 가져옴
-        Pageable pageable = PageRequest.of(0, 1);
-        String recentSummary = summaryRepository.findLatestSummaryByProject(project, pageable).getContent().get(0);
+        // 최신 요약은 MySql에서 가져옴
+        LocalDateTime updateTime;
+        String summaryContent;
 
-        if(recentSummary.isEmpty()){
-            recentSummary = "로그 요약본이 존재하지 않습니다.";
-        }
+        Optional<Summary> latestSummary = summaryRepository.findLatestSummaryByProject(project, PageRequest.of(0, 1))
+                .getContent()
+                .stream()
+                .findFirst();
+
+        summaryContent = latestSummary.map(Summary::getContent)
+                .orElse("로그 요약본이 존재하지 않습니다.");
+        updateTime = latestSummary.map(Summary::getCreatedDate)
+                .orElse(null);
 
         // 최신 로그는 ElasticSearch에서 가져옴
         String recentLog = logService.searchRecentLogInStr(project.getContainerName(), 2L);
@@ -151,7 +158,8 @@ public class ProjectService {
         return new ProjectResponse.FindProjectByIdDTO(
                 project.getProjectName(),
                 project.getDescription(),
-                recentSummary,
+                summaryContent,
+                formatLocalDateTime(updateTime),
                 recentLog);
     }
 
@@ -213,6 +221,10 @@ public class ProjectService {
     }
 
     public static String formatLocalDateTime(LocalDateTime localDateTime) {
+        if(localDateTime == null){
+            return null;
+        }
+
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
         return localDateTime.format(formatter);
     }

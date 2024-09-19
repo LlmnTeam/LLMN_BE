@@ -7,7 +7,6 @@ import com.example.llmn.core.errors.ExceptionCode;
 import com.example.llmn.core.security.JWTProvider;
 import com.example.llmn.domain.SshInfo;
 import com.example.llmn.domain.User;
-import com.example.llmn.domain.UserRole;
 import com.example.llmn.repository.SshInfoRepository;
 import com.example.llmn.repository.UserRepository;
 import jakarta.mail.MessagingException;
@@ -89,7 +88,6 @@ public class UserService {
                 .nickName(requestDTO.nickName())
                 .email(requestDTO.email())
                 .password(passwordEncoder.encode(requestDTO.password()))
-                .role(UserRole.USER)
                 .sshInfo(sshInfo)
                 .build();
 
