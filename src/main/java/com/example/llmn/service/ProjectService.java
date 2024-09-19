@@ -220,7 +220,21 @@ public class ProjectService {
         );
     }
 
-    public static String formatLocalDateTime(LocalDateTime localDateTime) {
+    @Transactional
+    public void deleteProjectById(Long userId, Long projectId){
+        Project project = projectRepository.findById(projectId).orElseThrow(
+                () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
+        );
+
+        // 권한 체크
+        if(!project.getUser().getId().equals(userId)){
+            throw new CustomException(ExceptionCode.USER_FORBIDDEN);
+        }
+
+        projectRepository.delete(project);
+    }
+
+    private String formatLocalDateTime(LocalDateTime localDateTime) {
         if(localDateTime == null){
             return null;
         }

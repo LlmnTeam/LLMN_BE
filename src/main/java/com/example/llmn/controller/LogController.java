@@ -28,13 +28,13 @@ public class LogController {
 
     private final LogService logService;
 
-    @PatchMapping("/log")
+    @PatchMapping("/logs")
     public ResponseEntity<?> fetchLogs() throws IOException {
         // logService.fetchLogs();
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, null));
     }
 
-    @GetMapping("/log")
+    @GetMapping("/logs")
     public ResponseEntity<?> searchLogs(@RequestParam Instant startTime,
                                         @RequestParam Instant endTime,
                                         @RequestParam(required = false) String logLevel,
@@ -43,7 +43,7 @@ public class LogController {
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 
-    @GetMapping("/log/download")
+    @GetMapping("/logs/download")
     public ResponseEntity<Resource> downloadLogFile(@RequestParam("fileName") String fileName) throws IOException {
         Resource resource = logService.getLogFileAsResource(fileName);
         return ResponseEntity.ok()
