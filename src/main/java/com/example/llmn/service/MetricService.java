@@ -2,6 +2,7 @@ package com.example.llmn.service;
 
 import com.example.llmn.controller.DTO.MetricDTO;
 import com.example.llmn.controller.DTO.MetricResponse;
+import com.example.llmn.core.utils.SshUtils;
 import com.example.llmn.domain.Metric;
 
 import com.example.llmn.repository.MetricRepository;
@@ -91,7 +92,7 @@ public class MetricService {
             session = connectFuture.verify(10, TimeUnit.SECONDS).getSession();
 
             // 키 파일로 인증 설정
-            KeyPair keyPair = loadKeyPair(privateKeyPath);
+            KeyPair keyPair = SshUtils.loadKeyPair(privateKeyPath);
             session.addPublicKeyIdentity(keyPair);
 
             // 연결
@@ -304,42 +305,5 @@ public class MetricService {
             }
         }
         return 0;
-    }
-
-    private KeyPair loadKeyPair(String privateKeyPath) throws IOException, GeneralSecurityException {
-        // privateKeyPath에 해당하는 파일 객체 생성
-        File privateKeyFile = new File(privateKeyPath);
-
-        if (!privateKeyFile.exists()) {
-            throw new IOException("Pem 키 파일이 존재하지 않음: " + privateKeyPath);
-        }
-
-        // 파일 입력 스트림을 열어 키 파일을 읽어들임
-        try (InputStream inputStream = new FileInputStream(privateKeyFile)) {
-            // NamedResource는 SSHD 라이브러리에서 파일의 이름을 나타내는 인터페이스
-            NamedResource resourceKey = new NamedResource() {
-                @Override
-                public String getName() {
-                    return privateKeyFile.getName();
-                }
-            };
-
-            FilePasswordProvider provider = FilePasswordProvider.EMPTY; // 패스프레이즈 없는 경우
-            SessionContext session = null; // 특정 세션이 필요하지 않아서 null로 설정
-
-            // SecurityUtils를 통해 등록된 KeyPairResourceParser를 가져옴
-            KeyPairResourceParser parser = SecurityUtils.getKeyPairResourceParser();
-            if (parser == null) {
-                throw new GeneralSecurityException("등록된 key-pair 파서가 존재하지 않음.");
-            }
-
-            // 키 파일을 읽어 KeyPair 객체들을 로드
-            Collection<KeyPair> keyPairs = parser.loadKeyPairs(session, resourceKey, provider, inputStream);
-            if (GenericUtils.isEmpty(keyPairs)) {
-                throw new IOException("keyPair 로드 실패: " + privateKeyPath);
-            }
-
-            return keyPairs.iterator().next(); // 첫 번째 KeyPair 반환
-        }
     }
 }
