@@ -34,4 +34,9 @@ public class UserRequest {
                 String remoteName,
                 String remoteHost,
                 String remoteKeyPath) {}
+
+        public record EmailDTO(
+                @NotBlank(message = "이메일을 입력해주세요.")
+                @Pattern(regexp = "^[\\w._%+-]+@[\\w.-]+\\.[a-zA-Z]{2,6}$", message = "올바른 이메일 형식을 입력해주세요.")
+                String email){}
 }

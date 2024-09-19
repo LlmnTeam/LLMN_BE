@@ -28,6 +28,7 @@ public class UserController {
 
     private final UserService userService;
     private static final String UPLOAD_DIR = "ssh";
+    private static final String CODE_TYPE_JOIN = "join";
 
     @PostMapping("/auth/login")
     public ResponseEntity<?> login(@RequestBody @Valid UserRequest.LoginDTO requestDTO, HttpServletRequest request) throws MessagingException {
@@ -72,5 +73,12 @@ public class UserController {
             e.printStackTrace();
             return ResponseEntity.ok().body(ApiUtils.error("파일 업로드 중 오류가 발생했습니다.", HttpStatus.INTERNAL_SERVER_ERROR));
         }
+    }
+
+    @PostMapping("/accounts/check/email")
+    public ResponseEntity<?> checkEmailAndSendCode(@RequestBody @Valid UserRequest.EmailDTO requestDTO) throws MessagingException {
+        UserResponse.CheckEmailExistDTO responseDTO = userService.checkEmailExist(requestDTO.email());
+        userService.sendCodeWithValidation(requestDTO.email(), CODE_TYPE_JOIN, responseDTO.isValid());
+        return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 }
