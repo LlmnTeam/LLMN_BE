@@ -175,4 +175,51 @@ public class SshUtils {
 
         return resultBuilder.toString();
     }
+
+    private static String executeRemoteCommandInSocket(ClientSession session, String command, String redisChannel) throws Exception {
+        StringBuilder resultBuilder = new StringBuilder();
+
+        try (ClientChannel channel = session.createExecChannel(command)) {
+            PipedOutputStream pipedOut = new PipedOutputStream();
+            PipedInputStream pipedIn = new PipedInputStream(pipedOut);
+
+            // Redis publisher 설정
+            Jedis jedis = new Jedis("localhost"); // Redis 서버 설정 (Redis가 로컬에서 실행 중인 경우)
+
+            new Thread(() -> {
+                try {
+                    byte[] buffer = new byte[1024];
+                    int bytesRead;
+                    while ((bytesRead = pipedIn.read(buffer)) != -1) {
+                        String output = new String(buffer, 0, bytesRead, StandardCharsets.UTF_8);
+                        jedis.publish(redisChannel, output); // Redis 채널로 실시간 명령어 출력 전송
+                        resultBuilder.append(output); // 결과에 추가
+                    }
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }).start();
+
+            // PipedOutputStream에 쓰기
+            channel.setOut(pipedOut);
+            channel.open().verify(5, TimeUnit.SECONDS);
+
+            // 채널이 닫힐 때까지 대기
+            Set<ClientChannelEvent> events = channel.waitFor(EnumSet.of(ClientChannelEvent.CLOSED), TimeUnit.MINUTES.toMillis(5));
+            if (events.contains(ClientChannelEvent.TIMEOUT)) {
+                throw new Exception("커맨드 타임아웃 발생");
+            }
+
+            // 종료 상태 확인
+            Integer exitStatus = channel.getExitStatus();
+            if (exitStatus != null) {
+                resultBuilder.append("\n명령어 종료 상태: ").append(exitStatus);
+            }
+
+        } catch (Exception e) {
+            throw new Exception("명령어 실행 중 에러 발생: " + e.getMessage(), e);
+        }
+
+        return resultBuilder.toString();
+    }
 }

@@ -12,9 +12,11 @@ public class RedisWebSocketHandler extends TextWebSocketHandler {
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
-        // Redis에 연결 및 구독
+        String redisChannel = "ssh-command-output"; // 고정된 채널 이름 사용
+
         Jedis jedis = new Jedis("localhost"); // Redis 서버에 연결
 
+        // Redis 채널 구독
         new Thread(() -> {
             jedis.subscribe(new JedisPubSub() {
                 @Override
@@ -26,10 +28,10 @@ public class RedisWebSocketHandler extends TextWebSocketHandler {
                         e.printStackTrace();
                     }
                 }
-            }, "your-redis-channel"); // 구독할 Redis 채널
+            }, redisChannel); // 고정된 채널 구독
         }).start();
 
-        System.out.println("WebSocket 연결됨: " + session.getId());
+        System.out.println("WebSocket 연결됨: " + session.getId() + ", 구독 채널: " + redisChannel);
     }
 
     @Override
