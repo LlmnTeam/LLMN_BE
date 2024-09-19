@@ -33,6 +33,5 @@ public class UserRequest {
                 boolean isLocal,
                 String remoteName,
                 String remoteHost,
-                String remotePort,
                 String remoteKeyPath) {}
 }

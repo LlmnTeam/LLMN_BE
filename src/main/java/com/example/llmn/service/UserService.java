@@ -1,6 +1,7 @@
 package com.example.llmn.service;
 
 import com.example.llmn.controller.DTO.UserRequest;
+import com.example.llmn.controller.DTO.UserResponse;
 import com.example.llmn.core.errors.CustomException;
 import com.example.llmn.core.errors.ExceptionCode;
 import com.example.llmn.core.security.JWTProvider;
@@ -10,15 +11,27 @@ import com.example.llmn.domain.UserRole;
 import com.example.llmn.repository.SshInfoRepository;
 import com.example.llmn.repository.UserRepository;
 import jakarta.mail.MessagingException;
+import jakarta.mail.internet.MimeMessage;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseCookie;
+import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.thymeleaf.context.Context;
+import org.thymeleaf.spring6.SpringTemplateEngine;
 
+import java.security.SecureRandom;
 import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+
+import static com.example.llmn.core.utils.MailTemplate.VERIFICATION_CODE;
 
 @Service
 @RequiredArgsConstructor
@@ -29,6 +42,14 @@ public class UserService {
     private final UserRepository userRepository;
     private final SshInfoRepository sshInfoRepository;
     private final RedisService redisService;
+    private final JavaMailSender mailSender;
+    private final SpringTemplateEngine templateEngine;
+
+    @Value("${spring.mail.username}")
+    private String SERVICE_MAIL_ACCOUNT;
+    private static final String EMAIL_CODE_KEY_PREFIX = "code:";
+    private static final String MAIL_TEMPLATE_FOR_CODE = "verification_code_email.html";
+    private static final String UTF_EIGHT_ENCODING = "UTF-8";
 
     @Transactional
     public Map<String, String> login(UserRequest.@Valid LoginDTO requestDTO, HttpServletRequest request) throws MessagingException {
@@ -59,7 +80,6 @@ public class UserService {
                 .isLocal(requestDTO.isLocal())
                 .remoteName(requestDTO.remoteName())
                 .remoteHost(requestDTO.remoteHost())
-                .remotePort(requestDTO.remotePort())
                 .remoteKeyPath(requestDTO.remoteKeyPath())
                 .build();
 
@@ -74,6 +94,25 @@ public class UserService {
                 .build();
 
         userRepository.save(user);
+    }
+
+    @Transactional(readOnly = true)
+    public UserResponse.CheckEmailExistDTO checkEmailExist(String email){
+        boolean isValid = !userRepository.existsByEmailWithRemoved(email);
+        return new UserResponse.CheckEmailExistDTO(isValid);
+    }
+
+    @Async
+    public void sendCodeWithValidation(String email, String codeType, boolean isValid) throws MessagingException {
+        // TTL 체크
+        if(redisService.isDateExist(EMAIL_CODE_KEY_PREFIX + codeType, email)){
+            throw new CustomException(ExceptionCode.ALREADY_SEND_EMAIL);
+        }
+
+        // 유효한 경우에만 메일 전송
+        if(isValid){
+            sendCodeByEmail(email, codeType);
+        }
     }
 
     private Map<String, String> createToken(User user){
@@ -113,5 +152,48 @@ public class UserService {
         // 로컬 회원 가입을 통해 이미 가입함
         if(userRepository.existsByEmail(email))
             throw new CustomException(ExceptionCode.USER_EMAIL_EXIST);
+    }
+
+    private String generateVerificationCode() {
+        String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+        SecureRandom random = new SecureRandom();
+
+        return IntStream.range(0, 8) // 8자리
+                .map(i -> random.nextInt(chars.length()))
+                .mapToObj(chars::charAt)
+                .map(Object::toString)
+                .collect(Collectors.joining());
+    }
+
+    @Async
+    public void sendCodeByEmail(String email, String codeType) throws MessagingException {
+        // 인증 코드 전송 및 레디스에 저장
+        String verificationCode = generateVerificationCode();
+
+        // 메일 전송 템플릿 보낼 데이터는 map에 담음
+        Map<String, Object> model = new HashMap<>();
+        model.put("code", verificationCode);
+
+        sendMail(email, VERIFICATION_CODE.getSubject(), MAIL_TEMPLATE_FOR_CODE, model);
+
+        redisService.storeValue(EMAIL_CODE_KEY_PREFIX + codeType, email, verificationCode, 175 * 1000L); // 3분 동안 유효
+    }
+
+    @Async
+    public void sendMail(String toEmail, String subject, String templateName, Map<String, Object> templateModel) throws MessagingException {
+        MimeMessage message = mailSender.createMimeMessage();
+        MimeMessageHelper helper = new MimeMessageHelper(message, true, UTF_EIGHT_ENCODING);
+
+        // 템플릿 설정
+        Context context = new Context();
+        templateModel.forEach(context::setVariable);
+        String htmlContent = templateEngine.process(templateName, context);
+        helper.setText(htmlContent, true);
+
+        helper.setFrom(SERVICE_MAIL_ACCOUNT);
+        helper.setTo(toEmail);
+        helper.setSubject(subject);
+
+        mailSender.send(message);
     }
 }

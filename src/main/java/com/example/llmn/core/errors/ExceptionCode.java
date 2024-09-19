@@ -18,6 +18,7 @@ public enum ExceptionCode {
     USER_FORBIDDEN(HttpStatus.FORBIDDEN, "권한이 없습니다."),
     USER_UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "로그인이 되지 않았습니다."),
     USER_ALREADY_EXIT(HttpStatus.NOT_FOUND, "이미 탈퇴한 계정입니다."),
+    ALREADY_SEND_EMAIL(HttpStatus.NOT_FOUND, "이미 이메일을 전송하였습니다. 5분 후에 다시 시도해주세요"),
 
     // ElasticSearch 오류
     ELASTIC_SEARCH_ERROR(HttpStatus.NOT_FOUND, "ElasticSearch에 문제가 발생했습니다."),

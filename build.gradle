@@ -72,6 +72,9 @@ dependencies {
 	// sshd
 	implementation 'org.apache.sshd:sshd-core:2.9.3'
 	implementation 'commons-io:commons-io:2.11.0'
+
+	// Thymeleaf
+	implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
 }
 
 tasks.named('test') {

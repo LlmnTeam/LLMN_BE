@@ -44,7 +44,7 @@ public class JWTProvider {
                 .withSubject(user.getEmail())
                 .withExpiresAt(new Date(System.currentTimeMillis() + exp))
                 .withClaim("id", user.getId())
-                .withClaim("role", user.getRole().ordinal())
+                .withClaim("isLocal", user.getSshInfo().isLocal())
                 .withClaim("nickName", user.getNickName())
                 .sign(Algorithm.HMAC512(SECRET));
         return jwt;

@@ -26,17 +26,13 @@ public class SshInfo extends TimeStamp{
     private String remoteHost;
 
     @Column
-    private String remotePort;
-
-    @Column
     private String remoteKeyPath;
 
     @Builder
-    public SshInfo(boolean isLocal, String remoteName, String remoteHost, String remotePort, String remoteKeyPath) {
+    public SshInfo(boolean isLocal, String remoteName, String remoteHost, String remoteKeyPath) {
         this.isLocal = isLocal;
         this.remoteName = remoteName;
         this.remoteHost = remoteHost;
-        this.remotePort = remotePort;
         this.remoteKeyPath = remoteKeyPath;
     }
 }
