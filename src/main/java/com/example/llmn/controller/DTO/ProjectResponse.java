@@ -14,7 +14,6 @@ public class ProjectResponse {
     public record FindProjectInfoByIdDTO(
             String projectName,
             String containerName,
-            boolean isLocalContainer,
             String description){}
 
     public record FindProjectListDTO(List<ProjectDTO> projects){}

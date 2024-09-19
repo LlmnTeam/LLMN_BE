@@ -48,7 +48,6 @@ public class ProjectService {
                 .user(user)
                 .projectName(requestDTO.projectName())
                 .containerName(requestDTO.containerName())
-                .isLocalContainer(requestDTO.isLocalContainer())
                 .description(requestDTO.description())
                 .containerStatus(containerStatus)
                 .build();
@@ -69,7 +68,6 @@ public class ProjectService {
         return new ProjectResponse.FindProjectInfoByIdDTO(
                 project.getProjectName(),
                 project.getContainerName(),
-                project.isLocalContainer(),
                 project.getDescription());
     }
 
@@ -89,7 +87,7 @@ public class ProjectService {
                 ? ContainerStatus.NOT_WORKING
                 : project.getContainerStatus();
 
-        project.updateProject(requestDTO.projectName(), requestDTO.containerName(), requestDTO.description(), requestDTO.isLocalContainer(), containerStatus);
+        project.updateProject(requestDTO.projectName(), requestDTO.containerName(), requestDTO.description(), containerStatus);
     }
 
     @Transactional

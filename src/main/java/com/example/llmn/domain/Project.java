@@ -31,30 +31,25 @@ public class Project extends TimeStamp{
     private ContainerStatus containerStatus;
 
     @Column
-    boolean isLocalContainer;
-
-    @Column
     private String description;
 
     @Column
     private boolean isWorking;
 
     @Builder
-    public Project(User user, String projectName, String containerName, String description, ContainerStatus containerStatus, boolean isLocalContainer) {
+    public Project(User user, String projectName, String containerName, String description, ContainerStatus containerStatus) {
         this.user = user;
         this.projectName = projectName;
         this.containerName = containerName;
         this.containerStatus = containerStatus;
-        this.isLocalContainer = isLocalContainer;
         this.description = description;
         this.isWorking = true;
     }
 
-    public void updateProject(String projectName, String containerName, String description, boolean isLocalContainer, ContainerStatus containerStatus){
+    public void updateProject(String projectName, String containerName, String description, ContainerStatus containerStatus){
         this.projectName = projectName;
         this.containerName = containerName;
         this.description = description;
-        this.isLocalContainer = isLocalContainer;
         this.containerStatus = containerStatus;
     }
 }

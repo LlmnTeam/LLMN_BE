@@ -44,7 +44,7 @@ public class UserController {
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.CREATED, null));
     }
 
-    @PostMapping("/upload")
+    @PostMapping("/accounts/ssh")
     public ResponseEntity<?> uploadSSHKey(@RequestParam("file") MultipartFile file) {
         // 파일이 빈 경우 오류 처리
         if (file.isEmpty()) {
