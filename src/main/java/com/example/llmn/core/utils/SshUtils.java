@@ -91,7 +91,7 @@ public class SshUtils {
             session.auth().verify(10, TimeUnit.SECONDS);
 
             // 명령어 실행
-            String commandOutput = executeRemoteCommand(session, command);
+            String commandOutput = executeRemoteCommandNotStream(session, command);
             resultBuilder.append(commandOutput);
 
         } catch (Exception e) {
@@ -109,7 +109,7 @@ public class SshUtils {
         return resultBuilder.toString();
     }
 
-    private static String executeRemoteCommand(ClientSession session, String command) throws Exception {
+    private static String executeRemoteCommandNotStream(ClientSession session, String command) throws Exception {
         StringBuilder resultBuilder = new StringBuilder();
 
         try (ClientChannel channel = session.createExecChannel(command)) {
@@ -125,6 +125,51 @@ public class SshUtils {
             }
 
             resultBuilder.append(new String(responseStream.toByteArray(), StandardCharsets.UTF_8));
+        }
+
+        return resultBuilder.toString();
+    }
+
+    private static String executeRemoteCommandInStream(ClientSession session, String command) throws Exception {
+        StringBuilder resultBuilder = new StringBuilder();
+
+        try (ClientChannel channel = session.createExecChannel(command)) {
+            PipedOutputStream pipedOut = new PipedOutputStream();
+            PipedInputStream pipedIn = new PipedInputStream(pipedOut);
+
+            // 실시간으로 명령어 출력 받기 (PipedInputStream 통해 읽기)
+            new Thread(() -> {
+                try {
+                    byte[] buffer = new byte[1024];
+                    int bytesRead;
+                    while ((bytesRead = pipedIn.read(buffer)) != -1) {
+                        String output = new String(buffer, 0, bytesRead, StandardCharsets.UTF_8);
+                        // System.out.print(output); // 표준 출력에 실시간으로 출력
+                        resultBuilder.append(output); // 결과에 추가
+                    }
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }).start();
+
+            // PipedOutputStream에 쓰기
+            channel.setOut(pipedOut);
+            channel.open().verify(5, TimeUnit.SECONDS);
+
+            // 채널이 닫힐 때까지 대기
+            Set<ClientChannelEvent> events = channel.waitFor(EnumSet.of(ClientChannelEvent.CLOSED), TimeUnit.MINUTES.toMillis(5));
+            if (events.contains(ClientChannelEvent.TIMEOUT)) {
+                throw new Exception("커맨드 타임아웃 발생");
+            }
+
+            // 종료 상태 확인
+            Integer exitStatus = channel.getExitStatus();
+            if (exitStatus != null) {
+                resultBuilder.append("\n종료됨.").append(exitStatus);
+            }
+
+        } catch (Exception e) {
+            throw new Exception("명령어 실행 중 에러 발생: " + e.getMessage(), e);
         }
 
         return resultBuilder.toString();
