@@ -1,5 +1,10 @@
 package com.example.llmn.core.utils;
 
+import org.apache.sshd.client.SshClient;
+import org.apache.sshd.client.channel.ClientChannel;
+import org.apache.sshd.client.channel.ClientChannelEvent;
+import org.apache.sshd.client.future.ConnectFuture;
+import org.apache.sshd.client.session.ClientSession;
 import org.apache.sshd.common.NamedResource;
 import org.apache.sshd.common.config.keys.FilePasswordProvider;
 import org.apache.sshd.common.config.keys.loader.KeyPairResourceParser;
@@ -7,15 +12,20 @@ import org.apache.sshd.common.session.SessionContext;
 import org.apache.sshd.common.util.GenericUtils;
 import org.apache.sshd.common.util.security.SecurityUtils;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Paths;
 import java.security.GeneralSecurityException;
 import java.security.KeyPair;
 import java.util.Collection;
+import java.util.EnumSet;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 public class SshUtils {
+
+    private static final int SSH_PORT_NUM = 22;
 
     public static KeyPair loadKeyPair(String privateKeyPath) throws IOException, GeneralSecurityException {
         // privateKeyPath에 해당하는 파일 객체 생성
@@ -52,5 +62,71 @@ public class SshUtils {
 
             return keyPairs.iterator().next(); // 첫 번째 KeyPair 반환
         }
+    }
+
+    public static String executeCommand(String host, String username, String privateKeyPath, String command) throws Exception {
+        SshClient client = null;
+        ClientSession session = null;
+        StringBuilder resultBuilder = new StringBuilder();
+
+        try {
+            // SSH 클라이언트 생성
+            client = SshClient.setUpDefaultClient();
+            client.start();
+
+            // 파일 경로 설정 (file:// 경로 지원)
+            if (privateKeyPath.startsWith("file://")) {
+                privateKeyPath = Paths.get(URI.create(privateKeyPath)).toString();
+            }
+
+            // 클라이언트 세션 생성
+            ConnectFuture connectFuture = client.connect(username, host, SSH_PORT_NUM);
+            session = connectFuture.verify(10, TimeUnit.SECONDS).getSession();
+
+            // 키 파일로 인증 설정
+            KeyPair keyPair = SshUtils.loadKeyPair(privateKeyPath);
+            session.addPublicKeyIdentity(keyPair);
+
+            // 연결
+            session.auth().verify(10, TimeUnit.SECONDS);
+
+            // 명령어 실행
+            String commandOutput = executeRemoteCommand(session, command);
+            resultBuilder.append(commandOutput);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return "에러: " + e.getMessage();
+        } finally {
+            if (session != null) {
+                session.close(false);
+            }
+            if (client != null) {
+                client.stop();
+            }
+        }
+
+        return resultBuilder.toString();
+    }
+
+    private static String executeRemoteCommand(ClientSession session, String command) throws Exception {
+        StringBuilder resultBuilder = new StringBuilder();
+
+        try (ClientChannel channel = session.createExecChannel(command)) {
+            ByteArrayOutputStream responseStream = new ByteArrayOutputStream();
+            channel.setOut(responseStream);
+
+            channel.open().verify(5, TimeUnit.SECONDS);
+
+            // 명령어가 완료될 때까지 대기 (기본적으로 5분)
+            Set<ClientChannelEvent> events = channel.waitFor(EnumSet.of(ClientChannelEvent.CLOSED), TimeUnit.MINUTES.toMillis(5));
+            if (events.contains(ClientChannelEvent.TIMEOUT)) {
+                throw new Exception("커맨드 타임아웃 발생");
+            }
+
+            resultBuilder.append(new String(responseStream.toByteArray(), StandardCharsets.UTF_8));
+        }
+
+        return resultBuilder.toString();
     }
 }

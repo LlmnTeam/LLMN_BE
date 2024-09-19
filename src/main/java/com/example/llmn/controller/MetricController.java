@@ -4,6 +4,7 @@ import com.example.llmn.controller.DTO.MetricResponse;
 import com.example.llmn.controller.DTO.ProjectResponse;
 import com.example.llmn.core.security.CustomUserDetails;
 import com.example.llmn.core.utils.ApiUtils;
+import com.example.llmn.core.utils.SshUtils;
 import com.example.llmn.service.MetricService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -36,5 +37,14 @@ public class MetricController {
                                                   @RequestParam String username)  {
         Map<String, Object> stringObjectMap = metricService.collectRemoteMetrics(privateKeyPath, host, username);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, stringObjectMap));
+    }
+
+    @GetMapping("/test2")
+    public ResponseEntity<?> test(@RequestParam String privateKeyPath,
+                                  @RequestParam String host,
+                                  @RequestParam String username,
+                                  @RequestParam String command) throws Exception {
+        String s = SshUtils.executeCommand(host, username, privateKeyPath, command);
+        return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, s));
     }
 }
