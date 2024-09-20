@@ -38,7 +38,7 @@ public class LlmService {
     private static final int METRIC_HISTORY_PREVIOUS_HOUR = 1;
 
     @Transactional
-    @Scheduled(cron = "0 5 * * * *")
+    @Scheduled(cron = "0 5 * * * *") // 매시 5분
     public void summaryProjectLog(){
         List<Project> projects = projectRepository.findAll();
 
@@ -75,7 +75,7 @@ public class LlmService {
     }
 
     @Transactional
-    @Scheduled(cron = "0 15 * * * *")
+    @Scheduled(cron = "0 15 * * * *") // 매시 15분에
     public void summaryPerformance(){
         LogDTO.PerformanceSummaryResponseDTO performanceSummaryDTO = fetchMetricSummary();
 
@@ -95,6 +95,19 @@ public class LlmService {
         Summary performanceSummary = Summary.builder()
                 .content(dailySummaryDTO.dailySummary())
                 .summaryType(SummaryType.DAILY)
+                .build();
+
+        summaryRepository.save(performanceSummary);
+    }
+
+    @Transactional
+    @Scheduled(cron = "0 45 23 * * 0") // 매주 일요일 11시 45분
+    public void summaryTrend(){
+        LogDTO.TrendSummaryResponseDTO trendSummaryDTO = fetchTrendSummary();
+
+        Summary performanceSummary = Summary.builder()
+                .content(trendSummaryDTO.trendSummary())
+                .summaryType(SummaryType.TEND)
                 .build();
 
         summaryRepository.save(performanceSummary);
