@@ -34,7 +34,7 @@ public class LlmService {
     private static final int METRIC_HISTORY_PREVIOUS_HOUR = 1;
 
     @Transactional
-    @Scheduled(cron = "0 0,30 * * * *")
+    @Scheduled(cron = "0 0 * * * *")
     public void summaryProjectLog(){
         List<Project> projects = projectRepository.findAll();
 
@@ -71,7 +71,7 @@ public class LlmService {
     }
 
     @Transactional
-    @Scheduled(cron = "0 15,45 * * * *")
+    @Scheduled(cron = "0 15 * * * *")
     public void summaryPerformance(){
         LogDTO.PerformanceSummaryResponseDTO performanceSummaryDTO = fetchMetricSummary();
 

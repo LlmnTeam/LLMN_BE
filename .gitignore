@@ -39,3 +39,6 @@ volume/
 
 # LOG
 logs/
+
+# SSH
+ssh/

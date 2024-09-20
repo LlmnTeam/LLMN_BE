@@ -26,7 +26,7 @@ class LogRequest(BaseModel):
     cotent: str
 
 # LLM 요약을 생성하는 함수
-async def generate_log_summary(cotent: str):    
+async def generate_log_summary(content: str):    
     prompt = (
         "### Persona ###\n"
         "You are an expert system log analyst. Your task is to summarize and detect anomalies in the following system logs.\n"
@@ -36,7 +36,7 @@ async def generate_log_summary(cotent: str):
         "Use icons or emojis to enhance readability and highlight key sections.\n"
         "\n"
         "### Log Data ###\n"
-        f"{cotent}\n"
+        f"{content}\n"
         "\n"
         "### General Summary ###\n"
         "1. Summarize the key events from the log data.\n"
@@ -92,7 +92,7 @@ async def generate_log_summary(cotent: str):
 
     return general_summary, anomaly_summary
 
-async def generate_performance_summary(cotent: str):    
+async def generate_performance_summary(content: str):    
     prompt = (
         "### Persona ###\n"
         "You are an expert system performance analyst. Your task is to summarize and identify abnormal patterns in the following performance metrics.\n"
@@ -100,9 +100,10 @@ async def generate_performance_summary(cotent: str):
         "Make sure to be concise but provide enough detail for an administrator to understand key events and anomalies.\n"
         "If there are fewer than three events or anomalies, only provide the relevant information. Do not force the list to reach three items.\n"
         "Use icons or emojis to enhance readability and highlight key sections.\n"
+        "Only include critical and urgent recommendations in the response.\n"
         "\n"
         "### Performance Data ###\n"
-        f"{cotent}\n"
+        f"{content}\n"
         "\n"
         "### Performance Summary ###\n"
         "1. Format the response in the following structure with icons or emojis to improve readability:\n"
@@ -122,16 +123,16 @@ async def generate_performance_summary(cotent: str):
         "     - 평균 송신량: [평균 송신량] KB\n"
         "     - 최대 송신량: [최대 송신량] KB (발생 시간: [최대 시간])\n"
         "\n"
-        "- 탐지된 비정상 패턴:\n"
+        "- 탐지된 비정상 패턴\n"
         "   1. [First detected abnormal pattern]\n"
         "   2. [Second detected abnormal pattern]\n"
         "   3. [Third detected abnormal pattern]\n"
         "   ...(continue numbering as needed)\n"
         "\n"
         "- 권장 조치\n"
-        "   1. [First recommended action]\n"
-        "   2. [Second recommended action]\n"
-        "   3. [Third recommended action]\n"
+        "   1. [First critical action]\n"
+        "   2. [Second critical action]\n"
+        "   3. [Third critical action]\n"
         "   ...(continue numbering as needed)\n"
     )
 
@@ -150,6 +151,70 @@ async def generate_performance_summary(cotent: str):
 
     return performance_summary
 
+async def generate_daily_summary(content: str):    
+    prompt = (
+        "### Persona ###\n"
+        "You are an expert system performance and application log analyst. Your task is to generate a daily key summary report based on application and performance logs.\n"
+        "Your responses should be in Korean and provide only the most critical and urgent information.\n"
+        "The report should focus on key events, abnormal patterns, and immediate actions required to resolve issues.\n"
+        "Use icons or emojis to highlight key sections and ensure that the report is structured for quick review by an administrator.\n"
+        "If there are fewer than three events or anomalies, only provide the relevant information. Do not force the list to reach three items.\n"
+        "Do not include non-critical information. Focus on events or patterns that require immediate attention.\n"
+        "\n"
+        "### Input Data ###\n"
+        f"{content}\n"
+        "\n"
+        "### Daily Key Summary Report ###\n"
+        "Format the response in the following structure:\n"
+        "\n"
+        "🔍 일일 핵심 요약 리포트\n"
+        "\n"
+        "1. 주요 경고 및 오류\n"
+        "- 경고/오류 항목들\n"
+        "   1. [First critical warning or error]\n"
+        "   2. [Second critical warning or error]\n"
+        "   3. [Third critical warning or error]\n"
+        "   ...(continue numbering as needed)\n"
+        "\n"
+        "- 발생 빈도\n"
+        "   - ERROR: [Total number of ERRORs]\n"
+        "   - WARN: [Total number of WARNs]\n"
+        "\n"
+        "2. 시스템 성능 개요\n"
+        "- CPU 사용량: 평균 [평균 CPU 사용량]%, 최대 [최대 CPU 사용량]% (발생 시간: [최대 CPU 사용량 발생 시간])\n"
+        "- 메모리 사용량: 평균 [평균 메모리 사용량] MB, 최대 [최대 메모리 사용량] MB (발생 시간: [최대 메모리 사용량 발생 시간])\n"
+        "- 네트워크 수신량: 평균 [평균 수신량] MB, 최대 [최대 수신량] MB (발생 시간: [최대 수신량 발생 시간])\n"
+        "- 네트워크 송신량: 평균 [평균 송신량] MB, 최대 [최대 송신량] MB (발생 시간: [최대 송신량 발생 시간])\n"
+        "   ...(continue numbering as needed)\n"
+        "\n"
+        "3. 탐지된 비정상 패턴\n"
+        "- [First detected abnormal pattern]\n"
+        "- [Second detected abnormal pattern]\n"
+        "- [Third detected abnormal pattern]\n"
+        "   ...(continue numbering as needed)\n"
+        "\n"
+        "4. 긴급 권장 조치\n"
+        "- [First critical action]\n"
+        "- [Second critical action]\n"
+        "- [Third critical action]\n"
+        "   ...(continue numbering as needed)\n"
+    )
+
+    chatmodel = ChatOpenAI(
+        model="gpt-4o-mini",
+        temperature=0.3,
+        max_tokens=750,
+        openai_api_key=settings.OPENAI_API_KEY
+    )
+    
+    prompt_template = PromptTemplate(input_variables=["prompt"], template="{prompt}")
+    formatted_prompt = prompt_template.format(prompt=prompt)
+
+    response = chatmodel.invoke(formatted_prompt)
+    daily_summary = response.content  
+
+    return daily_summary
+
 # FastAPI 엔드포인트
 @app.post("/process/logSummary")
 async def process_log_summary(request: LogRequest):
@@ -167,4 +232,12 @@ async def process_performance_summary(request: LogRequest):
     
     return {
         "performanceSummary": performance_summary
+    }
+
+@app.post("/process/dailySummary")
+async def process_daily_summary(request: LogRequest):
+    daily_summary = await generate_performance_summary(request.cotent)
+    
+    return {
+        "dailySummaryy": daily_summary
     }
