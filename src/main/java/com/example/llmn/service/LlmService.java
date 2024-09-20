@@ -35,6 +35,7 @@ public class LlmService {
     private static final String PERFORMANCE_SUMMERY_URI = "http://localhost:8000/process/performanceSummary";
     private static final String DAILY_SUMMERY_URI = "http://localhost:8000/process/dailySummary";
     private static final String TREND_SUMMERY_URI = "http://localhost:8000/process/trendSummary";
+    private static final String RECOMMEND_URI = "http://localhost:8000/process/recommend";
     private static final int METRIC_HISTORY_PREVIOUS_HOUR = 1;
 
     @Transactional
@@ -187,11 +188,11 @@ public class LlmService {
             logMessageBuilder.append("- 오늘의 성능 요약이 없습니다.\n");
         } else {
             for (Summary summary : performanceSummaries) {
-                logMessageBuilder.append("- [")
-                        .append(summary.getSummaryType().name())
-                        .append("] ")
+                logMessageBuilder.append("Date: ")
+                        .append(summary.getCreatedDate())
+                        .append("\n")
                         .append(summary.getContent())
-                        .append("\n");
+                        .append("\n\n");
             }
         }
 
@@ -201,11 +202,11 @@ public class LlmService {
             logMessageBuilder.append("- 오늘의 로그 요약이 없습니다.\n");
         } else {
             for (Summary summary : logSummaries) {
-                logMessageBuilder.append("- [")
-                        .append(summary.getSummaryType().name())
-                        .append("] ")
+                logMessageBuilder.append("Date: ")
+                        .append(summary.getCreatedDate())
+                        .append("\n")
                         .append(summary.getContent())
-                        .append("\n");
+                        .append("\n\n");
             }
         }
 
@@ -231,7 +232,8 @@ public class LlmService {
         logMessageBuilder.append("### Weekly Trend Summaries ###\n\n");
 
         for (Summary summary : trendSummaries) {
-            logMessageBuilder.append("Date: ").append(summary.getCreatedDate())
+            logMessageBuilder.append("Date: ")
+                    .append(summary.getCreatedDate())
                     .append("\n")
                     .append(summary.getContent())
                     .append("\n\n");
@@ -245,6 +247,55 @@ public class LlmService {
                 .bodyValue(new LogDTO.SummaryRequestDTO(logMessage))
                 .retrieve()
                 .bodyToMono(LogDTO.TrendSummaryResponseDTO.class)
+                .block();
+    }
+
+    private LogDTO.RecommendationDTO fetchRecommendation() {
+        StringBuilder logMessageBuilder = new StringBuilder();
+
+        LocalDateTime startOfTime = LocalDateTime.now().minusHours(6);
+
+        // 성능 요약 리스트와 어플리케이션 요약 리스트
+        List<Summary> performanceSummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.PERFORMANCE), startOfTime);
+        List<Summary> logSummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.GENERAL, SummaryType.ANOMALY), startOfTime);
+
+        // 성능 요약을 로그 메시지로 변환
+        logMessageBuilder.append("### Performance Summary ###\n");
+        if (performanceSummaries.isEmpty()) {
+            logMessageBuilder.append("- 성능 요약 내역이 없습니다.\n");
+        } else {
+            for (Summary summary : performanceSummaries) {
+                logMessageBuilder.append("Date: ")
+                        .append(summary.getCreatedDate())
+                        .append("\n")
+                        .append(summary.getContent())
+                        .append("\n\n");
+            }
+        }
+
+        // 일반 및 이상 로그 요약을 로그 메시지로 변환
+        logMessageBuilder.append("\n### Application Log Summary ###\n");
+        if (logSummaries.isEmpty()) {
+            logMessageBuilder.append("- 로그 요약 내역이 없습니다.\n");
+        } else {
+            for (Summary summary : logSummaries) {
+                logMessageBuilder.append("Date: ")
+                        .append(summary.getCreatedDate())
+                        .append("\n")
+                        .append(summary.getContent())
+                        .append("\n\n");
+            }
+        }
+
+        // logMessage 문자열로 변환
+        String logMessage = logMessageBuilder.toString();
+
+        // LLM에 전달하기 위해 FastAPI에 요청
+        return webClient.post()
+                .uri(buildURI(RECOMMEND_URI))
+                .bodyValue(new LogDTO.SummaryRequestDTO(logMessage))
+                .retrieve()
+                .bodyToMono(LogDTO.RecommendationDTO.class)
                 .block();
     }
 
