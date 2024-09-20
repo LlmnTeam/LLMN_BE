@@ -177,7 +177,7 @@ public class SshUtils {
         return resultBuilder.toString();
     }
 
-    private static String executeRemoteCommandInSocket(ClientSession session, String command) throws Exception {
+    public static String executeRemoteCommandInSocket(ClientSession session, String command) throws Exception {
         StringBuilder resultBuilder = new StringBuilder();
         String redisChannel = "ssh-command-output"; // 고정된 Redis 채널 이름
 

@@ -4,8 +4,10 @@ import com.example.llmn.controller.DTO.MetricResponse;
 import com.example.llmn.controller.DTO.ProjectResponse;
 import com.example.llmn.core.security.CustomUserDetails;
 import com.example.llmn.core.utils.ApiUtils;
+import com.example.llmn.core.utils.SSHCommandExecutor;
 import com.example.llmn.core.utils.SshUtils;
 import com.example.llmn.service.MetricService;
+import com.example.llmn.service.SSHService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -21,6 +23,7 @@ import java.util.Map;
 public class MetricController {
 
     private final MetricService metricService;
+    private final SSHService sshService;
     private static final int METRIC_HISTORY_PREVIOUS_HOUR = 24;
 
     @GetMapping("/metrics")
@@ -38,11 +41,18 @@ public class MetricController {
     }
 
     @PostMapping("/command")
-    public ResponseEntity<?> command(@RequestBody MetricResponse.CommandDTO requestDTO) throws Exception {
-        String s = SshUtils.executeCommand(requestDTO.host(),
-                requestDTO.username(),
-                requestDTO.privateKeyPath(),
-                requestDTO.command());
-        return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, s));
+    public ResponseEntity<?> executeCommand(@RequestBody Map<String, String> request) {
+        String command = request.get("command");
+
+        try {
+            // 동일한 SSH 세션을 사용하여 명령어 실행
+            String result = sshService.executeCommand(command);
+
+            // 명령어 실행 결과를 JSON으로 응답
+            return ResponseEntity.ok(Map.of("result", result));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("명령어 실행 중 에러 발생");
+        }
     }
 }
