@@ -93,12 +93,12 @@ public class LlmService {
     public void summaryDaily(){
         LogDTO.DailySummaryResponseDTO dailySummaryDTO = fetchDailySummary();
 
-        Summary performanceSummary = Summary.builder()
+        Summary dailySummary = Summary.builder()
                 .content(dailySummaryDTO.dailySummary())
                 .summaryType(SummaryType.DAILY)
                 .build();
 
-        summaryRepository.save(performanceSummary);
+        summaryRepository.save(dailySummary);
     }
 
     @Transactional
@@ -106,12 +106,25 @@ public class LlmService {
     public void summaryTrend(){
         LogDTO.TrendSummaryResponseDTO trendSummaryDTO = fetchTrendSummary();
 
-        Summary performanceSummary = Summary.builder()
+        Summary trendSummary = Summary.builder()
                 .content(trendSummaryDTO.trendSummary())
                 .summaryType(SummaryType.TEND)
                 .build();
 
-        summaryRepository.save(performanceSummary);
+        summaryRepository.save(trendSummary);
+    }
+
+    @Transactional
+    @Scheduled(cron = "0 20 0,6,12,18 * * *") // 6시간 간격으로 20분에
+    public void recommend(){
+        LogDTO.RecommendationDTO recommendationDTO = fetchRecommendation();
+
+        Summary recommend = Summary.builder()
+                .content(recommendationDTO.recommend())
+                .summaryType(SummaryType.RECOMMENDATION)
+                .build();
+
+        summaryRepository.save(recommend);
     }
 
     private LogDTO.SummaryResponseDTO fetchLogSummary(Instant startTime, Instant endTime, String serviceName) {
