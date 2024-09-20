@@ -43,22 +43,22 @@ async def generate_log_summary(content: str):
         "2. The summary should include the main [ERROR], [WARN], and [INFO] events.\n"
         "3. Format the response in the following structure with icons or emojis to improve readability:\n"
         "\n"
-        "[일반적인 요약]\n"
+        "[📊 일반적인 요약]\n"
         "- 주요 이벤트\n"
         "   1. [First major event]\n"
         "   2. [Second major event]\n"
         "   3. [Third major event]\n"
         "   ...(continue numbering as needed)\n"
         "- 발생 빈도:\n"
-        "   - ERROR: [number of ERRORs]\n"
-        "   - WARN: [number of WARNs]\n"
-        "   - INFO: [number of INFOs]\n"
+        "   - ❗ERROR: [number of ERRORs]\n"
+        "   - ⚠️ WARN: [number of WARNs]\n"
+        "   - ℹ️ INFO: [number of INFOs]\n"
         "\n"
         "### Anomaly Detection ###\n"
         "1. Identify any abnormal patterns, such as repetitive errors or unusual occurrences.\n"
         "2. Format the response in the following structure with icons or emojis to improve readability:\n"
         "\n"
-        "[이상 탐지 요약]\n"
+        "[🚨 이상 탐지 요약]\n"
         "- 탐지된 비정상 패턴\n"
         "   1. [First detected anomaly]\n"
         "   2. [Second detected anomaly]\n"
@@ -108,7 +108,6 @@ async def generate_performance_summary(content: str):
         "### Performance Summary ###\n"
         "1. Format the response in the following structure with icons or emojis to improve readability:\n"
         "\n"
-        "[성능 요약]\n"
         "- 성능 개요"
         "   - CPU\n"
         "     - 평균 사용량: [평균 CPU 사용량]%\n"
@@ -324,6 +323,41 @@ async def generate_trend_summary(content: str):
 
     return trend_summary
 
+async def generate_recommend(content: str):    
+    prompt = (
+        "### Persona ###\n"
+        "You are an expert system performance analyst. Your task is to provide concise, actionable recommendations based on application logs and performance data from the past 6 hours.\n"
+        "Your responses should be in Korean and focus on key performance issues and suggestions for immediate action.\n"
+        "Use short, clear recommendations that directly address the most urgent and critical system problems.\n"
+        "The format should be simple and easy to understand. Each recommendation should begin with a dash (-).\n"
+        "\n"
+        "### Input Data ###\n"
+        f"{content}\n"
+        "\n"
+        "### Recommendations ###\n"
+        "Format the response as a list of brief recommendations based on the input data:\n"
+        "\n"
+        "- [First recommendation]\n"
+        "- [Second recommendation]\n"
+        "- [Third recommendation]\n"
+        "   ...(continue numbering as needed)\n"
+    )
+
+    chatmodel = ChatOpenAI(
+        model="gpt-4o-mini",
+        temperature=0.3,
+        max_tokens=750,
+        openai_api_key=settings.OPENAI_API_KEY
+    )
+    
+    prompt_template = PromptTemplate(input_variables=["prompt"], template="{prompt}")
+    formatted_prompt = prompt_template.format(prompt=prompt)
+
+    response = chatmodel.invoke(formatted_prompt)
+    recommend = response.content  
+
+    return recommend
+
 # FastAPI 엔드포인트
 @app.post("/process/logSummary")
 async def process_log_summary(request: LogRequest):
@@ -345,7 +379,7 @@ async def process_performance_summary(request: LogRequest):
 
 @app.post("/process/dailySummary")
 async def process_daily_summary(request: LogRequest):
-    daily_summary = await generate_performance_summary(request.cotent)
+    daily_summary = await generate_daily_summary(request.cotent)
     
     return {
         "dailySummary": daily_summary
@@ -353,8 +387,16 @@ async def process_daily_summary(request: LogRequest):
 
 @app.post("/process/trendSummary")
 async def process_daily_summary(request: LogRequest):
-    trend_summary = await generate_performance_summary(request.cotent)
+    trend_summary = await generate_trend_summary(request.cotent)
     
     return {
         "trendSummary": trend_summary
+    }
+
+@app.post("/process/recommend")
+async def process_recommend(request: LogRequest):
+    recommend = await generate_recommend(request.cotent)
+    
+    return {
+        "recommend": recommend
     }
