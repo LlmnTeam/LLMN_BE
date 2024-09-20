@@ -9,4 +9,6 @@ public class LogDTO {
     public record PerformanceSummaryResponseDTO(String performanceSummary){}
 
     public record DailySummaryResponseDTO(String dailySummary){}
+
+    public record TrendSummaryResponseDTO(String trendSummary){}
 }

@@ -34,6 +34,7 @@ public class LlmService {
     private static final String LOG_SUMMERY_URI = "http://localhost:8000/process/logSummary";
     private static final String PERFORMANCE_SUMMERY_URI = "http://localhost:8000/process/performanceSummary";
     private static final String DAILY_SUMMERY_URI = "http://localhost:8000/process/dailySummary";
+    private static final String TREND_SUMMERY_URI = "http://localhost:8000/process/trendSummary";
     private static final int METRIC_HISTORY_PREVIOUS_HOUR = 1;
 
     @Transactional
@@ -163,9 +164,8 @@ public class LlmService {
 
         LocalDateTime startOfDay = LocalDateTime.now().with(LocalTime.MIN);
 
-        // 성능 요약 리스트를 가져옴
+        // 성능 요약 리스트와 어플리케이션 요약 리스트
         List<Summary> performanceSummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.PERFORMANCE), startOfDay);
-        // 일반 및 이상 로그 요약 리스트를 가져옴
         List<Summary> logSummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.GENERAL, SummaryType.ANOMALY), startOfDay);
 
         // 성능 요약을 로그 메시지로 변환
@@ -205,6 +205,33 @@ public class LlmService {
                 .bodyValue(new LogDTO.SummaryRequestDTO(logMessage))
                 .retrieve()
                 .bodyToMono(LogDTO.DailySummaryResponseDTO.class)
+                .block();
+    }
+
+    private LogDTO.TrendSummaryResponseDTO fetchTrendSummary(){
+        StringBuilder logMessageBuilder = new StringBuilder();
+
+        // 1주일 전까지의 일일 리포트를 인풋으로 사용
+        LocalDateTime startOfDay = LocalDateTime.now().minusWeeks(1).with(LocalTime.MIN);
+        List<Summary> trendSummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.DAILY), startOfDay);
+
+        logMessageBuilder.append("### Weekly Trend Summaries ###\n\n");
+
+        for (Summary summary : trendSummaries) {
+            logMessageBuilder.append("Date: ").append(summary.getCreatedDate())
+                    .append("\n")
+                    .append(summary.getContent())
+                    .append("\n\n");
+        }
+
+        // logMessage 문자열로 변환
+        String logMessage = logMessageBuilder.toString();
+
+        return webClient.post()
+                .uri(buildURI(TREND_SUMMERY_URI))
+                .bodyValue(new LogDTO.SummaryRequestDTO(logMessage))
+                .retrieve()
+                .bodyToMono(LogDTO.TrendSummaryResponseDTO.class)
                 .block();
     }
 
