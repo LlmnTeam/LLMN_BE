@@ -1,5 +1,6 @@
 package com.example.llmn.core.config;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.socket.WebSocketHandler;
 import org.springframework.web.socket.config.annotation.EnableWebSocket;
@@ -8,13 +9,10 @@ import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry
 
 @Configuration
 @EnableWebSocket
+@RequiredArgsConstructor
 public class WebSocketConfig implements WebSocketConfigurer {
 
     private final RedisWebSocketHandler redisWebSocketHandler;
-
-    public WebSocketConfig(RedisWebSocketHandler redisWebSocketHandler) {
-        this.redisWebSocketHandler = redisWebSocketHandler;
-    }
 
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {

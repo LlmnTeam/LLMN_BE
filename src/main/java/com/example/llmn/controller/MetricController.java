@@ -11,9 +11,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
@@ -39,12 +37,12 @@ public class MetricController {
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, stringObjectMap));
     }
 
-    @GetMapping("/test2")
-    public ResponseEntity<?> test(@RequestParam String privateKeyPath,
-                                  @RequestParam String host,
-                                  @RequestParam String username,
-                                  @RequestParam String command) throws Exception {
-        String s = SshUtils.executeCommand(host, username, privateKeyPath, command);
+    @PostMapping("/command")
+    public ResponseEntity<?> command(@RequestBody MetricResponse.CommandDTO requestDTO) throws Exception {
+        String s = SshUtils.executeCommand(requestDTO.host(),
+                requestDTO.username(),
+                requestDTO.privateKeyPath(),
+                requestDTO.command());
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, s));
     }
 }

@@ -1,6 +1,7 @@
 package com.example.llmn.controller.DTO;
 
 import com.example.llmn.domain.ContainerStatus;
+import org.springframework.web.bind.annotation.RequestParam;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -35,4 +36,10 @@ public class MetricResponse {
             long usedMemory,
             long networkReceived,
             long networkSent){}
+
+    public record CommandDTO(
+            String privateKeyPath,
+            String host,
+            String username,
+            String command){}
 }

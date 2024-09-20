@@ -27,6 +27,7 @@ import java.util.concurrent.TimeUnit;
 public class SshUtils {
 
     private static final int SSH_PORT_NUM = 22;
+    private static final int REDIS_PORT = 6379; // Redis 기본 포트 설정
 
     public static KeyPair loadKeyPair(String privateKeyPath) throws IOException, GeneralSecurityException {
         // privateKeyPath에 해당하는 파일 객체 생성
@@ -82,17 +83,17 @@ public class SshUtils {
 
             // 클라이언트 세션 생성
             ConnectFuture connectFuture = client.connect(username, host, SSH_PORT_NUM);
-            session = connectFuture.verify(10, TimeUnit.SECONDS).getSession();
+            session = connectFuture.verify(30, TimeUnit.SECONDS).getSession();
 
             // 키 파일로 인증 설정
             KeyPair keyPair = SshUtils.loadKeyPair(privateKeyPath);
             session.addPublicKeyIdentity(keyPair);
 
             // 연결
-            session.auth().verify(10, TimeUnit.SECONDS);
+            session.auth().verify(30, TimeUnit.SECONDS);
 
             // 명령어 실행
-            String commandOutput = executeRemoteCommandNotStream(session, command);
+            String commandOutput = executeRemoteCommandInSocket(session, command);
             resultBuilder.append(commandOutput);
 
         } catch (Exception e) {
@@ -176,23 +177,29 @@ public class SshUtils {
         return resultBuilder.toString();
     }
 
-    private static String executeRemoteCommandInSocket(ClientSession session, String command, String redisChannel) throws Exception {
+    private static String executeRemoteCommandInSocket(ClientSession session, String command) throws Exception {
         StringBuilder resultBuilder = new StringBuilder();
+        String redisChannel = "ssh-command-output"; // 고정된 Redis 채널 이름
 
-        try (ClientChannel channel = session.createExecChannel(command)) {
+        try (ClientChannel channel = session.createExecChannel("bash -l -c '" + command + "'")) {
+            // 표준 출력과 표준 에러 출력을 모두 처리
             PipedOutputStream pipedOut = new PipedOutputStream();
-            PipedInputStream pipedIn = new PipedInputStream(pipedOut);
+            PipedOutputStream pipedErr = new PipedOutputStream();
+            PipedInputStream pipedInOut = new PipedInputStream(pipedOut);
+            PipedInputStream pipedInErr = new PipedInputStream(pipedErr);
 
             // Redis publisher 설정
-            Jedis jedis = new Jedis("localhost"); // Redis 서버 설정 (Redis가 로컬에서 실행 중인 경우)
+            Jedis jedis = new Jedis("localhost", REDIS_PORT);
 
+            // 표준 출력 스트림 처리 (stdout)
             new Thread(() -> {
                 try {
-                    byte[] buffer = new byte[1024];
+                    byte[] buffer = new byte[4096];
                     int bytesRead;
-                    while ((bytesRead = pipedIn.read(buffer)) != -1) {
+
+                    while ((bytesRead = pipedInOut.read(buffer)) != -1) {
                         String output = new String(buffer, 0, bytesRead, StandardCharsets.UTF_8);
-                        jedis.publish(redisChannel, output); // Redis 채널로 실시간 명령어 출력 전송
+                        jedis.publish(redisChannel, output); // 고정된 Redis 채널로 실시간 명령어 출력 전송
                         resultBuilder.append(output); // 결과에 추가
                     }
                 } catch (IOException e) {
@@ -200,9 +207,28 @@ public class SshUtils {
                 }
             }).start();
 
-            // PipedOutputStream에 쓰기
-            channel.setOut(pipedOut);
-            channel.open().verify(5, TimeUnit.SECONDS);
+            // 표준 에러 스트림 처리 (stderr)
+            new Thread(() -> {
+                try {
+                    byte[] buffer = new byte[1024];
+                    int bytesRead;
+
+                    while ((bytesRead = pipedInErr.read(buffer)) != -1) {
+                        String errorOutput = new String(buffer, 0, bytesRead, StandardCharsets.UTF_8);
+                        jedis.publish(redisChannel, "ERROR: " + errorOutput); // 에러 메시지 전송
+                        resultBuilder.append("ERROR: ").append(errorOutput); // 에러 메시지 결과에 추가
+                    }
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }).start();
+
+            // PipedOutputStream에 표준 출력과 에러 출력 모두 연결
+            channel.setOut(pipedOut);   // 표준 출력
+            channel.setErr(pipedErr);   // 표준 에러 출력
+
+            // 채널이 정상적으로 열렸는지 확인
+            channel.open().verify(30, TimeUnit.SECONDS);
 
             // 채널이 닫힐 때까지 대기
             Set<ClientChannelEvent> events = channel.waitFor(EnumSet.of(ClientChannelEvent.CLOSED), TimeUnit.MINUTES.toMillis(5));

@@ -28,21 +28,10 @@ public class LlmService {
     private final MetricService metricService;
     private final SummaryRepository summaryRepository;
     private final ProjectRepository projectRepository;
-    private final LogWebSocketHandler logWebSocketHandler;
     private final WebClient webClient;
     private static final String LOG_SUMMERY_URI = "http://localhost:8000/process/logSummary";
     private static final String PERFORMANCE_SUMMERY_URI = "http://localhost:8000/process/performanceSummary";
     private static final int METRIC_HISTORY_PREVIOUS_HOUR = 1;
-
-    // 주기적으로 로그를 가져와 특정 서비스의 로그만 전송
-    @Scheduled(fixedRate = 50000)
-    public void streamLogs() {
-        String serviceName = "spring";
-        String logMessage = "Spring 서비스의 로그 메시지";
-
-        // WebSocket을 통해 서비스 로그 전송
-        logWebSocketHandler.sendLog(serviceName, logMessage);
-    }
 
     @Transactional
     @Scheduled(cron = "0 0,30 * * * *")
