@@ -86,6 +86,19 @@ public class LlmService {
         summaryRepository.save(performanceSummary);
     }
 
+    @Transactional
+    @Scheduled(cron = "0 55 23 * * *") // 매일 11시 55분
+    public void summaryDaily(){
+        LogDTO.DailySummaryResponseDTO dailySummaryDTO = fetchDailySummary();
+
+        Summary performanceSummary = Summary.builder()
+                .content(dailySummaryDTO.dailySummary())
+                .summaryType(SummaryType.DAILY)
+                .build();
+
+        summaryRepository.save(performanceSummary);
+    }
+
     private LogDTO.SummaryResponseDTO fetchLogSummary(Instant startTime, Instant endTime, String serviceName) {
         // 로그 메시지는 ElasticSearch에서 가져온다
         String logMessage = logService.searchLogInStr(startTime, endTime, serviceName);
