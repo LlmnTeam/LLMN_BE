@@ -1,5 +1,12 @@
 package com.example.llmn.service;
 
+import com.example.llmn.core.errors.CustomException;
+import com.example.llmn.core.errors.ExceptionCode;
+import com.example.llmn.core.utils.SshUtils;
+import com.example.llmn.domain.SshInfo;
+import com.example.llmn.domain.User;
+import com.example.llmn.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.io.BufferedReader;
@@ -10,21 +17,38 @@ import java.util.List;
 import java.util.Map;
 
 @Service
+@RequiredArgsConstructor
 public class DockerService {
 
+    private final UserRepository userRepository;
+
     // 도커 컨테이너 종료
-    public void stopContainerByName(String containerName) throws Exception {
-        if (isContainerRunning(containerName)) {
-            String command = "docker stop " + containerName;
+    public void stopContainerByName(String containerName, Long userId) throws Exception {
+        SshInfo sshInfo = userRepository.findSshInfoById(userId).orElseThrow(
+                () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
+        );
+
+        String command = "docker stop " + containerName;
+
+        if(sshInfo.isLocal()){
             executeCommand(command);
+        } else{
+            SshUtils.executeCommand(sshInfo.getRemoteHost(), sshInfo.getRemoteName(), sshInfo.getRemoteKeyPath(), command);
         }
     }
 
     // 도커 컨테이너 재시작
-    public void restartContainerByName(String containerName) throws Exception {
-        if (isContainerRunning(containerName)) {
-            String command = "docker restart " + containerName;
+    public void restartContainerByName(String containerName, Long userId) throws Exception {
+        SshInfo sshInfo = userRepository.findSshInfoById(userId).orElseThrow(
+                () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
+        );
+
+        String command = "docker restart " + containerName;
+
+        if(sshInfo.isLocal()){
             executeCommand(command);
+        } else{
+            SshUtils.executeCommand(sshInfo.getRemoteHost(), sshInfo.getRemoteName(), sshInfo.getRemoteKeyPath(), command);
         }
     }
 

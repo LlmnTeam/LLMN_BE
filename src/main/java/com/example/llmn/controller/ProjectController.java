@@ -87,13 +87,13 @@ public class ProjectController {
 
     @PostMapping("/container/stop")
     public ResponseEntity<?> stopContainer(@RequestBody ProjectRequest.ContainerDTO requestDTO, @AuthenticationPrincipal CustomUserDetails userDetails) throws Exception {
-        dockerService.stopContainerByName(requestDTO.name());
+        dockerService.stopContainerByName(requestDTO.name(), userDetails.getUser().getId());
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, null));
     }
 
     @PostMapping("/container/restart")
-    public ResponseEntity<?> restartContainer(@RequestBody ProjectRequest.ContainerDTO requestDTO) throws Exception {
-        dockerService.restartContainerByName(requestDTO.name());
+    public ResponseEntity<?> restartContainer(@RequestBody ProjectRequest.ContainerDTO requestDTO, @AuthenticationPrincipal CustomUserDetails userDetails) throws Exception {
+        dockerService.restartContainerByName(requestDTO.name(), userDetails.getUser().getId());
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, null));
     }
 
