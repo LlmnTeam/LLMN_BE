@@ -239,5 +239,5 @@ async def process_daily_summary(request: LogRequest):
     daily_summary = await generate_performance_summary(request.cotent)
     
     return {
-        "dailySummaryy": daily_summary
+        "dailySummary": daily_summary
     }

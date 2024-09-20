@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 public interface SummaryRepository extends JpaRepository<Summary, Long> {
@@ -26,9 +27,12 @@ public interface SummaryRepository extends JpaRepository<Summary, Long> {
     @Query("SELECT s FROM Summary s " +
             "WHERE s.summaryType IN :types " +
             "AND s.id = (SELECT MAX(subS.id) FROM Summary subS WHERE subS.summaryType = s.summaryType)")
-    List<Summary> findLatestSummariesByTypes(@Param("types") List<SummaryType> types);
+    List<Summary> findLatestByTypes(@Param("types") List<SummaryType> types);
 
     @Query("SELECT s FROM Summary s " +
             "WHERE s.summaryType = :type")
     Page<Summary> findSummaryByType(@Param("type") SummaryType type, Pageable pageable);
+
+    @Query("SELECT s FROM Summary s WHERE s.summaryType IN :types AND s.createdDate >= :startOfDay")
+    List<Summary> findByTypeWithinDate(@Param("types") List<SummaryType> types, @Param("startOfDay") LocalDateTime startOfDay);
 }

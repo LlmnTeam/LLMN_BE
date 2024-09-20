@@ -7,4 +7,6 @@ public class LogDTO {
     public record SummaryResponseDTO(String generalSummary, String anomalySummary){}
 
     public record PerformanceSummaryResponseDTO(String performanceSummary){}
+
+    public record DailySummaryResponseDTO(String dailySummary){}
 }

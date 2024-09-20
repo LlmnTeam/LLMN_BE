@@ -1,8 +1,6 @@
 package com.example.llmn.service;
 
 import com.example.llmn.controller.DTO.InsightResponse;
-import com.example.llmn.core.errors.CustomException;
-import com.example.llmn.core.errors.ExceptionCode;
 import com.example.llmn.domain.Summary;
 import com.example.llmn.domain.SummaryType;
 import com.example.llmn.repository.SummaryRepository;
@@ -28,7 +26,7 @@ public class InsightService {
     @Transactional(readOnly = true)
     public InsightResponse.FindInsightHomeDTO findInsightList() {
         List<SummaryType> types = List.of(SummaryType.PERFORMANCE, SummaryType.DAILY, SummaryType.TEND, SummaryType.RECOMMENDATION);
-        List<Summary> latestSummaries = summaryRepository.findLatestSummariesByTypes(types);
+        List<Summary> latestSummaries = summaryRepository.findLatestByTypes(types);
 
         // SummaryType을 키로 하고 Summary의 content를 값으로 하는 Map
         Map<SummaryType, Summary> summaryMap = latestSummaries.stream()

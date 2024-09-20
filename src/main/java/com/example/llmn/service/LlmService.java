@@ -17,6 +17,8 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 
@@ -31,10 +33,11 @@ public class LlmService {
     private final WebClient webClient;
     private static final String LOG_SUMMERY_URI = "http://localhost:8000/process/logSummary";
     private static final String PERFORMANCE_SUMMERY_URI = "http://localhost:8000/process/performanceSummary";
+    private static final String DAILY_SUMMERY_URI = "http://localhost:8000/process/dailySummary";
     private static final int METRIC_HISTORY_PREVIOUS_HOUR = 1;
 
     @Transactional
-    @Scheduled(cron = "0 0 * * * *")
+    @Scheduled(cron = "0 5 * * * *")
     public void summaryProjectLog(){
         List<Project> projects = projectRepository.findAll();
 
@@ -139,6 +142,56 @@ public class LlmService {
                 .bodyValue(new LogDTO.SummaryRequestDTO(logMessage))
                 .retrieve()
                 .bodyToMono(LogDTO.PerformanceSummaryResponseDTO.class)
+                .block();
+    }
+
+    private LogDTO.DailySummaryResponseDTO fetchDailySummary() {
+        StringBuilder logMessageBuilder = new StringBuilder();
+
+        LocalDateTime startOfDay = LocalDateTime.now().with(LocalTime.MIN);
+
+        // 성능 요약 리스트를 가져옴
+        List<Summary> performanceSummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.PERFORMANCE), startOfDay);
+        // 일반 및 이상 로그 요약 리스트를 가져옴
+        List<Summary> logSummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.GENERAL, SummaryType.ANOMALY), startOfDay);
+
+        // 성능 요약을 로그 메시지로 변환
+        logMessageBuilder.append("### Performance Summary ###\n");
+        if (performanceSummaries.isEmpty()) {
+            logMessageBuilder.append("- 오늘의 성능 요약이 없습니다.\n");
+        } else {
+            for (Summary summary : performanceSummaries) {
+                logMessageBuilder.append("- [")
+                        .append(summary.getSummaryType().name())
+                        .append("] ")
+                        .append(summary.getContent())
+                        .append("\n");
+            }
+        }
+
+        // 일반 및 이상 로그 요약을 로그 메시지로 변환
+        logMessageBuilder.append("\n### Application Log Summary ###\n");
+        if (logSummaries.isEmpty()) {
+            logMessageBuilder.append("- 오늘의 로그 요약이 없습니다.\n");
+        } else {
+            for (Summary summary : logSummaries) {
+                logMessageBuilder.append("- [")
+                        .append(summary.getSummaryType().name())
+                        .append("] ")
+                        .append(summary.getContent())
+                        .append("\n");
+            }
+        }
+
+        // logMessage 문자열로 변환
+        String logMessage = logMessageBuilder.toString();
+
+        // LLM에 전달하기 위해 FastAPI에 요청
+        return webClient.post()
+                .uri(buildURI(DAILY_SUMMERY_URI))
+                .bodyValue(new LogDTO.SummaryRequestDTO(logMessage))
+                .retrieve()
+                .bodyToMono(LogDTO.DailySummaryResponseDTO.class)
                 .block();
     }
 
