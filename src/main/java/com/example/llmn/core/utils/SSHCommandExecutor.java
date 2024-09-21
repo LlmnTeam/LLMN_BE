@@ -80,21 +80,15 @@ public class SSHCommandExecutor {
         }
     }
 
-    // 각 스레드가 동시에 동일한 SSH 세션에 접근하여 명령어를 실행하고,
-    // 동일한 pipedIn과 pipedOut 스트림에 동시 접근할 수 있는 문제 방지를 위해 syschronizrd 사용
+    // 각 스레드가 동시에 동일한 SSH 세션에 접근하여 명령어를 실행하고, 동일한 pipedIn과 pipedOut 스트림에 동시 접근할 수 있는 문제 방지를 위해 syschronizrd 사용
     public synchronized String executeCommand(String command) throws Exception {
-        // 초기 로그인 메시지 처리 => pipedOut.available()이 0보다 크면 명령어의 결과가 출력된 상태
+        // 초기 로그인 메시지 처리 => 데이터를 읽되 저장하지 않고 버림
         if (pipedOut.available() > 0) {
-            StringBuilder initialMessage = new StringBuilder();
             byte[] buffer = new byte[4096];
-
+            
             while (pipedOut.available() > 0) {
-                int bytesRead = pipedOut.read(buffer);
-                if (bytesRead != -1) {
-                    initialMessage.append(new String(buffer, 0, bytesRead, StandardCharsets.UTF_8));
-                }
+                pipedOut.read(buffer);
             }
-            System.out.println("초기 메시지: " + initialMessage);
         }
 
         // 명령어를 지속적으로 입력받아 실행
@@ -123,6 +117,8 @@ public class SSHCommandExecutor {
                 Thread.sleep(100); // CPU 자원 낭비 방지 차원
             }
         }
+
+        System.out.println("결과:" + resultBuilder);
 
         return resultBuilder.toString();
     }
