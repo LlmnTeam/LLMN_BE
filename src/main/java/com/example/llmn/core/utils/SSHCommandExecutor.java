@@ -21,7 +21,7 @@ import java.util.concurrent.TimeUnit;
 
 public class SSHCommandExecutor {
     private final SshClient client;
-    private final ClientSession session;
+    private ClientSession session;
     private final ClientChannel shellChannel;
     private final OutputStream pipedIn;
     private final InputStream pipedOut;
@@ -155,5 +155,10 @@ public class SSHCommandExecutor {
             client.stop();
         }
         System.out.println("SSH 세션 및 Shell 채널 종료.");
+    }
+
+    // SSH 세션이 연결되어 있는지 확인
+    public boolean isConnected() {
+        return session != null && session.isOpen();
     }
 }
