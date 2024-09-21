@@ -1,17 +1,12 @@
 package com.example.llmn.controller;
 
 import com.example.llmn.controller.DTO.MetricResponse;
-import com.example.llmn.controller.DTO.ProjectResponse;
-import com.example.llmn.core.security.CustomUserDetails;
 import com.example.llmn.core.utils.ApiUtils;
-import com.example.llmn.core.utils.SSHCommandExecutor;
-import com.example.llmn.core.utils.SshUtils;
 import com.example.llmn.service.MetricService;
 import com.example.llmn.service.SSHService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 
@@ -46,7 +41,7 @@ public class MetricController {
 
         try {
             System.out.println("comend:" + command);
-            String result = sshService.executeCommand(command);
+            String result = sshService.executeCommandInShell(command);
 
             // 명령어 실행 결과를 JSON으로 응답
             return ResponseEntity.ok(Map.of("result", result));

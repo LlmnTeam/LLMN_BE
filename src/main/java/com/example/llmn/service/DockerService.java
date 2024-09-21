@@ -2,9 +2,7 @@ package com.example.llmn.service;
 
 import com.example.llmn.core.errors.CustomException;
 import com.example.llmn.core.errors.ExceptionCode;
-import com.example.llmn.core.utils.SshUtils;
 import com.example.llmn.domain.SshInfo;
-import com.example.llmn.domain.User;
 import com.example.llmn.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -21,6 +19,7 @@ import java.util.Map;
 public class DockerService {
 
     private final UserRepository userRepository;
+    private final SSHService sshService;
 
     // 도커 컨테이너 종료
     public void stopContainerByName(String containerName, Long userId) throws Exception {
@@ -33,7 +32,7 @@ public class DockerService {
         if(sshInfo.isLocal()){
             executeCommand(command);
         } else{
-            SshUtils.executeCommand(sshInfo.getRemoteHost(), sshInfo.getRemoteName(), sshInfo.getRemoteKeyPath(), command);
+            sshService.executeCommandOnce(command);
         }
     }
 
@@ -48,7 +47,7 @@ public class DockerService {
         if(sshInfo.isLocal()){
             executeCommand(command);
         } else{
-            SshUtils.executeCommand(sshInfo.getRemoteHost(), sshInfo.getRemoteName(), sshInfo.getRemoteKeyPath(), command);
+            sshService.executeCommandOnce(command);
         }
     }
 

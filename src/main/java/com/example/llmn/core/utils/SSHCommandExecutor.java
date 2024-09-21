@@ -1,7 +1,6 @@
 package com.example.llmn.core.utils;
 
 import org.apache.sshd.client.SshClient;
-import org.apache.sshd.client.channel.ChannelShell;
 import org.apache.sshd.client.channel.ClientChannel;
 import org.apache.sshd.client.channel.ClientChannelEvent;
 import org.apache.sshd.client.future.ConnectFuture;
@@ -47,7 +46,7 @@ public class SSHCommandExecutor {
                 .getSession();
 
         // 3. 인증을 위해 개인 키를 로드하고 SSH 세션에 공개 키 인증을 추가
-        KeyPair keyPair = SshUtils.loadKeyPair(privateKeyPath);
+        KeyPair keyPair = KeyPairUtils.loadKeyPair(privateKeyPath);
         session.addPublicKeyIdentity(keyPair);
 
         // 4. 세션 인증 수행
@@ -81,7 +80,7 @@ public class SSHCommandExecutor {
     }
 
     // 각 스레드가 동시에 동일한 SSH 세션에 접근하여 명령어를 실행하고, 동일한 pipedIn과 pipedOut 스트림에 동시 접근할 수 있는 문제 방지를 위해 syschronizrd 사용
-    public synchronized String executeCommand(String command) throws Exception {
+    public synchronized String executeCommandInShell(String command) throws Exception {
         // 초기 로그인 메시지 처리 => 데이터를 읽되 저장하지 않고 버림
         if (pipedOut.available() > 0) {
             byte[] buffer = new byte[4096];
@@ -120,6 +119,27 @@ public class SSHCommandExecutor {
         }
 
         //System.out.println("결과:" + resultBuilder);
+
+        return resultBuilder.toString();
+    }
+
+    public String executeCommandOnce(String command) throws Exception {
+        StringBuilder resultBuilder = new StringBuilder();
+
+        try (ClientChannel channel = session.createExecChannel(command)) {
+            ByteArrayOutputStream responseStream = new ByteArrayOutputStream();
+            channel.setOut(responseStream);
+
+            channel.open().verify(5, TimeUnit.SECONDS);
+
+            // 명령어가 완료될 때까지 대기 (기본적으로 5분)
+            Set<ClientChannelEvent> events = channel.waitFor(EnumSet.of(ClientChannelEvent.CLOSED), TimeUnit.MINUTES.toMillis(5));
+            if (events.contains(ClientChannelEvent.TIMEOUT)) {
+                throw new Exception("커맨드 타임아웃 발생");
+            }
+
+            resultBuilder.append(new String(responseStream.toByteArray(), StandardCharsets.UTF_8));
+        }
 
         return resultBuilder.toString();
     }

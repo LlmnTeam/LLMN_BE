@@ -16,8 +16,12 @@ public class SSHService {
     }
 
     // 명령어 실행
-    public String executeCommand(String command) throws Exception {
-        return executor.executeCommand(command);
+    public String executeCommandInShell(String command) throws Exception {
+        return executor.executeCommandInShell(command);
+    }
+
+    public String executeCommandOnce(String command) throws Exception {
+        return executor.executeCommandOnce(command);
     }
 
     // SSH 세션 종료

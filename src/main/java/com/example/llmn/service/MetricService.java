@@ -2,7 +2,7 @@ package com.example.llmn.service;
 
 import com.example.llmn.controller.DTO.MetricDTO;
 import com.example.llmn.controller.DTO.MetricResponse;
-import com.example.llmn.core.utils.SshUtils;
+import com.example.llmn.core.utils.KeyPairUtils;
 import com.example.llmn.domain.Metric;
 
 import com.example.llmn.repository.MetricRepository;
@@ -12,12 +12,6 @@ import org.apache.sshd.client.channel.ClientChannel;
 import org.apache.sshd.client.channel.ClientChannelEvent;
 import org.apache.sshd.client.future.ConnectFuture;
 import org.apache.sshd.client.session.ClientSession;
-import org.apache.sshd.common.NamedResource;
-import org.apache.sshd.common.config.keys.FilePasswordProvider;
-import org.apache.sshd.common.config.keys.loader.KeyPairResourceParser;
-import org.apache.sshd.common.session.SessionContext;
-import org.apache.sshd.common.util.GenericUtils;
-import org.apache.sshd.common.util.security.SecurityUtils;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,14 +24,11 @@ import java.io.*;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
-import java.security.GeneralSecurityException;
 import java.security.KeyPair;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
-
-import static org.apache.sshd.common.util.security.bouncycastle.BouncyCastleKeyPairResourceParser.loadKeyPair;
 
 @Service
 @RequiredArgsConstructor
@@ -92,7 +83,7 @@ public class MetricService {
             session = connectFuture.verify(10, TimeUnit.SECONDS).getSession();
 
             // 키 파일로 인증 설정
-            KeyPair keyPair = SshUtils.loadKeyPair(privateKeyPath);
+            KeyPair keyPair = KeyPairUtils.loadKeyPair(privateKeyPath);
             session.addPublicKeyIdentity(keyPair);
 
             // 연결
