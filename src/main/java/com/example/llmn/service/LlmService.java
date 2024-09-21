@@ -266,9 +266,8 @@ public class LlmService {
     private LogDTO.RecommendationDTO fetchRecommendation() {
         StringBuilder logMessageBuilder = new StringBuilder();
 
+        // 6시간 전의 요약들을 인풋으로
         LocalDateTime startOfTime = LocalDateTime.now().minusHours(6);
-
-        // 성능 요약 리스트와 어플리케이션 요약 리스트
         List<Summary> performanceSummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.PERFORMANCE), startOfTime);
         List<Summary> logSummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.GENERAL, SummaryType.ANOMALY), startOfTime);
 

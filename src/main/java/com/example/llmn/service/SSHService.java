@@ -5,7 +5,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class SSHService {
-    private SSHCommandExecutor executor;
+    private final SSHCommandExecutor executor;
     private static final String HOST = "54.180.202.202";
     private static final String USER_NAME = "ubuntu";
     private static final String PRIVATE_KEY_PATH = "file:///Users/lhh/LLMN/ssh/Llmn.pem";

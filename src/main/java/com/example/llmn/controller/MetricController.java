@@ -45,7 +45,7 @@ public class MetricController {
         String command = request.get("command");
 
         try {
-            // 동일한 SSH 세션을 사용하여 명령어 실행
+            System.out.println("comend:" + command);
             String result = sshService.executeCommand(command);
 
             // 명령어 실행 결과를 JSON으로 응답

@@ -21,15 +21,18 @@ import java.util.concurrent.TimeUnit;
 
 
 public class SSHCommandExecutor {
-    private SshClient client;
-    private ClientSession session;
-    private ClientChannel shellChannel;
-    private OutputStream pipedIn;
-    private InputStream pipedOut;
-    private Jedis jedis;
+    private final SshClient client;
+    private final ClientSession session;
+    private final ClientChannel shellChannel;
+    private final OutputStream pipedIn;
+    private final InputStream pipedOut;
+    private final Jedis jedis;
     private static final String REDIS_CHANNEL = "ssh-command-output"; // 고정된 Redis 채널 이름
+    private static final String REDIS_HOST = "localhost";
+    private static final int REDIS_PORT = 6379;
 
     public SSHCommandExecutor(String host, String username, String privateKeyPath) throws Exception {
+        // 1. SSH 클라이언트를 기본 설정으로 초기화 => SSH 클라이언트를 시작하여 연결을 수락할 준비를 함
         client = SshClient.setUpDefaultClient();
         client.start();
 
@@ -37,19 +40,24 @@ public class SSHCommandExecutor {
             privateKeyPath = Paths.get(URI.create(privateKeyPath)).toString();
         }
 
+        // 2. SSH 서버에 연결
         ConnectFuture connectFuture = client.connect(username, host, 22);
-        session = connectFuture.verify(30, TimeUnit.SECONDS).getSession();
+        session = connectFuture
+                .verify(10, TimeUnit.SECONDS) // 10초 안에 연결을 확인하고 세션을 얻음
+                .getSession();
 
+        // 3. 인증을 위해 개인 키를 로드하고 SSH 세션에 공개 키 인증을 추가
         KeyPair keyPair = SshUtils.loadKeyPair(privateKeyPath);
         session.addPublicKeyIdentity(keyPair);
-        session.auth().verify(30, TimeUnit.SECONDS);
 
-        System.out.println("SSH 세션 연결 및 인증 완료");
+        // 4. 세션 인증 수행
+        session.auth()
+                .verify(10, TimeUnit.SECONDS); //인증이 10초 내에 성공하지 않으면 타임아웃 발생
 
-        // Redis 연결
-        jedis = new Jedis("localhost", 6379);
+        // 5. Redis 연결
+        jedis = new Jedis(REDIS_HOST, REDIS_PORT);
 
-        // PtyChannelConfiguration 객체 생성 및 설정
+        // 6. PtyChannelConfiguration 객체 생성 및 터미널 설정
         PtyChannelConfiguration ptyConfig = new PtyChannelConfiguration();
         ptyConfig.setPtyType("xterm");  // 터미널 유형 설정
         ptyConfig.setPtyColumns(80);    // 터미널 너비 설정
@@ -57,91 +65,67 @@ public class SSHCommandExecutor {
         ptyConfig.setPtyWidth(640);     // 실제 창 너비 설정
         ptyConfig.setPtyHeight(480);    // 실제 창 높이 설정
 
-        // Shell 채널을 열어 지속적인 명령어 실행을 가능하게 함
+        // 7. Shell 채널을 열어 지속적인 명령어 실행을 가능하게 설정
         shellChannel = session.createShellChannel(ptyConfig, Collections.emptyMap());
 
+        // 8. Shell 채널이 정상적으로 생성되었는지 확인
         if (shellChannel != null) {
-            shellChannel.open().verify(30, TimeUnit.SECONDS);
-            pipedIn = shellChannel.getInvertedIn();
-            pipedOut = shellChannel.getInvertedOut();
+            shellChannel.open()
+                    .verify(30, TimeUnit.SECONDS); // 30초 내에 채널이 성공적으로 열렸는지 확인
 
-            System.out.println("SSH 세션 연결 및 Shell 채널 열림.");
+            pipedIn = shellChannel.getInvertedIn(); // 표준 입력 스트림에 연결
+            pipedOut = shellChannel.getInvertedOut(); // 표준 출력 스트림에 연결
         } else {
             throw new Exception("Shell 채널 초기화 실패");
         }
     }
 
+    // 각 스레드가 동시에 동일한 SSH 세션에 접근하여 명령어를 실행하고,
+    // 동일한 pipedIn과 pipedOut 스트림에 동시 접근할 수 있는 문제 방지를 위해 syschronizrd 사용
     public synchronized String executeCommand(String command) throws Exception {
-        if (pipedIn == null || pipedOut == null) {
-            throw new IllegalStateException("Shell 채널이 초기화되지 않았습니다.");
-        }
+        // 초기 로그인 메시지 처리 => pipedOut.available()이 0보다 크면 명령어의 결과가 출력된 상태
+        if (pipedOut.available() > 0) {
+            StringBuilder initialMessage = new StringBuilder();
+            byte[] buffer = new byte[4096];
 
-        StringBuilder resultBuilder = new StringBuilder();
+            while (pipedOut.available() > 0) {
+                int bytesRead = pipedOut.read(buffer);
+                if (bytesRead != -1) {
+                    initialMessage.append(new String(buffer, 0, bytesRead, StandardCharsets.UTF_8));
+                }
+            }
+            System.out.println("초기 메시지: " + initialMessage);
+        }
 
         // 명령어를 지속적으로 입력받아 실행
         pipedIn.write((command + "\n").getBytes());
         pipedIn.flush();
 
-        // Redis publisher 설정 (명령어 실행 결과 실시간 전송)
-        PipedOutputStream pipedOutStd = new PipedOutputStream();
-        PipedOutputStream pipedErrStd = new PipedOutputStream();
-        PipedInputStream pipedInOut = new PipedInputStream(pipedOutStd);
-        PipedInputStream pipedInErr = new PipedInputStream(pipedErrStd);
+        // 결과를 비동기적으로 읽음 => 결과가 출력될 때까지 대기
+        StringBuilder resultBuilder = new StringBuilder();
+        byte[] buffer = new byte[4096];
+        boolean commandCompleted = false;
 
-        // 표준 출력 스트림 처리 (stdout)
-        Thread stdoutThread = new Thread(() -> {
-            try {
-                byte[] buffer = new byte[4096];
-                int bytesRead;
-                while ((bytesRead = pipedInOut.read(buffer)) != -1) {
-                    String output = new String(buffer, 0, bytesRead, StandardCharsets.UTF_8);
-                    jedis.publish(REDIS_CHANNEL, output); // 고정된 Redis 채널로 실시간 명령어 출력 전송
-                    resultBuilder.append(output); // 결과에 추가
+        while (!commandCompleted) {
+            // 명령어 출력이 있을 때만 읽기
+            while (pipedOut.available() > 0) {
+                int bytesRead = pipedOut.read(buffer);
+                if (bytesRead != -1) {
+                    resultBuilder.append(new String(buffer, 0, bytesRead, StandardCharsets.UTF_8));
                 }
-            } catch (IOException e) {
-                e.printStackTrace();
             }
-        });
 
-        // 표준 에러 스트림 처리 (stderr)
-        Thread stderrThread = new Thread(() -> {
-            try {
-                byte[] buffer = new byte[1024];
-                int bytesRead;
-                while ((bytesRead = pipedInErr.read(buffer)) != -1) {
-                    String errorOutput = new String(buffer, 0, bytesRead, StandardCharsets.UTF_8);
-                    jedis.publish(REDIS_CHANNEL, "ERROR: " + errorOutput); // 에러 메시지 전송
-                    resultBuilder.append("ERROR: ").append(errorOutput); // 에러 메시지 결과에 추가
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
+            // 프롬프트를 통해 명령어 완료 확인 => 프롬프트가 나타나면 명령어가 완료된 것으로 간주
+            String result = resultBuilder.toString();
+            if (result.contains("ubuntu@") || result.endsWith("$ ")) {
+                commandCompleted = true;
+            } else {
+                Thread.sleep(100); // CPU 자원 낭비 방지 차원
             }
-        });
-
-        stdoutThread.start();
-        stderrThread.start();
-
-        // 표준 출력 및 표준 에러 연결
-        shellChannel.setOut(pipedOutStd);   // 표준 출력
-        shellChannel.setErr(pipedErrStd);   // 표준 에러 출력
-
-        // 채널이 정상적으로 열렸는지 확인
-        shellChannel.open().verify(30, TimeUnit.SECONDS);
-
-        // 채널이 닫힐 때까지 대기
-        Set<ClientChannelEvent> events = shellChannel.waitFor(EnumSet.of(ClientChannelEvent.CLOSED), TimeUnit.MINUTES.toMillis(5));
-        if (events.contains(ClientChannelEvent.TIMEOUT)) {
-            throw new Exception("커맨드 타임아웃 발생");
         }
 
-        // 종료 상태 확인
-        Integer exitStatus = shellChannel.getExitStatus();
-        if (exitStatus != null) {
-            resultBuilder.append("\n명령어 종료 상태: ").append(exitStatus);
-        }
         return resultBuilder.toString();
     }
-
 
     public void close() throws Exception {
         if (shellChannel != null) {
