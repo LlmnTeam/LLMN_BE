@@ -85,7 +85,7 @@ public class SSHCommandExecutor {
         // 초기 로그인 메시지 처리 => 데이터를 읽되 저장하지 않고 버림
         if (pipedOut.available() > 0) {
             byte[] buffer = new byte[4096];
-            
+
             while (pipedOut.available() > 0) {
                 pipedOut.read(buffer);
             }
@@ -106,6 +106,7 @@ public class SSHCommandExecutor {
                 int bytesRead = pipedOut.read(buffer);
                 if (bytesRead != -1) {
                     resultBuilder.append(new String(buffer, 0, bytesRead, StandardCharsets.UTF_8));
+                    jedis.publish(REDIS_CHANNEL, new String(buffer, 0, bytesRead, StandardCharsets.UTF_8));
                 }
             }
 
@@ -118,7 +119,7 @@ public class SSHCommandExecutor {
             }
         }
 
-        System.out.println("결과:" + resultBuilder);
+        //System.out.println("결과:" + resultBuilder);
 
         return resultBuilder.toString();
     }
