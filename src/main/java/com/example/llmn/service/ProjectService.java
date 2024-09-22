@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -91,11 +92,11 @@ public class ProjectService {
     public ProjectResponse.FindProjectListDTO findProjectList(Long userId) throws Exception {
         List<Project> projects = projectRepository.findByUserId(userId);
 
-        // 실행중인 컨테이너 목록 조회
-        List<String> runningContainerNames = dockerService.findRunningContainerNameList();
-
         // 컨테이너 리소스 조회
         Map<String, Map<String, String>> containersResourceUsageMap = dockerService.findContainersResourceUsage();
+
+        // 실행중인 컨테이너 목록 (Map의 키가 컨테이너 이름이니 이를 리스트로 변환)
+        List<String> runningContainerNames = new ArrayList<>(containersResourceUsageMap.keySet());
 
         List<ProjectResponse.ProjectDTO> projectDTOS = projects.stream()
                 .map(project -> {
