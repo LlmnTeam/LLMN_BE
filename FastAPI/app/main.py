@@ -1,13 +1,34 @@
 # main.py
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from pydantic_settings import BaseSettings
 import logging
 import os
 from langchain_openai import ChatOpenAI
 from langchain.prompts import PromptTemplate 
+from langchain.callbacks.base import BaseCallbackHandler
+from fastapi.middleware.cors import CORSMiddleware
+from typing import Any, Dict, List
+from queue import Queue
+from threading import Thread
+import asyncio
+from langchain.schema import LLMResult
 
 app = FastAPI()
+
+# logs 디렉토리 경로
+current_dir = os.path.dirname(os.path.abspath(__file__))
+logs_dir = os.path.join(current_dir, "..", "..", "logs")
+
+# CORS 설정
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],  
+    allow_headers=["*"], 
+)
 
 # 환경 변수 설정
 class Settings(BaseSettings):
@@ -22,10 +43,81 @@ settings = Settings()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# DTO
 class LogRequest(BaseModel):
-    cotent: str
+    content: str
 
-# LLM 요약을 생성하는 함수
+class Question(BaseModel):
+    question: str
+
+class LogFile(BaseModel):
+    name: str
+
+class LogFilesRequest(BaseModel):
+    logFiles: list[LogFile]
+    question: str
+
+# OpenAI API 스트리밍
+class StreamingHandler(BaseCallbackHandler):
+    def __init__(self, queue) -> None:
+        super().__init__()
+        self._queue = queue
+        self._stop_signal = None
+        print("Custom handler Initialized")
+
+    # 새로운 토큰이 생성될 때 호출 => 생성된 토큰을 큐에 넣어 비동기적으로 전달
+    def on_llm_new_token(self, token: str, **kwargs) -> None:
+        self._queue.put(token)
+
+    # LLM이 텍스트 생성을 시작할 때 호출
+    def on_llm_start(
+        self, serialized: Dict[str, Any], prompts: List[str], **kwargs: Any
+    ) -> None:
+        print("generation started")
+
+    # LLM이 텍스트 생성을 완료했을 때 호출 => 생성 종료 신호를 큐에 넣어 생성을 중단
+    def on_llm_end(self, response: LLMResult, **kwargs: Any) -> None:
+        print("\ngeneration concluded")
+        self._queue.put(self._stop_signal)
+
+class Rag_Service:
+    # 스트리밍 핸들러와 LLM을 초기화
+    def __init__(self):
+        self.streamer_queue = Queue() # 토큰을 비동기적으로 전달하기 위한 저장소로 사용
+        self.streaming_handler = StreamingHandler(queue=self.streamer_queue)
+        self.LLM = ChatOpenAI(
+            model="gpt-4o-mini",
+            streaming=True,
+            callbacks=[self.streaming_handler],
+            openai_api_key=settings.OPENAI_API_KEY
+        )
+
+    # LLM 호출
+    def generate(self, llm, text):
+        llm.invoke(text)
+
+    # 별도의 스레드를 생성 (텍스트 생성을 백그라운드에서 처리하기 위해)
+    def start_generation(self, llm, text):
+        thread = Thread(target=self.generate, kwargs={"llm": llm, "text": text})
+        thread.start()
+
+    # 비동기적으로 스트리밍 방식으로 텍스트를 생성
+    async def generate_text_streaming(self, text: Question):
+        self.start_generation(self.LLM, text.question)
+
+        while True:
+            value = self.streamer_queue.get() # 큐에서 토큰 또는 종료 신호를 가져옴
+
+            if value == None:
+                break
+            yield value 
+
+            # 큐에서 처리된 항목을 완료 처리 => 0.1초 동안 비동기적으로 대기하여 스트리밍 속도를 조정
+            self.streamer_queue.task_done() 
+            await asyncio.sleep(0.1) 
+
+######################################################################################################
+
 async def generate_log_summary(content: str):    
     prompt = (
         "### Persona ###\n"
@@ -358,10 +450,44 @@ async def generate_recommend(content: str):
 
     return recommend
 
-# FastAPI 엔드포인트
+def read_log_file(file_path: str):
+    try:
+        with open(file_path, "r", encoding="utf-8") as file:
+            return file.read()
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"File {file_path} not found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+def combine_logs_and_question(log_files_request: LogFilesRequest) -> str:
+    log_message_builder = []
+
+    # 로그 파일의 내용을 모두 읽어서 하나의 문자열로 결합
+    for logFile in log_files_request.logFiles:
+        file_path = os.path.join(logs_dir, logFile.name)
+        log_content = read_log_file(file_path)
+        log_message_builder.append(f"### Log file: {logFile.name} ###\n{log_content}\n")
+
+    prompt = (
+        "### Persona ###\n"
+        "You are an expert system log analyst. Your task is to analyze the following log files and provide insightful, detailed responses based on system performance, errors, and abnormal patterns.\n"
+        "Focus on the key issues found in the logs and the user's question.\n"
+        "Your responses should be in Korean.\n"
+        "\n"
+        "### Log Files ###\n"
+        f"{''.join(log_message_builder)}\n"
+        "\n"
+        "### User Question ###\n"
+        f"{log_files_request.question}\n"
+    )
+
+    return prompt
+
+#################################################################################################
+
 @app.post("/process/logSummary")
 async def process_log_summary(request: LogRequest):
-    general_summary, anomaly_summary = await generate_log_summary(request.cotent)
+    general_summary, anomaly_summary = await generate_log_summary(request.content)
     
     # 결과를 JSON으로 반환
     return {
@@ -371,7 +497,7 @@ async def process_log_summary(request: LogRequest):
 
 @app.post("/process/performanceSummary")
 async def process_performance_summary(request: LogRequest):
-    performance_summary = await generate_performance_summary(request.cotent)
+    performance_summary = await generate_performance_summary(request.content)
     
     return {
         "performanceSummary": performance_summary
@@ -379,7 +505,7 @@ async def process_performance_summary(request: LogRequest):
 
 @app.post("/process/dailySummary")
 async def process_daily_summary(request: LogRequest):
-    daily_summary = await generate_daily_summary(request.cotent)
+    daily_summary = await generate_daily_summary(request.content)
     
     return {
         "dailySummary": daily_summary
@@ -387,7 +513,7 @@ async def process_daily_summary(request: LogRequest):
 
 @app.post("/process/trendSummary")
 async def process_daily_summary(request: LogRequest):
-    trend_summary = await generate_trend_summary(request.cotent)
+    trend_summary = await generate_trend_summary(request.content)
     
     return {
         "trendSummary": trend_summary
@@ -395,8 +521,21 @@ async def process_daily_summary(request: LogRequest):
 
 @app.post("/process/recommend")
 async def process_recommend(request: LogRequest):
-    recommend = await generate_recommend(request.cotent)
+    recommend = await generate_recommend(request.content)
     
     return {
         "recommend": recommend
     }
+
+#@app.post("/question")
+#async def generate_text_streaming(query: Question):
+#    rag_service = Rag_Service()
+#
+#    return StreamingResponse(rag_service.generate_text_streaming(query), media_type='text/event-stream')
+
+@app.post("/logs/question")
+async def process_logs_and_question(log_files_request: LogFilesRequest):
+    final_question = combine_logs_and_question(log_files_request)
+
+    rag_service = Rag_Service()
+    return StreamingResponse(rag_service.generate_text_streaming(final_question), media_type='text/event-stream')
