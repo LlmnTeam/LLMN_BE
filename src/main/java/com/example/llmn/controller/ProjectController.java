@@ -79,21 +79,21 @@ public class ProjectController {
     }
 
     @GetMapping("/container")
-    public ResponseEntity<?> findContainerList() throws Exception {
-        List<String> runningContainerNameList = dockerService.findRunningContainerNameList();
+    public ResponseEntity<?> findContainerList(@AuthenticationPrincipal CustomUserDetails userDetails) throws Exception {
+        List<String> runningContainerNameList = dockerService.findRunningContainerNameList(userDetails.getUser().getId());
         ProjectResponse.FindContainerListDTO responseDTO = new ProjectResponse.FindContainerListDTO(runningContainerNameList);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 
     @PostMapping("/container/stop")
-    public ResponseEntity<?> stopContainer(@RequestBody ProjectRequest.ContainerDTO requestDTO) throws Exception {
-        boolean response = dockerService.stopContainerByName(requestDTO.name());
+    public ResponseEntity<?> stopContainer(@RequestBody ProjectRequest.ContainerDTO requestDTO, @AuthenticationPrincipal CustomUserDetails userDetails) throws Exception {
+        boolean response = dockerService.stopContainerByName(requestDTO.name(), userDetails.getUser().getId());
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, response));
     }
 
     @PostMapping("/container/restart")
-    public ResponseEntity<?> restartContainer(@RequestBody ProjectRequest.ContainerDTO requestDTO) throws Exception {
-        boolean response = dockerService.restartContainerByName(requestDTO.name());
+    public ResponseEntity<?> restartContainer(@RequestBody ProjectRequest.ContainerDTO requestDTO, @AuthenticationPrincipal CustomUserDetails userDetails) throws Exception {
+        boolean response = dockerService.restartContainerByName(requestDTO.name(), userDetails.getUser().getId());
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, response));
     }
 

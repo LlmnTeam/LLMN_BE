@@ -14,7 +14,7 @@ public class SSHService {
     private SSHCommandExecutor executor;
     private final RedisService redisService;
     private final UserRepository userRepository;
-    
+
     private static final String REDIS_SSH_KEY = "SSH";
     public static final Long REDIS_SSH_KEY_EXP = 60L * 60 * 24 * 180; // 180일
     private static final String DELIMITER = ":";
@@ -56,6 +56,7 @@ public class SSHService {
                     () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
             );
 
+            // remoteHost, remoteName, keyPath를 하나의 문자로 합쳐서 저장
             String combinedInfo = String.join(DELIMITER, sshInfoInDB.getRemoteHost(), sshInfoInDB.getRemoteName(), sshInfoInDB.getRemoteKeyPath());
             redisService.storeValue(REDIS_SSH_KEY, userId.toString(), combinedInfo, REDIS_SSH_KEY_EXP);
 
@@ -65,7 +66,7 @@ public class SSHService {
         }
     }
 
-    // sshInfoStr을 SsshInfo 객체로 변환
+    // 문자인 sshInfoStr을 SsshInfo 객체로 변환
     private SshInfo parseSshInfo(String sshInfoStr) {
         String[] parts = sshInfoStr.split(DELIMITER);
 

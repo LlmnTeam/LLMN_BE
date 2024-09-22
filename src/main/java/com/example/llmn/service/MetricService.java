@@ -64,52 +64,41 @@ public class MetricService {
         metricRepository.save(metric);
     }
 
-    public Map<String, Object> collectRemoteMetrics(String privateKeyPath, String host, String username) {
-        Map<String, Object> metrics = new HashMap<>();
-        SshClient client = null;
-        ClientSession session = null;
+    public Map<String, String> collectRemoteMetrics(Long userId) throws Exception {
+        // CPU와 메모리 사용량을 동시에 얻기 위한 top 명령어 실행
+        String command = "top -b -n1 | grep \"Cpu(s)\\|Mem\"";
+        String commandResponse = sshService.executeCommandOnce(command, userId);
 
-        try {
-            // SSH 클라이언트 생성
-            client = SshClient.setUpDefaultClient();
-            client.start();
+        Map<String, String> metricsMap = new HashMap<>();
 
-            // 파일 경로 설정 (file:// 경로 지원)
-            if (privateKeyPath.startsWith("file://")) {
-                privateKeyPath = Paths.get(URI.create(privateKeyPath)).toString();
+        // 명령어 응답 파싱
+        String[] lines = commandResponse.split("\n");
+
+        for (String line : lines) {
+            line = line.trim();
+
+            // CPU 사용량 라인 처리
+            if (line.startsWith("Cpu(s):")) {
+                String[] cpuParts = line.split(",");
+                String usUsage = cpuParts[0].split(":")[1].trim().replace("%us", "");
+                String syUsage = cpuParts[1].trim().replace("%sy", "");
+
+                // us와 sy를 합쳐서 CPU 부하량 계산
+                double cpuUsage = Double.parseDouble(usUsage) + Double.parseDouble(syUsage);
+                metricsMap.put("cpuUsage", String.format("%.2f%%", cpuUsage));
             }
 
-            // 클라이언트 세션 생성
-            ConnectFuture connectFuture = client.connect(username, host, SSH_PORT_NUM);
-            session = connectFuture.verify(10, TimeUnit.SECONDS).getSession();
-
-            // 키 파일로 인증 설정
-            KeyPair keyPair = KeyPairUtils.loadKeyPair(privateKeyPath);
-            session.addPublicKeyIdentity(keyPair);
-
-            // 연결
-            session.auth().verify(10, TimeUnit.SECONDS);
-
-            // CPU 사용량 가져오기
-            String cpuUsage = executeRemoteCommand(session, "top -bn1 | grep 'Cpu(s)'");
-            metrics.put("cpuUsage", parseCpuUsage(cpuUsage));
-
-            // 메모리 사용량 가져오기
-            String memoryUsage = executeRemoteCommand(session, "free -m");
-            metrics.put("memoryUsage", parseMemoryUsage(memoryUsage));
-
-        } catch (Exception e) {
-            e.printStackTrace();
-        } finally {
-            if (session != null) {
-                session.close(false);
-            }
-            if (client != null) {
-                client.stop();
+            // 메모리 사용량 라인 처리
+            if (line.startsWith("KiB Mem") || line.startsWith("MiB Mem")) {
+                String[] memParts = line.split(",");
+                String memUsed = memParts[1].trim().split(" ")[0];
+                String memTotal = memParts[0].trim().split(" ")[2];
+                String memUsage = String.format("%.2f%%", (Double.parseDouble(memUsed) / Double.parseDouble(memTotal)) * 100);
+                metricsMap.put("memoryUsage", memUsage);
             }
         }
 
-        return metrics;
+        return metricsMap;
     }
 
     public MetricResponse.FindCurrentMetricDTO findCurrentMetric() {

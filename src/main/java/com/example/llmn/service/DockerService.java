@@ -15,25 +15,25 @@ public class DockerService {
     private final SSHService sshService;
 
     // 도커 컨테이너 종료
-    public boolean stopContainerByName(String containerName) throws Exception {
+    public boolean stopContainerByName(String containerName, Long userId) throws Exception {
         String command = "docker stop " + containerName;
-        String commandResponse = sshService.executeCommandOnce(command);
+        String commandResponse = sshService.executeCommandOnce(command, userId);
 
         return commandResponse.trim().equals(containerName);  // 성공 여부 true/false로 리턴
     }
 
     // 도커 컨테이너 재시작
-    public boolean restartContainerByName(String containerName) throws Exception {
+    public boolean restartContainerByName(String containerName, Long userId) throws Exception {
         String command = "docker restart " + containerName;
-        String commandResponse = sshService.executeCommandOnce(command);
+        String commandResponse = sshService.executeCommandOnce(command, userId);
 
         return commandResponse.trim().equals(containerName);
     }
 
     // 실행중인 도커 컨테이너 목록 조회
-    public List<String> findRunningContainerNameList() throws Exception {
+    public List<String> findRunningContainerNameList(Long userId) throws Exception {
         String command = "docker ps --format \"{{.Names}}\"";
-        String commandResponse = sshService.executeCommandOnce(command);
+        String commandResponse = sshService.executeCommandOnce(command, userId);
 
         // 응답을 줄 단위로 나눠서 리스트로 변환
         List<String> containerNames = Arrays.asList(commandResponse.split("\n"));
@@ -48,17 +48,17 @@ public class DockerService {
     }
 
     // 특정 컨테이너의 실행 여부 확인
-    public boolean isContainerRunning(String containerName) throws Exception {
-        List<String> containerList = findRunningContainerNameList();
+    public boolean isContainerRunning(String containerName, Long userId) throws Exception {
+        List<String> containerList = findRunningContainerNameList(userId);
 
         return containerList.stream()
                 .anyMatch(name -> name.equals(containerName));
     }
 
     // 컨테이너의 사용 리소스 조회
-    public Map<String, Map<String, String>> findContainersResourceUsage() throws Exception {
+    public Map<String, Map<String, String>> findContainersResourceUsage(Long userId) throws Exception {
         String command = "docker stats --no-stream --format \"{{.Name}}:{{.CPUPerc}}:{{.MemUsage}}\"";
-        String commandResponse = sshService.executeCommandOnce(command);
+        String commandResponse = sshService.executeCommandOnce(command, userId);
 
         // 결과를 줄 단위로 나눔
         String[] lines = commandResponse.split("\n");
