@@ -1,20 +1,17 @@
 package com.example.llmn.service;
 
-import com.example.llmn.controller.DTO.MetricDTO;
 import com.example.llmn.controller.DTO.MetricResponse;
 import com.example.llmn.domain.Metric;
 
 import com.example.llmn.domain.User;
 import com.example.llmn.repository.MetricRepository;
 import com.example.llmn.repository.UserRepository;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import oshi.SystemInfo;
-import oshi.hardware.CentralProcessor;
-import oshi.hardware.GlobalMemory;
-import oshi.hardware.NetworkIF;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -28,9 +25,12 @@ public class MetricService {
     private final UserRepository userRepository;
     private final RedisService redisService;
     private final SSHService sshService;
-    
+    private final ObjectMapper objectMapper;
+
     private static final String NETWORK_RECEIVED_KEY = "network:received";
     private static final String NETWORK_TRANSMITTED_KEY = "network:transmitted";
+    private static final String METRIC_KEY = "metric";
+    private static final Long METRIC_EXP = 10 * 60 * 1000L; // 10분
 
     @Scheduled(cron = "0 0/10 * * * *")
     public void collectMetrics() throws Exception {
@@ -124,16 +124,28 @@ public class MetricService {
     }
 
     public MetricResponse.FindCurrentMetricDTO findCurrentMetric(Long userId) throws Exception {
+        // 1. 레디스에서 캐시된 값을 먼저 조회
+        MetricResponse.FindCurrentMetricDTO cachedMetric = getCachedMetric(userId);
+        if (cachedMetric != null) {
+            return cachedMetric;
+        }
+
+        // 2. 캐시된 값이 없으면 새로운 메트릭 수집 후 저장
         Map<String, Double> topMetrics = collectTopMetrics(userId);
         Map<String, Double> networkMetrics = collectNetworkMetrics(userId);
 
-        return new MetricResponse.FindCurrentMetricDTO(
+        MetricResponse.FindCurrentMetricDTO metricDTO = new MetricResponse.FindCurrentMetricDTO(
                 topMetrics.get("cpuUsage"),
                 topMetrics.get("totalMemory"),
                 topMetrics.get("usedMemory"),
-                networkMetrics.get("networkReceived"), // 하루동안 누적 네트워크 트래픽
+                networkMetrics.get("networkReceived"),
                 networkMetrics.get("networkSent")
         );
+
+        // 유효 시간은 10분
+        redisService.storeValue(METRIC_KEY, userId.toString() ,metricDTO.toString(), METRIC_EXP);
+
+        return metricDTO;
     }
 
     @Transactional(readOnly = true)
@@ -221,5 +233,25 @@ public class MetricService {
         }
 
         return networkUsageMap;
+    }
+
+    // 캐시에서 지표를 가져오는 메서드
+    private MetricResponse.FindCurrentMetricDTO getCachedMetric(Long userId) {
+        String cachedValue = redisService.getDataInStr(METRIC_KEY, userId.toString());
+
+        // 캐시된 값이 없으면 null 반환
+        if (cachedValue == null) {
+            return null;
+        }
+
+        return convertStringToMetricDTO(cachedValue);
+    }
+
+    private MetricResponse.FindCurrentMetricDTO convertStringToMetricDTO(String cachedValue) {
+        try {
+            return objectMapper.readValue(cachedValue, MetricResponse.FindCurrentMetricDTO.class);
+        } catch (JsonProcessingException e) {;
+            return null; // 변환에 실패한 경우 null 반환
+        }
     }
 }

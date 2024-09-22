@@ -8,6 +8,7 @@ import com.example.llmn.domain.Summary;
 import com.example.llmn.domain.SummaryType;
 import com.example.llmn.repository.ProjectRepository;
 import com.example.llmn.repository.SummaryRepository;
+import com.example.llmn.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -28,6 +29,7 @@ public class LlmService {
 
     private final LogService logService;
     private final MetricService metricService;
+    private final UserRepository userRepository;
     private final SummaryRepository summaryRepository;
     private final ProjectRepository projectRepository;
     private final WebClient webClient;
@@ -78,14 +80,18 @@ public class LlmService {
     @Transactional
     @Scheduled(cron = "0 15 * * * *") // 매시 15분에
     public void summaryPerformance(){
-        LogDTO.PerformanceSummaryResponseDTO performanceSummaryDTO = fetchMetricSummary();
+        List<Long> userIds = userRepository.findIds();
 
-        Summary performanceSummary = Summary.builder()
-                .content(performanceSummaryDTO.performanceSummary())
-                .summaryType(SummaryType.PERFORMANCE)
-                .build();
+        for(Long userId: userIds) {
+            LogDTO.PerformanceSummaryResponseDTO performanceSummaryDTO = fetchMetricSummary(userId);
 
-        summaryRepository.save(performanceSummary);
+            Summary performanceSummary = Summary.builder()
+                    .content(performanceSummaryDTO.performanceSummary())
+                    .summaryType(SummaryType.PERFORMANCE)
+                    .build();
+
+            summaryRepository.save(performanceSummary);
+        }
     }
 
     @Transactional

@@ -113,7 +113,6 @@ public class RedisService {
     // String 반환
     public String getDataInStr(String type, String id){ return redisTemplate.opsForValue().get(buildKey(type, id)); }
 
-    public String getDataInStr(String key){ return redisTemplate.opsForValue().get(key); }
 
     // Double 반환
     public Double getDataInDouble(String key){
