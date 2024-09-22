@@ -76,7 +76,6 @@ public class UserService {
         checkDuplicateNickname(requestDTO.nickName());
 
         SshInfo sshInfo = SshInfo.builder()
-                .isLocal(requestDTO.isLocal())
                 .remoteName(requestDTO.remoteName())
                 .remoteHost(requestDTO.remoteHost())
                 .remoteKeyPath(requestDTO.remoteKeyPath())

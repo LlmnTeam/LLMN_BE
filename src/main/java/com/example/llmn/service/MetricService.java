@@ -36,6 +36,7 @@ public class MetricService {
 
     private final MetricRepository metricRepository;
     private final RedisService redisService;
+    private final SSHService sshService;
     private final SystemInfo systemInfo = new SystemInfo();
     private final CentralProcessor processor = systemInfo.getHardware().getProcessor();
 

@@ -17,9 +17,6 @@ public class SshInfo extends TimeStamp{
     private Long id;
 
     @Column
-    private boolean isLocal;
-
-    @Column
     private String remoteName;
 
     @Column
@@ -29,8 +26,7 @@ public class SshInfo extends TimeStamp{
     private String remoteKeyPath;
 
     @Builder
-    public SshInfo(boolean isLocal, String remoteName, String remoteHost, String remoteKeyPath) {
-        this.isLocal = isLocal;
+    public SshInfo(String remoteName, String remoteHost, String remoteKeyPath) {
         this.remoteName = remoteName;
         this.remoteHost = remoteHost;
         this.remoteKeyPath = remoteKeyPath;
