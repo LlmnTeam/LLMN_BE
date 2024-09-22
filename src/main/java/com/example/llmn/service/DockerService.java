@@ -22,36 +22,22 @@ public class DockerService {
     private final SSHService sshService;
 
     // 도커 컨테이너 종료
-    public void stopContainerByName(String containerName, Long userId) throws Exception {
-        SshInfo sshInfo = userRepository.findSshInfoById(userId).orElseThrow(
-                () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
-        );
-
+    public boolean stopContainerByName(String containerName) throws Exception {
         String command = "docker stop " + containerName;
+        String commandResponse = sshService.executeCommandOnce(command);
 
-        if(sshInfo.isLocal()){
-            executeCommand(command);
-        } else{
-            sshService.executeCommandOnce(command);
-        }
+        return commandResponse.trim().equals(containerName);  // 성공 여부 true/false로 리턴
     }
 
     // 도커 컨테이너 재시작
-    public void restartContainerByName(String containerName, Long userId) throws Exception {
-        SshInfo sshInfo = userRepository.findSshInfoById(userId).orElseThrow(
-                () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
-        );
-
+    public boolean restartContainerByName(String containerName) throws Exception {
         String command = "docker restart " + containerName;
+        String commandResponse = sshService.executeCommandOnce(command);
 
-        if(sshInfo.isLocal()){
-            executeCommand(command);
-        } else{
-            sshService.executeCommandOnce(command);
-        }
+        return commandResponse.trim().equals(containerName);
     }
 
-    // 도커 컨테이너 이름 목록
+    // 도커 컨테이너 이름 목록 조회
     public List<String> findRunningContainerNameList() throws Exception {
         String command = "docker ps --format \"{{.Names}}\"";
         return executeCommandAndReturnOutput(command);

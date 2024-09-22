@@ -42,11 +42,8 @@ public class MetricController {
         try {
             System.out.println("comend:" + command);
             String result = sshService.executeCommandInShell(command);
-
-            // 명령어 실행 결과를 JSON으로 응답
             return ResponseEntity.ok(Map.of("result", result));
         } catch (Exception e) {
-            e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("명령어 실행 중 에러 발생");
         }
     }

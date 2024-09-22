@@ -102,8 +102,8 @@ class Rag_Service:
         thread.start()
 
     # 비동기적으로 스트리밍 방식으로 텍스트를 생성
-    async def generate_text_streaming(self, text: Question):
-        self.start_generation(self.LLM, text.question)
+    async def generate_text_streaming(self, text: str):
+        self.start_generation(self.LLM, text)
 
         while True:
             value = self.streamer_queue.get() # 큐에서 토큰 또는 종료 신호를 가져옴

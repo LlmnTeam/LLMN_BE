@@ -18,7 +18,6 @@ import java.util.EnumSet;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
-
 public class SSHCommandExecutor {
     private final SshClient client;
     private ClientSession session;
