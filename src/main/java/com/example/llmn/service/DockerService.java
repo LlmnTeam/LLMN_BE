@@ -1,9 +1,5 @@
 package com.example.llmn.service;
 
-import com.example.llmn.core.errors.CustomException;
-import com.example.llmn.core.errors.ExceptionCode;
-import com.example.llmn.domain.SshInfo;
-import com.example.llmn.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -51,36 +47,45 @@ public class DockerService {
         return containerNames;
     }
 
-    // 특정 컨테이너 이름으로 실행 여부 확인
+    // 특정 컨테이너의 실행 여부 확인
     public boolean isContainerRunning(String containerName) throws Exception {
-        String command = "docker ps --filter \"name=" + containerName + "\" --format \"{{.Names}}\"";
-        List<String> output = executeCommandAndReturnOutput(command);
-        return output.stream().anyMatch(name -> name.equals(containerName));
+        List<String> containerList = findRunningContainerNameList();
+
+        return containerList.stream()
+                .anyMatch(name -> name.equals(containerName));
     }
 
     // 컨테이너의 사용 리소스 조회
-    public Map<String, Map<String, String>> findAllContainersResourceUsage() throws Exception {
-        // docker stats 명령어로 모든 실행 중인 컨테이너의 CPU, 메모리 사용량 가져오기
+    public Map<String, Map<String, String>> findContainersResourceUsage() throws Exception {
         String command = "docker stats --no-stream --format \"{{.Name}}:{{.CPUPerc}}:{{.MemUsage}}\"";
-        List<String> outputLines = executeCommandAndReturnOutput(command);
+        String commandResponse = sshService.executeCommandOnce(command);
 
-        // 컨테이너 이름을 키로 하고, CPU와 메모리 사용량을 값으로 하는 맵 생성
-        Map<String, Map<String, String>> containersResourceUsage = new HashMap<>();
-        for (String line : outputLines) {
-            String[] usageStats = line.split(":");
-            String containerName = usageStats[0].trim();
-            String cpuUsage = usageStats[1].trim();
-            String memoryUsage = usageStats[2].split(" / ")[0].trim();  // 메모리 사용량에서 첫 부분만 추출
+        // 결과를 줄 단위로 나눔
+        String[] lines = commandResponse.split("\n");
 
-            // 컨테이너 이름을 키로 하여 맵에 저장
-            Map<String, String> resourceUsage = new HashMap<>();
-            resourceUsage.put("CPU", cpuUsage);
-            resourceUsage.put("Memory", memoryUsage);
+        // 컨테이너 이름을 키로 하고, CPU와 메모리 사용량을 담은 맵을 값으로 하는 바깥쪽 맵 생성
+        Map<String, Map<String, String>> containerUsageMap = new HashMap<>();
 
-            containersResourceUsage.put(containerName, resourceUsage);
+        // 각 줄을 ':'로 나누어 컨테이너 이름, CPU, 메모리 사용량을 추출
+        for (String line : lines) {
+            String[] parts = line.split(":");
+
+            // 예상되는 3개의 요소가 모두 있는지 확인
+            if (parts.length == 3) {
+                String containerName = parts[0].trim();
+                String cpuUsage = parts[1].trim();
+                String memUsage = parts[2].trim();
+
+                // 내부 맵 생성 후 CPU와 메모리 사용량 추가
+                Map<String, String> resourceUsage = new HashMap<>();
+                resourceUsage.put("CPU", cpuUsage);
+                resourceUsage.put("Memory", memUsage);
+
+                containerUsageMap.put(containerName, resourceUsage);
+            }
         }
 
-        return containersResourceUsage;
+        return containerUsageMap;
     }
 
     // 명령어 실행 함수
@@ -97,28 +102,7 @@ public class DockerService {
 
         int exitCode = process.waitFor();
         if (exitCode != 0) {
-            throw new RuntimeException("Command execution failed with exit code: " + exitCode);
+            throw new RuntimeException("명령어 실행 실패: " + exitCode);
         }
-    }
-
-    // 명령어 실행 후 결과 반환 함수
-    private List<String> executeCommandAndReturnOutput(String command) throws Exception {
-        ProcessBuilder processBuilder = new ProcessBuilder();
-        processBuilder.command("bash", "-c", command);
-        Process process = processBuilder.start();
-
-        List<String> output = new ArrayList<>();
-        BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-        String line;
-        while ((line = reader.readLine()) != null) {
-            output.add(line);  // 각 라인은 컨테이너 이름이 됨
-        }
-
-        int exitCode = process.waitFor();
-        if (exitCode != 0) {
-            throw new RuntimeException("Command execution failed with exit code: " + exitCode);
-        }
-
-        return output;
     }
 }

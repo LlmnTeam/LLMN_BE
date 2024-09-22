@@ -1,6 +1,5 @@
 package com.example.llmn.service;
 
-import com.example.llmn.controller.DTO.LogDTO;
 import com.example.llmn.controller.DTO.ProjectRequest;
 import com.example.llmn.controller.DTO.ProjectResponse;
 import com.example.llmn.core.errors.CustomException;
@@ -13,14 +12,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -99,7 +95,7 @@ public class ProjectService {
         List<String> runningContainerNames = dockerService.findRunningContainerNameList();
 
         // 컨테이너 리소스 조회
-        Map<String, Map<String, String>> containersResourceUsageMap = dockerService.findAllContainersResourceUsage();
+        Map<String, Map<String, String>> containersResourceUsageMap = dockerService.findContainersResourceUsage();
 
         List<ProjectResponse.ProjectDTO> projectDTOS = projects.stream()
                 .map(project -> {
