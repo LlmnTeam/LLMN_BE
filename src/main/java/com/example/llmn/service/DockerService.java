@@ -9,16 +9,13 @@ import org.springframework.stereotype.Service;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class DockerService {
 
-    private final UserRepository userRepository;
     private final SSHService sshService;
 
     // 도커 컨테이너 종료
@@ -37,10 +34,21 @@ public class DockerService {
         return commandResponse.trim().equals(containerName);
     }
 
-    // 도커 컨테이너 이름 목록 조회
+    // 실행중인 도커 컨테이너 목록 조회
     public List<String> findRunningContainerNameList() throws Exception {
         String command = "docker ps --format \"{{.Names}}\"";
-        return executeCommandAndReturnOutput(command);
+        String commandResponse = sshService.executeCommandOnce(command);
+
+        // 응답을 줄 단위로 나눠서 리스트로 변환
+        List<String> containerNames = Arrays.asList(commandResponse.split("\n"));
+
+        // 각 항목의 앞뒤 공백을 제거
+        containerNames = containerNames.stream()
+                .map(String::trim)
+                .filter(name -> !name.isEmpty())
+                .collect(Collectors.toList());
+
+        return containerNames;
     }
 
     // 특정 컨테이너 이름으로 실행 여부 확인
