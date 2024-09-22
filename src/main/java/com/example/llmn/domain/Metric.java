@@ -16,23 +16,28 @@ public class Metric extends TimeStamp {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
+    private User user;
+
     @Column
     private double cpuUsage;
 
     @Column
-    private long totalMemory;
+    private double totalMemory;
 
     @Column
-    private long usedMemory;
+    private double usedMemory;
 
     @Column
-    private long totalBytesReceived;
+    private double totalBytesReceived;
 
     @Column
-    private long totalBytesSent;
+    private double totalBytesSent;
 
     @Builder
-    public Metric(double cpuUsage, long totalMemory, long usedMemory, long totalBytesReceived, long totalBytesSent) {
+    public Metric(User user, double cpuUsage, double totalMemory, double usedMemory, double totalBytesReceived, double totalBytesSent) {
+        this.user = user;
         this.cpuUsage = cpuUsage;
         this.totalMemory = totalMemory;
         this.usedMemory = usedMemory;

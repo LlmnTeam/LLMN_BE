@@ -32,10 +32,10 @@ public class MetricResponse {
 
     public record FindCurrentMetricDTO(
             double cpuUsage,
-            long totalMemory,
-            long usedMemory,
-            long networkReceived,
-            long networkSent){}
+            double totalMemory,
+            double usedMemory,
+            double networkReceived,
+            double networkSent){}
 
     public record CommandDTO(
             String privateKeyPath,

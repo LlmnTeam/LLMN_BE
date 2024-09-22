@@ -13,6 +13,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Date;
 import java.util.Map;
 
 @Controller
@@ -32,7 +33,7 @@ public class MetricController {
 
     @GetMapping("/metrics/remote")
     public ResponseEntity<?> collectRemoteMetrics(@AuthenticationPrincipal CustomUserDetails userDetails) throws Exception {
-        Map<String, String> stringObjectMap = metricService.collectTopMetrics(userDetails.getUser().getId());
+        Map<String, Double> stringObjectMap = metricService.collectTopMetrics(userDetails.getUser().getId());
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, stringObjectMap));
     }
 

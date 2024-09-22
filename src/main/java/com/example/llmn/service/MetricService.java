@@ -42,20 +42,30 @@ public class MetricService {
     private static final String NETWORK_TRANSMITTED_KEY = "network:transmitted";
 
     @Scheduled(cron = "0 0/10 * * * *")
-    public void collectMetrics() {
-        Metric metric = Metric.builder()
-                .cpuUsage((double) metrics.get("cpuUsage"))
-                .totalMemory((long) metrics.get("totalMemory"))
-                .usedMemory((long) metrics.get("usedMemory"))
-                .totalBytesReceived((long) metrics.get("networkReceived")) // 10분 간격의 네트워크 트래픽
-                .totalBytesSent((long) metrics.get("networkSent"))
-                .build();
+    public void collectMetrics() throws Exception {
+        List<Long> userIds = userRepository.findIds();
 
-        metricRepository.save(metric);
+        for(Long userId : userIds){
+            User userRef = userRepository.getReferenceById(userId);
+
+            Map<String, Double> topMetrics = collectTopMetrics(userId);
+            Map<String, Double> networkMetrics = collectNetworkMetrics(userId);
+
+            Metric metric = Metric.builder()
+                    .user(userRef)
+                    .cpuUsage(topMetrics.get("cpuUsage"))
+                    .totalMemory(topMetrics.get("totalMemory"))
+                    .usedMemory(topMetrics.get("usedMemory"))
+                    .totalBytesReceived(networkMetrics.get("networkReceived")) // 10분 간격의 네트워크 트래픽
+                    .totalBytesSent(networkMetrics.get("networkSent"))
+                    .build();
+
+            metricRepository.save(metric);
+        }
     }
 
-    public Map<String, String> collectTopMetrics(Long userId) throws Exception {
-        Map<String, String> metricsMap = new HashMap<>();
+    public Map<String, Double> collectTopMetrics(Long userId) throws Exception {
+        Map<String, Double> metricsMap = new HashMap<>();
 
         // CPU와 메모리 사용량을 동시에 얻기 위한 top 명령어 실행
         String command = "top -b -n1 | grep \"Cpu(s)\\|Mem\"";
@@ -78,7 +88,7 @@ public class MetricService {
 
                 // us와 sy를 합쳐서 CPU 부하량 계산
                 double cpuUsage = Double.parseDouble(usUsage) + Double.parseDouble(syUsage);
-                metricsMap.put("cpuUsage", String.format("%.2f%%", cpuUsage));
+                metricsMap.put("cpuUsage", cpuUsage);
             }
 
             // 메모리 사용량 라인 처리
@@ -89,16 +99,15 @@ public class MetricService {
                 String memTotal = memParts[0].replaceAll("[^0-9.]", "").trim();
                 String memUsed = memParts[2].replaceAll("[^0-9.]", "").trim();
 
-                // 메모리 사용량 퍼센트 계산
-                double memUsage = (Double.parseDouble(memUsed) / Double.parseDouble(memTotal)) * 100;
-                metricsMap.put("memoryUsage", String.format("%.2f%%", memUsage));
+                metricsMap.put("totalMemory", Double.parseDouble(memTotal));
+                metricsMap.put("usedMemory", Double.parseDouble(memUsed));
             }
         }
 
         return metricsMap;
     }
 
-    // 네트워크 송수신량을 수집하여 Redis에 저장하고 10분마다 차이를 계산
+    // 네트워크 송수신량을 수집하여 레디스에 저장하고 10분마다 차이를 계산
     public Map<String, Double> collectNetworkMetrics(Long userId) throws Exception {
         Map<String, Double> metricsMap = new HashMap<>();
 
@@ -110,29 +119,29 @@ public class MetricService {
         Double previousTransmitted = redisService.getDataInDouble(NETWORK_TRANSMITTED_KEY);
 
         // 10분간의 네트워크 사용량 계산
-        double receivedDiff = currentUsage.get("receivedMB") - previousReceived;
-        double transmittedDiff = currentUsage.get("transmittedMB") - previousTransmitted;
+        double receivedDiff = currentUsage.get("networkReceived") - previousReceived;
+        double transmittedDiff = currentUsage.get("networkSent") - previousTransmitted;
 
-        metricsMap.put("receivedMB", receivedDiff);
-        metricsMap.put("transmittedMB", transmittedDiff);
+        metricsMap.put("networkReceived", receivedDiff);
+        metricsMap.put("networkSent", transmittedDiff);
 
         // Redis에 현재 네트워크 사용량 업데이트
-        redisService.storeValue(NETWORK_RECEIVED_KEY, String.valueOf(currentUsage.get("receivedMB")));
-        redisService.storeValue(NETWORK_TRANSMITTED_KEY, String.valueOf(currentUsage.get("transmittedMB")));
+        redisService.storeValue(NETWORK_RECEIVED_KEY, String.valueOf(currentUsage.get("networkReceived")));
+        redisService.storeValue(NETWORK_TRANSMITTED_KEY, String.valueOf(currentUsage.get("networkSent")));
 
         return metricsMap;
     }
 
-    public MetricResponse.FindCurrentMetricDTO findCurrentMetric() {
-        Map<String, Object> metrics = gatherMetrics();
-        Map<String, Long> dailyTraffic = getDailyTraffic();
+    public MetricResponse.FindCurrentMetricDTO findCurrentMetric(Long userId) throws Exception {
+        Map<String, Double> topMetrics = collectTopMetrics(userId);
+        Map<String, Double> networkMetrics = collectNetworkMetrics(userId);
 
         return new MetricResponse.FindCurrentMetricDTO(
-                (double) metrics.get("cpuUsage"),
-                (long) metrics.get("totalMemory"),
-                (long) metrics.get("usedMemory"),
-                dailyTraffic.get("dailyReceived"), // 하루동안 누적 네트워크 트래픽
-                dailyTraffic.get("dailySent")
+                topMetrics.get("cpuUsage"),
+                topMetrics.get("totalMemory"),
+                topMetrics.get("usedMemory"),
+                networkMetrics.get("networkReceived"), // 하루동안 누적 네트워크 트래픽
+                networkMetrics.get("networkSent")
         );
     }
 
@@ -203,95 +212,6 @@ public class MetricService {
         return dailyTraffic;
     }
 
-    // 네트워크 트래픽의 수신 및 송신 바이트를 계산
-    private MetricDTO.NetworkTraffic getTotalNetworkTraffic() {
-        List<NetworkIF> networkIFs = systemInfo.getHardware().getNetworkIFs();
-        long totalBytesReceived = 0;
-        long totalBytesSent = 0;
-
-        for (NetworkIF net : networkIFs) {
-            net.updateAttributes();
-            totalBytesReceived += net.getBytesRecv();
-            totalBytesSent += net.getBytesSent();
-        }
-
-        // 바이트 → MB 변환 (1024 * 1024)
-        long totalBytesReceivedInMB = totalBytesReceived / (1024 * 1024);
-        long totalBytesSentInMB = totalBytesSent / (1024 * 1024);
-
-        return new MetricDTO.NetworkTraffic(totalBytesReceivedInMB, totalBytesSentInMB);
-    }
-
-    private Map<String, Object> gatherMetrics() {
-        Map<String, Object> metrics = new HashMap<>();
-        GlobalMemory memory = systemInfo.getHardware().getMemory();
-
-        // CPU 사용량 계산
-        long[] newTicks = processor.getSystemCpuLoadTicks();
-        double cpuLoad = processor.getSystemCpuLoadBetweenTicks(oldTicks); // 이전 tick 값으로 CPU 로드 계산
-        oldTicks = newTicks; // 새로운 tick 값을 저장하여 다음 호출 시 사용
-        metrics.put("cpuUsage", cpuLoad * 100);
-
-        // 메모리 사용량 계산
-        long totalMemory = memory.getTotal();
-        long usedMemory = totalMemory - memory.getAvailable();
-        metrics.put("totalMemory", totalMemory);
-        metrics.put("usedMemory", usedMemory);
-
-        // 네트워크 트래픽 계산
-        MetricDTO.NetworkTraffic totalNetworkTraffic = getTotalNetworkTraffic();
-
-        // 이전에 저장된 값과의 차이로 네트워크 트래픽 계산
-        Long previousBytesReceived = redisService.getDataInLong(PREVIOUS_BYTES_RECEIVED);
-        Long previousBytesSent = redisService.getDataInLong(PREVIOUS_BYTES_SENT);
-
-        long bytesReceived = totalNetworkTraffic.bytesReceived() - previousBytesReceived;
-        long bytesSent = totalNetworkTraffic.bytesSent() - previousBytesSent;
-
-        // 현재 값을 다음 계산에 사용할 수 있도록 저장
-        redisService.storeValue(PREVIOUS_BYTES_RECEIVED, String.valueOf(totalNetworkTraffic.bytesReceived()), VALID_EXP);
-        redisService.storeValue(PREVIOUS_BYTES_SENT, String.valueOf(totalNetworkTraffic.bytesSent()), VALID_EXP);
-
-        // 구간 동안의 네트워크 트래픽을 저장
-        metrics.put("networkReceived", bytesReceived);
-        metrics.put("networkSent", bytesSent);
-
-        return metrics;
-    }
-
-    private double parseCpuUsage(String cpuUsageOutput) {
-        String[] split = cpuUsageOutput.split(",");
-
-        double us = Double.parseDouble(split[0].split(":")[1].trim().replace("us", "").trim()); // 사용자 영역
-        double sy = Double.parseDouble(split[1].trim().replace("sy", "").trim()); // 시스템 영역
-        double ni = Double.parseDouble(split[2].trim().replace("ni", "").trim()); // nice 프로세스
-        double wa = Double.parseDouble(split[4].trim().replace("wa", "").trim()); // IO 대기
-        double hi = Double.parseDouble(split[5].trim().replace("hi", "").trim()); // 하드웨어 인터럽트
-        double si = Double.parseDouble(split[6].trim().replace("si", "").trim()); // 소프트웨어 인터럽트
-
-        // 전체 CPU 사용량은 각 항목들의 합
-        return us + sy + ni + wa + hi + si;
-    }
-
-    private long parseMemoryUsage(String memoryUsageOutput) {
-        // 메모리 사용량 데이터를 파싱
-        String[] lines = memoryUsageOutput.split("\n");
-        String[] memoryData = lines[1].split("\\s+");
-        return Long.parseLong(memoryData[2]); // 사용 중인 메모리 값 (MB 단위)
-    }
-
-    private long parseNetworkUsage(String networkUsageOutput) {
-        // 네트워크 트래픽 데이터를 파싱
-        String[] lines = networkUsageOutput.split("\n");
-        for (String line : lines) {
-            if (line.contains("RX bytes")) {
-                String[] parts = line.split(" ");
-                return Long.parseLong(parts[2].replace("bytes:", ""));
-            }
-        }
-        return 0;
-    }
-
     // 네트워크 송수신량 수집
     private Map<String, Double> collectNetworkUsage(Long userId) throws Exception {
         String command = "cat /proc/net/dev | grep eth0";
@@ -308,8 +228,8 @@ public class MetricService {
             double receivedMB = receivedBytes / (1024.0 * 1024.0);
             double transmittedMB = transmittedBytes / (1024.0 * 1024.0);
 
-            networkUsageMap.put("receivedMB", receivedMB);
-            networkUsageMap.put("transmittedMB", transmittedMB);
+            networkUsageMap.put("networkReceived", receivedMB);
+            networkUsageMap.put("networkSent", transmittedMB);
         }
 
         return networkUsageMap;
