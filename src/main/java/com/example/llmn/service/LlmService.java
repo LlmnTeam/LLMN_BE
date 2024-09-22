@@ -144,9 +144,9 @@ public class LlmService {
                 .block();
     }
 
-    private LogDTO.PerformanceSummaryResponseDTO fetchMetricSummary(){
+    private LogDTO.PerformanceSummaryResponseDTO fetchMetricSummary(Long userId){
         // 1시간 전까지의 성능 지표
-        MetricResponse.FindMetricHistoryDTO metricHistory = metricService.findMetricHistory(METRIC_HISTORY_PREVIOUS_HOUR);
+        MetricResponse.FindMetricHistoryDTO metricHistory = metricService.findMetricHistory(METRIC_HISTORY_PREVIOUS_HOUR, userId);
 
         // StringBuilder를 사용하여 메트릭 정보를 문자열로 변환
         StringBuilder logMessageBuilder = new StringBuilder();

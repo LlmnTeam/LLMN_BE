@@ -28,16 +28,7 @@ public class MetricService {
     private final UserRepository userRepository;
     private final RedisService redisService;
     private final SSHService sshService;
-    private final SystemInfo systemInfo = new SystemInfo();
-    private final CentralProcessor processor = systemInfo.getHardware().getProcessor();
-
-    // 첫 번째 호출에서 CPU ticks 값을 저장
-    private long[] oldTicks = processor.getSystemCpuLoadTicks();
-    public static final Long VALID_EXP = 1000L * 60 * 60 * 24 * 7; // 일주일
-    private static final String PREVIOUS_BYTES_RECEIVED = "previousBytesReceived";
-    private static final String PREVIOUS_BYTES_SENT = "previousBytesSent";
-    private static final String DAILY_START_BYTES_RECEIVED = "dailyStartBytesReceived";
-    private static final String DAILY_START_BYTES_SENT = "dailyStartBytesSent";
+    
     private static final String NETWORK_RECEIVED_KEY = "network:received";
     private static final String NETWORK_TRANSMITTED_KEY = "network:transmitted";
 
@@ -107,7 +98,7 @@ public class MetricService {
         return metricsMap;
     }
 
-    // 네트워크 송수신량을 수집하여 레디스에 저장하고 10분마다 차이를 계산
+    // 네트워크 송수신량을 수집하여 레디스에 저장
     public Map<String, Double> collectNetworkMetrics(Long userId) throws Exception {
         Map<String, Double> metricsMap = new HashMap<>();
 
@@ -118,7 +109,7 @@ public class MetricService {
         Double previousReceived = redisService.getDataInDouble(NETWORK_RECEIVED_KEY);
         Double previousTransmitted = redisService.getDataInDouble(NETWORK_TRANSMITTED_KEY);
 
-        // 10분간의 네트워크 사용량 계산
+        // 네트워크 사용량 계산 (설정한 계산 주기에 따라 달라짐)
         double receivedDiff = currentUsage.get("networkReceived") - previousReceived;
         double transmittedDiff = currentUsage.get("networkSent") - previousTransmitted;
 
@@ -146,9 +137,10 @@ public class MetricService {
     }
 
     @Transactional(readOnly = true)
-    public MetricResponse.FindMetricHistoryDTO findMetricHistory(int minusHour){
+    public MetricResponse.FindMetricHistoryDTO findMetricHistory(int minusHour, Long userId){
+        // minusHour 내 지표들을 모두 가져옴
         LocalDateTime now = LocalDateTime.now().withMinute(0).withSecond(0).withNano(0);
-        List<Metric> metrics = metricRepository.findALlWithinDate(now.minusHours(minusHour));
+        List<Metric> metrics = metricRepository.findALlWithinDate(now.minusHours(minusHour), userId);
 
         // 시간 형식 "HH:mm"
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm");
@@ -164,7 +156,7 @@ public class MetricService {
         List<MetricResponse.MemoryMetricDTO> memoryMetricDTOS = metrics.stream()
                 .map(metric -> {
                     String time = metric.getCreatedDate().format(formatter);
-                    long memoryUsage = metric.getUsedMemory() / (1024 * 1024);
+                    long memoryUsage = (long) (metric.getUsedMemory() / (1024 * 1024));
                     return new MetricResponse.MemoryMetricDTO(time, memoryUsage);
                 })
                 .toList();
@@ -187,27 +179,23 @@ public class MetricService {
         return new MetricResponse.FindMetricHistoryDTO(cpuMetricDTOS, memoryMetricDTOS, networkInMetricDTOS, networkOutMetricDTOS);
     }
 
-    // 하루 시작 시점에 네트워크 트래픽 값을 저장 (매일 자정에 실행)
-    @Scheduled(cron = "0 0 0 * * *")
-    public void resetDailyTraffic() {
-        MetricDTO.NetworkTraffic totalNetworkTraffic = getTotalNetworkTraffic();
-        redisService.storeValue(DAILY_START_BYTES_RECEIVED, String.valueOf(totalNetworkTraffic.bytesReceived()), VALID_EXP);
-        redisService.storeValue(DAILY_START_BYTES_SENT, String.valueOf(totalNetworkTraffic.bytesSent()), VALID_EXP);
-    }
-
     // 하루 동안의 누적 네트워크 트래픽 계산
-    private Map<String, Long> getDailyTraffic() {
-        // 오늘 0시의 네트워크 트래픽값
-        long dailyStartBytesReceived = redisService.getDataInLong(DAILY_START_BYTES_RECEIVED);
-        long dailyStartBytesSent = redisService.getDataInLong(DAILY_START_BYTES_SENT);
+    public Map<String, Long> getTodayNetworkTraffic(Long userId) {
+        // minusHour 내 지표들을 모두 가져옴
+        LocalDateTime todayStart = LocalDateTime.now().withHour(0).withMinute(0).withSecond(0).withNano(0);
+        List<Metric> metrics = metricRepository.findALlWithinDate(todayStart, userId);
 
-        MetricDTO.NetworkTraffic totalNetworkTraffic = getTotalNetworkTraffic();
-        long dailyReceived = totalNetworkTraffic.bytesReceived() - dailyStartBytesReceived;
-        long dailySent = totalNetworkTraffic.bytesSent() - dailyStartBytesSent;
+        double dailyReceived = metrics.stream()
+                .mapToDouble(Metric::getTotalBytesReceived)
+                .sum();
+
+        double dailySent = metrics.stream()
+                .mapToDouble(Metric::getTotalBytesSent)
+                .sum();
 
         Map<String, Long> dailyTraffic = new HashMap<>();
-        dailyTraffic.put("dailyReceived", dailyReceived);
-        dailyTraffic.put("dailySent", dailySent);
+        dailyTraffic.put("dailyReceived", (long) dailyReceived);
+        dailyTraffic.put("dailySent", (long) dailySent);
 
         return dailyTraffic;
     }
