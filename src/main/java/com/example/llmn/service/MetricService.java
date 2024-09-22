@@ -31,6 +31,8 @@ public class MetricService {
     private static final String NETWORK_TRANSMITTED_KEY = "network:transmitted";
     private static final String METRIC_KEY = "metric";
     private static final Long METRIC_EXP = 10 * 60 * 1000L; // 10분
+    private static final boolean UPDATE_CACHE = true;
+    private static final boolean NOT_UPDATE_CACHE = false;
 
     @Scheduled(cron = "0 0/10 * * * *")
     public void collectMetrics() throws Exception {
@@ -40,7 +42,7 @@ public class MetricService {
             User userRef = userRepository.getReferenceById(userId);
 
             Map<String, Double> topMetrics = collectTopMetrics(userId);
-            Map<String, Double> networkMetrics = collectNetworkMetrics(userId);
+            Map<String, Double> networkMetrics = collectNetworkMetrics(userId, UPDATE_CACHE);
 
             Metric metric = Metric.builder()
                     .user(userRef)
@@ -98,27 +100,29 @@ public class MetricService {
         return metricsMap;
     }
 
-    // 네트워크 송수신량을 수집하여 레디스에 저장
-    public Map<String, Double> collectNetworkMetrics(Long userId) throws Exception {
+    // 네트워크 송수신량을 수집하고 레디스에 저장
+    public Map<String, Double> collectNetworkMetrics(Long userId, boolean updateCache) throws Exception {
         Map<String, Double> metricsMap = new HashMap<>();
 
-        // 네트워크 사용량 수집
+        // 현재 네트워크 사용량 조회
         Map<String, Double> currentUsage = collectNetworkUsage(userId);
 
-        // Redis에서 이전 네트워크 사용량 조회 (없으면 0.0)
+        // 레디스에서 이전 네트워크 사용량 조회 (없으면 0.0)
         Double previousReceived = redisService.getDataInDouble(NETWORK_RECEIVED_KEY);
         Double previousTransmitted = redisService.getDataInDouble(NETWORK_TRANSMITTED_KEY);
 
-        // 네트워크 사용량 계산 (설정한 계산 주기에 따라 달라짐)
+        // 특정 기간 동안의 네트워크 사용량 계산 (설정한 기간에 따라 달라짐)
         double receivedDiff = currentUsage.get("networkReceived") - previousReceived;
         double transmittedDiff = currentUsage.get("networkSent") - previousTransmitted;
 
         metricsMap.put("networkReceived", receivedDiff);
         metricsMap.put("networkSent", transmittedDiff);
 
-        // Redis에 현재 네트워크 사용량 업데이트
-        redisService.storeValue(NETWORK_RECEIVED_KEY, String.valueOf(currentUsage.get("networkReceived")));
-        redisService.storeValue(NETWORK_TRANSMITTED_KEY, String.valueOf(currentUsage.get("networkSent")));
+        // 업데이트 플래그가 존재 => 현재 네트워크 사용량으로 업데이트
+        if(updateCache) {
+            redisService.storeValue(NETWORK_RECEIVED_KEY, String.valueOf(currentUsage.get("networkReceived")));
+            redisService.storeValue(NETWORK_TRANSMITTED_KEY, String.valueOf(currentUsage.get("networkSent")));
+        }
 
         return metricsMap;
     }
@@ -130,9 +134,9 @@ public class MetricService {
             return cachedMetric;
         }
 
-        // 2. 캐시된 값이 없으면 새로운 메트릭 수집 후 저장
+        // 2. 캐시된 값이 없으면 새로운 Metric 수집 후 저장
         Map<String, Double> topMetrics = collectTopMetrics(userId);
-        Map<String, Double> networkMetrics = collectNetworkMetrics(userId);
+        Map<String, Double> networkMetrics = collectNetworkMetrics(userId, NOT_UPDATE_CACHE);
 
         MetricResponse.FindCurrentMetricDTO metricDTO = new MetricResponse.FindCurrentMetricDTO(
                 topMetrics.get("cpuUsage"),
@@ -235,7 +239,7 @@ public class MetricService {
         return networkUsageMap;
     }
 
-    // 캐시에서 지표를 가져오는 메서드
+    // 레디스에서 Metric을 가져오는 메서드
     private MetricResponse.FindCurrentMetricDTO getCachedMetric(Long userId) {
         String cachedValue = redisService.getDataInStr(METRIC_KEY, userId.toString());
 
