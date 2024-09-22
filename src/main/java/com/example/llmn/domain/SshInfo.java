@@ -26,7 +26,7 @@ public class SshInfo extends TimeStamp{
     private String remoteKeyPath;
 
     @Builder
-    public SshInfo(String remoteName, String remoteHost, String remoteKeyPath) {
+    public SshInfo(String remoteHost, String remoteName, String remoteKeyPath) {
         this.remoteName = remoteName;
         this.remoteHost = remoteHost;
         this.remoteKeyPath = remoteKeyPath;

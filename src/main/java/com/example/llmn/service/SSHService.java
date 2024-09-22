@@ -17,7 +17,7 @@ public class SSHService {
 
     private static final String REDIS_SSH_KEY = "SSH";
     public static final Long REDIS_SSH_KEY_EXP = 60L * 60 * 24 * 180; // 180일
-    private static final String DELIMITER = ":";
+    private static final String DELIMITER = "-";
     
     // 명령어 실행
     public String executeCommandInShell(String command, Long userId) throws Exception {
@@ -50,7 +50,7 @@ public class SSHService {
     private SshInfo getSshInfo(Long userId) {
         String sshInfoStr = redisService.getDataInStr(REDIS_SSH_KEY, userId.toString());
 
-        // 레디스에 데이터가 없으면 DB에서 가져옴
+        // 레디스에 캐시된 값이 없으면 DB에서 가져옴
         if (sshInfoStr == null) {
             SshInfo sshInfoInDB = userRepository.findSshInfoById(userId).orElseThrow(
                     () -> new CustomException(ExceptionCode.USER_NOT_FOUND)

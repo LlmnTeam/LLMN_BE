@@ -20,7 +20,7 @@ import java.util.concurrent.TimeUnit;
 
 public class SSHCommandExecutor {
     private final SshClient client;
-    private ClientSession session;
+    private final ClientSession session;
     private final ClientChannel shellChannel;
     private final OutputStream pipedIn;
     private final InputStream pipedOut;
@@ -28,6 +28,7 @@ public class SSHCommandExecutor {
     private static final String REDIS_CHANNEL = "ssh-command-output"; // 고정된 Redis 채널 이름
     private static final String REDIS_HOST = "localhost";
     private static final int REDIS_PORT = 6379;
+    private static final int SSH_PORT = 22;
 
     public SSHCommandExecutor(String host, String username, String privateKeyPath) throws Exception {
         // 1. SSH 클라이언트를 기본 설정으로 초기화 => SSH 클라이언트를 시작하여 연결을 수락할 준비를 함
@@ -39,7 +40,7 @@ public class SSHCommandExecutor {
         }
 
         // 2. SSH 서버에 연결
-        ConnectFuture connectFuture = client.connect(username, host, 22);
+        ConnectFuture connectFuture = client.connect(username, host, SSH_PORT);
         session = connectFuture
                 .verify(10, TimeUnit.SECONDS) // 10초 안에 연결을 확인하고 세션을 얻음
                 .getSession();

@@ -47,7 +47,6 @@ public class MetricService {
     private static final String PREVIOUS_BYTES_SENT = "previousBytesSent";
     private static final String DAILY_START_BYTES_RECEIVED = "dailyStartBytesReceived";
     private static final String DAILY_START_BYTES_SENT = "dailyStartBytesSent";
-    private static final int SSH_PORT_NUM = 22;
 
     @Scheduled(cron = "0 0/10 * * * *")
     public void collectMetrics() {
@@ -69,6 +68,8 @@ public class MetricService {
         String command = "top -b -n1 | grep \"Cpu(s)\\|Mem\"";
         String commandResponse = sshService.executeCommandOnce(command, userId);
 
+        System.out.println("response" + commandResponse);
+
         Map<String, String> metricsMap = new HashMap<>();
 
         // 명령어 응답 파싱
@@ -78,10 +79,13 @@ public class MetricService {
             line = line.trim();
 
             // CPU 사용량 라인 처리
-            if (line.startsWith("Cpu(s):")) {
+            if (line.startsWith("%Cpu(s):")) {
+                // 쉼표를 기준으로 분리
                 String[] cpuParts = line.split(",");
-                String usUsage = cpuParts[0].split(":")[1].trim().replace("%us", "");
-                String syUsage = cpuParts[1].trim().replace("%sy", "");
+
+                // "Cpu(s):" 제거 후 공백과 문자를 제거하여 숫자만 추출
+                String usUsage = cpuParts[0].split(":")[1].trim().replaceAll("[^0-9.]", "").trim();
+                String syUsage = cpuParts[1].trim().replaceAll("[^0-9.]", "").trim();
 
                 // us와 sy를 합쳐서 CPU 부하량 계산
                 double cpuUsage = Double.parseDouble(usUsage) + Double.parseDouble(syUsage);
@@ -89,12 +93,16 @@ public class MetricService {
             }
 
             // 메모리 사용량 라인 처리
-            if (line.startsWith("KiB Mem") || line.startsWith("MiB Mem")) {
+            if (line.startsWith("MiB Mem")) {
                 String[] memParts = line.split(",");
-                String memUsed = memParts[1].trim().split(" ")[0];
-                String memTotal = memParts[0].trim().split(" ")[2];
-                String memUsage = String.format("%.2f%%", (Double.parseDouble(memUsed) / Double.parseDouble(memTotal)) * 100);
-                metricsMap.put("memoryUsage", memUsage);
+
+                // 전체 메모리와 사용 메모리 추출
+                String memTotal = memParts[0].replaceAll("[^0-9.]", "").trim();
+                String memUsed = memParts[2].replaceAll("[^0-9.]", "").trim();
+
+                // 메모리 사용량 퍼센트 계산
+                double memUsage = (Double.parseDouble(memUsed) / Double.parseDouble(memTotal)) * 100;
+                metricsMap.put("memoryUsage", String.format("%.2f%%", memUsage));
             }
         }
 
