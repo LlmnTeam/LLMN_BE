@@ -122,6 +122,9 @@ public class UserService {
         // Refresh Token 갱신
         redisService.storeValue("refreshToken", String.valueOf(user.getId()), refreshToken, JWTProvider.REFRESH_EXP_MILLI);
 
+        // 로그인 ID를 세션으로 저장
+        redisService.storeValue("sessionId", user.getId().toString());
+
         // Map으로 토큰들을 담아 반환
         Map<String, String> tokens = new HashMap<>();
         tokens.put("accessToken", accessToken);

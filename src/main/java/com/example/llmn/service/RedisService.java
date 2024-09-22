@@ -26,8 +26,8 @@ public class RedisService {
     }
 
     // 유효 기간 X
-    public void storeValue(String type, String id, String value) {
-        redisTemplate.opsForValue().set(buildKey(type, id), value);
+    public void storeValue(String key, String value) {
+        redisTemplate.opsForValue().set(key, value);
     }
 
     public void addSetElement(String key, Long value) {
@@ -64,14 +64,6 @@ public class RedisService {
     public void deleteListElement(String key, String value){
         ListOperations<String, String> listOps = redisTemplate.opsForList();
         listOps.remove(key, 0, value);
-    }
-
-    public void incrementCnt(String type, String id, Long cnt){
-        redisTemplate.opsForValue().increment(buildKey(type, id), cnt);
-    }
-
-    public void decrementCnt(String type, String id, Long cnt){
-        redisTemplate.opsForValue().decrement(buildKey(type, id), cnt);
     }
 
     public void setExpireDate(String type, String id, Long expirationTime){
@@ -118,24 +110,21 @@ public class RedisService {
         return Long.valueOf(value);
     }
 
-    public Long getDataInLongWithNull(String type, String id){
-        String value = redisTemplate.opsForValue().get(buildKey(type, id));
-
-        if(value != null) return Long.valueOf(value);
-        else { return null;}
-    }
-
-    // 데이터 반환 - String 반환
+    // String 반환
     public String getDataInStr(String type, String id){ return redisTemplate.opsForValue().get(buildKey(type, id)); }
 
-    public Set<String> getMembersOfSet(String key) {
-        SetOperations<String, String> setOps = redisTemplate.opsForSet();
-        return setOps.members(key);
-    }
+    public String getDataInStr(String key){ return redisTemplate.opsForValue().get(key); }
 
-    public List<String> getMembersOfList(String key) {
-        ListOperations<String, String> listOps = redisTemplate.opsForList();
-        return listOps.range(key, 0, -1);
+    // Double 반환
+    public Double getDataInDouble(String key){
+        String value = redisTemplate.opsForValue().get(key);
+
+        // 값이 없으면 0.0 반환
+        if(value == null){
+            return 0.0;
+        }
+
+        return Double.valueOf(value);
     }
 
     public Long getTTL(String type, String id) {

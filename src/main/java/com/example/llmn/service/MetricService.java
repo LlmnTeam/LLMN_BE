@@ -2,16 +2,12 @@ package com.example.llmn.service;
 
 import com.example.llmn.controller.DTO.MetricDTO;
 import com.example.llmn.controller.DTO.MetricResponse;
-import com.example.llmn.core.utils.KeyPairUtils;
 import com.example.llmn.domain.Metric;
 
+import com.example.llmn.domain.User;
 import com.example.llmn.repository.MetricRepository;
+import com.example.llmn.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
-import org.apache.sshd.client.SshClient;
-import org.apache.sshd.client.channel.ClientChannel;
-import org.apache.sshd.client.channel.ClientChannelEvent;
-import org.apache.sshd.client.future.ConnectFuture;
-import org.apache.sshd.client.session.ClientSession;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,21 +16,16 @@ import oshi.hardware.CentralProcessor;
 import oshi.hardware.GlobalMemory;
 import oshi.hardware.NetworkIF;
 
-import java.io.*;
-import java.net.URI;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Paths;
-import java.security.KeyPair;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.concurrent.TimeUnit;
 
 @Service
 @RequiredArgsConstructor
 public class MetricService {
 
     private final MetricRepository metricRepository;
+    private final UserRepository userRepository;
     private final RedisService redisService;
     private final SSHService sshService;
     private final SystemInfo systemInfo = new SystemInfo();
@@ -47,11 +38,11 @@ public class MetricService {
     private static final String PREVIOUS_BYTES_SENT = "previousBytesSent";
     private static final String DAILY_START_BYTES_RECEIVED = "dailyStartBytesReceived";
     private static final String DAILY_START_BYTES_SENT = "dailyStartBytesSent";
+    private static final String NETWORK_RECEIVED_KEY = "network:received";
+    private static final String NETWORK_TRANSMITTED_KEY = "network:transmitted";
 
     @Scheduled(cron = "0 0/10 * * * *")
     public void collectMetrics() {
-        Map<String, Object> metrics = gatherMetrics();
-
         Metric metric = Metric.builder()
                 .cpuUsage((double) metrics.get("cpuUsage"))
                 .totalMemory((long) metrics.get("totalMemory"))
@@ -63,14 +54,12 @@ public class MetricService {
         metricRepository.save(metric);
     }
 
-    public Map<String, String> collectRemoteMetrics(Long userId) throws Exception {
+    public Map<String, String> collectTopMetrics(Long userId) throws Exception {
+        Map<String, String> metricsMap = new HashMap<>();
+
         // CPU와 메모리 사용량을 동시에 얻기 위한 top 명령어 실행
         String command = "top -b -n1 | grep \"Cpu(s)\\|Mem\"";
         String commandResponse = sshService.executeCommandOnce(command, userId);
-
-        System.out.println("response" + commandResponse);
-
-        Map<String, String> metricsMap = new HashMap<>();
 
         // 명령어 응답 파싱
         String[] lines = commandResponse.split("\n");
@@ -105,6 +94,31 @@ public class MetricService {
                 metricsMap.put("memoryUsage", String.format("%.2f%%", memUsage));
             }
         }
+
+        return metricsMap;
+    }
+
+    // 네트워크 송수신량을 수집하여 Redis에 저장하고 10분마다 차이를 계산
+    public Map<String, Double> collectNetworkMetrics(Long userId) throws Exception {
+        Map<String, Double> metricsMap = new HashMap<>();
+
+        // 네트워크 사용량 수집
+        Map<String, Double> currentUsage = collectNetworkUsage(userId);
+
+        // Redis에서 이전 네트워크 사용량 조회 (없으면 0.0)
+        Double previousReceived = redisService.getDataInDouble(NETWORK_RECEIVED_KEY);
+        Double previousTransmitted = redisService.getDataInDouble(NETWORK_TRANSMITTED_KEY);
+
+        // 10분간의 네트워크 사용량 계산
+        double receivedDiff = currentUsage.get("receivedMB") - previousReceived;
+        double transmittedDiff = currentUsage.get("transmittedMB") - previousTransmitted;
+
+        metricsMap.put("receivedMB", receivedDiff);
+        metricsMap.put("transmittedMB", transmittedDiff);
+
+        // Redis에 현재 네트워크 사용량 업데이트
+        redisService.storeValue(NETWORK_RECEIVED_KEY, String.valueOf(currentUsage.get("receivedMB")));
+        redisService.storeValue(NETWORK_TRANSMITTED_KEY, String.valueOf(currentUsage.get("transmittedMB")));
 
         return metricsMap;
     }
@@ -245,24 +259,6 @@ public class MetricService {
         return metrics;
     }
 
-    private String executeRemoteCommand(ClientSession session, String command) throws Exception {
-        ByteArrayOutputStream responseStream = new ByteArrayOutputStream();
-
-        try (ClientChannel channel = session.createExecChannel(command)) {
-            channel.setOut(responseStream);
-            channel.open().verify(5, TimeUnit.SECONDS);
-
-            // ClientChannelEvent.CLOSED 및 ClientChannelEvent.EOF를 기다림
-            Set<ClientChannelEvent> events = channel.waitFor(EnumSet.of(ClientChannelEvent.CLOSED, ClientChannelEvent.EOF), TimeUnit.SECONDS.toMillis(5));
-
-            if (events.contains(ClientChannelEvent.TIMEOUT)) {
-                throw new Exception("Command execution timed out");
-            }
-        }
-
-        return new String(responseStream.toByteArray(), StandardCharsets.UTF_8);
-    }
-
     private double parseCpuUsage(String cpuUsageOutput) {
         String[] split = cpuUsageOutput.split(",");
 
@@ -294,5 +290,28 @@ public class MetricService {
             }
         }
         return 0;
+    }
+
+    // 네트워크 송수신량 수집
+    private Map<String, Double> collectNetworkUsage(Long userId) throws Exception {
+        String command = "cat /proc/net/dev | grep eth0";
+        String commandResponse = sshService.executeCommandOnce(command, userId);
+
+        String[] parts = commandResponse.trim().split("\\s+");
+
+        Map<String, Double> networkUsageMap = new HashMap<>();
+        if (parts.length >= 10) {
+            long receivedBytes = Long.parseLong(parts[1]);  // 수신된 바이트
+            long transmittedBytes = Long.parseLong(parts[9]);  // 송신된 바이트
+
+            // 바이트를 MB로 변환
+            double receivedMB = receivedBytes / (1024.0 * 1024.0);
+            double transmittedMB = transmittedBytes / (1024.0 * 1024.0);
+
+            networkUsageMap.put("receivedMB", receivedMB);
+            networkUsageMap.put("transmittedMB", transmittedMB);
+        }
+
+        return networkUsageMap;
     }
 }
