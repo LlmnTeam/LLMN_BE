@@ -26,6 +26,7 @@ public class LlmService {
 
     private final LogService logService;
     private final MetricService metricService;
+    private final AlarmService alarmService;
     private final UserRepository userRepository;
     private final SummaryRepository summaryRepository;
     private final ProjectRepository projectRepository;
@@ -37,6 +38,10 @@ public class LlmService {
     private static final String TREND_SUMMERY_URI = "http://localhost:8000/process/trendSummary";
     private static final String RECOMMEND_URI = "http://localhost:8000/process/recommend";
     private static final int METRIC_HISTORY_PREVIOUS_HOUR = 1;
+    private static final String PERFORMANCE_SUMMARY_ALARM = "새로운 성능 요약이 생성 되었습니다.";
+    private static final String DAILY_SUMMARY_ALARM = "새로운 일일 요약이 생성 되었습니다.";
+    private static final String TREND_SUMMARY_ALARM = "장기 트렌드 분석 요약이 생성 되었습니다.";
+    private static final String RECOMMENDATION_ALARM = "새로운 추천 사항이 업데이트 되었습니다";
 
     @Transactional
     @Scheduled(cron = "0 0 * * * *") // 매시 0분
@@ -58,8 +63,11 @@ public class LlmService {
                         return;
                     }
 
-                    // 긴급히 체크해야하는지 여부 업데이트
                     project.updateIsUrgent(summaryDTO.isUrgent());
+
+                    // 긴급 알람 업데이트
+                    String emergencyAlarmContent = project.getProjectName() + "의 로그를 점검 해보세요. 문제점이 발견되었습니다.";
+                    alarmService.generateAlarm(project.getUser().getId(), emergencyAlarmContent, AlarmType.EMERGENCY);
 
                     // 일반 요약 저장
                     Summary generalSummary = Summary.builder()
@@ -80,6 +88,10 @@ public class LlmService {
                             .build();
 
                     summaryRepository.save(anomalySummary);
+
+                    // 업데이트 알람 생성
+                    String updateAlarmContent = project.getProjectName() + "의 요약이 업데이트 되었습니다.";
+                    alarmService.generateAlarm(project.getUser().getId(), updateAlarmContent, AlarmType.UPDATE);
                 });
     }
 
@@ -99,6 +111,9 @@ public class LlmService {
                     .build();
 
             summaryRepository.save(performanceSummary);
+
+            // 업데이트 알람 생성
+            alarmService.generateAlarm(userId, PERFORMANCE_SUMMARY_ALARM, AlarmType.UPDATE);
         }
     }
 
@@ -137,6 +152,9 @@ public class LlmService {
                     .build();
 
             summaryRepository.save(dailySummary);
+
+            // 업데이트 알람 생성
+            alarmService.generateAlarm(userId, DAILY_SUMMARY_ALARM, AlarmType.UPDATE);
         }
     }
 
@@ -156,6 +174,9 @@ public class LlmService {
                     .build();
 
             summaryRepository.save(trendSummary);
+
+            // 업데이트 알람 생성
+            alarmService.generateAlarm(userId, TREND_SUMMARY_ALARM, AlarmType.UPDATE);
         }
     }
 
@@ -175,6 +196,9 @@ public class LlmService {
                     .build();
 
             summaryRepository.save(recommend);
+
+            // 업데이트 알람 생성
+            alarmService.generateAlarm(userId, RECOMMENDATION_ALARM, AlarmType.UPDATE);
         }
     }
 
