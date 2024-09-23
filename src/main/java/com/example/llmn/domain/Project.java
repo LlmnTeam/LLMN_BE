@@ -34,7 +34,7 @@ public class Project extends TimeStamp{
     private String description;
 
     @Column
-    private boolean isWorking;
+    private boolean isUrgent;
 
     @Builder
     public Project(User user, String projectName, String containerName, String description, ContainerStatus containerStatus) {
@@ -43,7 +43,7 @@ public class Project extends TimeStamp{
         this.containerName = containerName;
         this.containerStatus = containerStatus;
         this.description = description;
-        this.isWorking = true;
+        this.isUrgent = false;
     }
 
     public void updateProject(String projectName, String containerName, String description, ContainerStatus containerStatus){
@@ -51,5 +51,9 @@ public class Project extends TimeStamp{
         this.containerName = containerName;
         this.description = description;
         this.containerStatus = containerStatus;
+    }
+
+    public void updateIsUrgent(boolean isUrgent){
+        this.isUrgent = isUrgent;
     }
 }

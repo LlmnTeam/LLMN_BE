@@ -20,7 +20,7 @@ public class ProjectResponse {
 
     public record ProjectDTO(
             Long id,
-            boolean isWorking,
+            boolean isUrgent,
             String name,
             String description,
             LocalDateTime updateTime,

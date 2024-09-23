@@ -111,7 +111,7 @@ public class ProjectService {
 
                     return new ProjectResponse.ProjectDTO(
                         project.getId(),
-                        project.isWorking(),
+                        project.isUrgent(),
                         project.getProjectName(),
                         project.getDescription(),
                         project.getUpdatedDate(),
