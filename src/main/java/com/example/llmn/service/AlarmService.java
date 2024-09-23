@@ -9,6 +9,7 @@ import com.example.llmn.domain.User;
 import com.example.llmn.repository.AlarmRepository;
 import com.example.llmn.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -64,5 +65,15 @@ public class AlarmService {
 
         // 현재 시간을 기준으로 읽었다고 업데이트
         alarm.updateIsRead(true, LocalDateTime.now());
+    }
+
+    @Transactional
+    @Scheduled(cron = "0 5 0 * * MON")
+    public void deleteReadAlarm(){
+        // 일주일이 지난 이미 읽은 알람들
+        LocalDateTime previousWeekDate = LocalDateTime.now().minusWeeks(1);
+        List<Alarm> readAlarm = alarmRepository.findReadBeforeDate(previousWeekDate);
+
+        alarmRepository.deleteAll(readAlarm);
     }
 }
