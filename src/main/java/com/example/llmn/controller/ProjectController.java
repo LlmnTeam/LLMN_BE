@@ -80,7 +80,7 @@ public class ProjectController {
 
     @GetMapping("/container")
     public ResponseEntity<?> findContainerList(@AuthenticationPrincipal CustomUserDetails userDetails) throws Exception {
-        List<String> runningContainerNameList = dockerService.findRunningContainerNameList(userDetails.getUser().getId());
+        List<String> runningContainerNameList = dockerService.findRunningContainerList(userDetails.getUser().getId());
         ProjectResponse.FindContainerListDTO responseDTO = new ProjectResponse.FindContainerListDTO(runningContainerNameList);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }

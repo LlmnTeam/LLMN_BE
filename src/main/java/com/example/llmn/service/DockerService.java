@@ -31,7 +31,7 @@ public class DockerService {
     }
 
     // 실행중인 도커 컨테이너 목록 조회
-    public List<String> findRunningContainerNameList(Long userId) throws Exception {
+    public List<String> findRunningContainerList(Long userId) throws Exception {
         String command = "docker ps --format \"{{.Names}}\"";
         String commandResponse = sshService.executeCommandOnce(command, userId);
 
@@ -49,7 +49,7 @@ public class DockerService {
 
     // 특정 컨테이너의 실행 여부 확인
     public boolean isContainerRunning(String containerName, Long userId) throws Exception {
-        List<String> containerList = findRunningContainerNameList(userId);
+        List<String> containerList = findRunningContainerList(userId);
 
         return containerList.stream()
                 .anyMatch(name -> name.equals(containerName));

@@ -1,8 +1,22 @@
 package com.example.llmn.controller.DTO;
 
+import java.util.List;
+
 public class UserResponse {
 
     public record LoginDTO(String accessToken) {}
 
     public record CheckEmailExistDTO(boolean isValid) {}
+
+    public record FindDashboardDTO(
+            String ip,
+            String cpuUsage,
+            String memoryUsage,
+            double networkReceived,
+            double networkSent,
+            String summary,
+            List<MetricResponse.CpuMetricDTO> cpuHistory,
+            List<MetricResponse.MemoryMetricDTO> memoryHistory,
+            List<MetricResponse.NetworkInMetricDTO> networkInHistory,
+            List<MetricResponse.NetworkOutMetricDTO> networkOutHistory){}
 }

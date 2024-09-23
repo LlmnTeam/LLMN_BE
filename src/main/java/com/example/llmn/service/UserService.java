@@ -1,5 +1,6 @@
 package com.example.llmn.service;
 
+import com.example.llmn.controller.DTO.MetricResponse;
 import com.example.llmn.controller.DTO.UserRequest;
 import com.example.llmn.controller.DTO.UserResponse;
 import com.example.llmn.core.errors.CustomException;
@@ -34,13 +35,13 @@ import static com.example.llmn.core.utils.MailTemplate.VERIFICATION_CODE;
 
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
 public class UserService {
 
     private final PasswordEncoder passwordEncoder;
     private final UserRepository userRepository;
     private final SshInfoRepository sshInfoRepository;
     private final RedisService redisService;
+    private final MetricService metricService;
     private final JavaMailSender mailSender;
     private final SpringTemplateEngine templateEngine;
 
@@ -110,6 +111,35 @@ public class UserService {
         if(isValid){
             sendCodeByEmail(email, codeType);
         }
+    }
+
+    @Transactional(readOnly = true)
+    public UserResponse.FindDashboardDTO findDashboard(Long userId) throws Exception {
+        SshInfo sshInfo = userRepository.findSshInfoById(userId).orElseThrow(
+                () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
+        );
+
+        // 현재 지표
+        MetricResponse.FindCurrentMetricDTO currentMetric = metricService.findCurrentMetric(userId);
+        String cpuUsage = String.format("%.2f%%", currentMetric.cpuUsage());
+        String memoryUsage = currentMetric.totalMemory() > 0
+                ? String.format("%.2f%%", (currentMetric.usedMemory() / currentMetric.totalMemory()) * 100)
+                : "N/A";
+
+        // 과거 지표
+        MetricResponse.FindMetricHistoryDTO metricHistory = metricService.findMetricHistory(24, userId);
+
+        return new UserResponse.FindDashboardDTO(
+                sshInfo.getRemoteHost(),
+                cpuUsage,
+                memoryUsage,
+                currentMetric.networkReceived(),
+                currentMetric.networkSent(),
+                "",
+                metricHistory.cpuMetrics(),
+                metricHistory.memoryMetrics(),
+                metricHistory.networkInMetrics(),
+                metricHistory.networkOutMetrics());
     }
 
     private Map<String, String> createToken(User user){
