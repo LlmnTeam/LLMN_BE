@@ -17,6 +17,10 @@ public class Summary extends TimeStamp{
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
+    private User user;
+
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "project_id")
     private Project project;
 
@@ -31,7 +35,8 @@ public class Summary extends TimeStamp{
     private boolean isChecked;
 
     @Builder
-    public Summary(Project project, SummaryType summaryType, String content) {
+    public Summary(User user, Project project, SummaryType summaryType, String content) {
+        this.user = user;
         this.project = project;
         this.summaryType = summaryType;
         this.content = content;

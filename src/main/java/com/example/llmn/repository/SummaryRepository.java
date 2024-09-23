@@ -30,13 +30,15 @@ public interface SummaryRepository extends JpaRepository<Summary, Long> {
     List<Summary> findLatestByTypes(@Param("types") List<SummaryType> types);
 
     @Query("SELECT s FROM Summary s " +
-            "WHERE s.summaryType = :type")
-    Page<Summary> findByType(@Param("type") SummaryType type, Pageable pageable);
+            "WHERE s.summaryType = :type AND s.user.id = :userId")
+    Page<Summary> findByType(@Param("type") SummaryType type, @Param("userId") Long userId, Pageable pageable);
 
     @Query("SELECT s.content FROM Summary s " +
             "WHERE s.summaryType = :type")
     Page<String> findContentByType(@Param("type") SummaryType type, Pageable pageable);
 
-    @Query("SELECT s FROM Summary s WHERE s.summaryType IN :types AND s.createdDate >= :startOfDay")
-    List<Summary> findByTypeWithinDate(@Param("types") List<SummaryType> types, @Param("startOfDay") LocalDateTime startOfDay);
+    @Query("SELECT s FROM Summary s " +
+            "JOIN s.user u " +
+            "WHERE s.summaryType IN :types AND u.id = :userId AND s.createdDate >= :startOfDay")
+    List<Summary> findByTypeWithinDate(@Param("types") List<SummaryType> types, @Param("userId") Long userId, @Param("startOfDay") LocalDateTime startOfDay);
 }

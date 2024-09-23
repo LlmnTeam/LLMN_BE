@@ -1,6 +1,7 @@
 package com.example.llmn.repository;
 
 import com.example.llmn.domain.Project;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -11,6 +12,10 @@ import java.util.Optional;
 
 @Repository
 public interface ProjectRepository extends JpaRepository<Project, Long> {
+
+    @EntityGraph(attributePaths = {"user"})
+    @Query("SELECT p FROM Project p")
+    List<Project> findAllWithUser();
 
     @Query("SELECT p FROM Project p WHERE p.user.id = :userId")
     List<Project> findByUserId(@Param("userId") Long userId);

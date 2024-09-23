@@ -2,10 +2,7 @@ package com.example.llmn.service;
 
 import com.example.llmn.controller.DTO.LogDTO;
 import com.example.llmn.controller.DTO.MetricResponse;
-import com.example.llmn.domain.ContainerStatus;
-import com.example.llmn.domain.Project;
-import com.example.llmn.domain.Summary;
-import com.example.llmn.domain.SummaryType;
+import com.example.llmn.domain.*;
 import com.example.llmn.repository.ProjectRepository;
 import com.example.llmn.repository.SummaryRepository;
 import com.example.llmn.repository.UserRepository;
@@ -44,7 +41,8 @@ public class LlmService {
     @Transactional
     @Scheduled(cron = "0 0 * * * *") // 매시 0분
     public void summaryProjectLog(){
-        List<Project> projects = projectRepository.findAll().stream()
+        // user랑 패치 조인해서 조회
+        List<Project> projects = projectRepository.findAllWithUser().stream()
                 .filter(project -> !project.getContainerStatus().equals(ContainerStatus.NOT_CONNECTED))
                 .toList();
 
@@ -65,6 +63,7 @@ public class LlmService {
 
                     // 일반 요약 저장
                     Summary generalSummary = Summary.builder()
+                            .user(project.getUser())
                             .project(project)
                             .content(summaryDTO.generalSummary())
                             .summaryType(SummaryType.GENERAL)
@@ -74,6 +73,7 @@ public class LlmService {
 
                     // 비정상 패턴 요약 저장
                     Summary anomalySummary = Summary.builder()
+                            .user(project.getUser())
                             .project(project)
                             .content(summaryDTO.anomalySummary())
                             .summaryType(SummaryType.ANOMALY)
@@ -91,7 +91,9 @@ public class LlmService {
         for(Long userId: userIds) {
             LogDTO.PerformanceSummaryResponseDTO performanceSummaryDTO = fetchMetricSummary(userId);
 
+            User userRef = userRepository.getReferenceById(userId);
             Summary performanceSummary = Summary.builder()
+                    .user(userRef)
                     .content(performanceSummaryDTO.performanceSummary())
                     .summaryType(SummaryType.PERFORMANCE)
                     .build();
@@ -103,53 +105,77 @@ public class LlmService {
     @Transactional
     @Scheduled(cron = "0 10 * * * *") // 매시 10분에
     public void summaryHourly(){
-        LogDTO.HourlySummaryResponseDTO hourlySummaryDTO = fetchHourlySummary();
+        List<Long> userIds = userRepository.findIds();
 
-        Summary hourlySummary = Summary.builder()
-                .content(hourlySummaryDTO.hourlySummary())
-                .summaryType(SummaryType.HOURLY)
-                .build();
+        for(Long userId: userIds) {
+            LogDTO.HourlySummaryResponseDTO hourlySummaryDTO = fetchHourlySummary(userId);
 
-        summaryRepository.save(hourlySummary);
+            User userRef = userRepository.getReferenceById(userId);
+            Summary hourlySummary = Summary.builder()
+                    .user(userRef)
+                    .content(hourlySummaryDTO.hourlySummary())
+                    .summaryType(SummaryType.HOURLY)
+                    .build();
+
+            summaryRepository.save(hourlySummary);
+        }
     }
 
     @Transactional
     @Scheduled(cron = "0 55 23 * * *") // 매일 11시 55분
     public void summaryDaily(){
-        LogDTO.DailySummaryResponseDTO dailySummaryDTO = fetchDailySummary();
+        List<Long> userIds = userRepository.findIds();
 
-        Summary dailySummary = Summary.builder()
-                .content(dailySummaryDTO.dailySummary())
-                .summaryType(SummaryType.DAILY)
-                .build();
+        for(Long userId: userIds) {
+            LogDTO.DailySummaryResponseDTO dailySummaryDTO = fetchDailySummary(userId);
 
-        summaryRepository.save(dailySummary);
+            User userRef = userRepository.getReferenceById(userId);
+            Summary dailySummary = Summary.builder()
+                    .user(userRef)
+                    .content(dailySummaryDTO.dailySummary())
+                    .summaryType(SummaryType.DAILY)
+                    .build();
+
+            summaryRepository.save(dailySummary);
+        }
     }
 
     @Transactional
     @Scheduled(cron = "0 45 23 * * 0") // 매주 일요일 11시 45분
     public void summaryTrend(){
-        LogDTO.TrendSummaryResponseDTO trendSummaryDTO = fetchTrendSummary();
+        List<Long> userIds = userRepository.findIds();
 
-        Summary trendSummary = Summary.builder()
-                .content(trendSummaryDTO.trendSummary())
-                .summaryType(SummaryType.TEND)
-                .build();
+        for(Long userId: userIds) {
+            LogDTO.TrendSummaryResponseDTO trendSummaryDTO = fetchTrendSummary(userId);
 
-        summaryRepository.save(trendSummary);
+            User userRef = userRepository.getReferenceById(userId);
+            Summary trendSummary = Summary.builder()
+                    .user(userRef)
+                    .content(trendSummaryDTO.trendSummary())
+                    .summaryType(SummaryType.TEND)
+                    .build();
+
+            summaryRepository.save(trendSummary);
+        }
     }
 
     @Transactional
     @Scheduled(cron = "0 20 0,6,12,18 * * *") // 6시간 간격으로 20분에
     public void recommend(){
-        LogDTO.RecommendationDTO recommendationDTO = fetchRecommendation();
+        List<Long> userIds = userRepository.findIds();
 
-        Summary recommend = Summary.builder()
-                .content(recommendationDTO.recommend())
-                .summaryType(SummaryType.RECOMMENDATION)
-                .build();
+        for(Long userId: userIds) {
+            LogDTO.RecommendationDTO recommendationDTO = fetchRecommendation(userId);
 
-        summaryRepository.save(recommend);
+            User userRef = userRepository.getReferenceById(userId);
+            Summary recommend = Summary.builder()
+                    .user(userRef)
+                    .content(recommendationDTO.recommend())
+                    .summaryType(SummaryType.RECOMMENDATION)
+                    .build();
+
+            summaryRepository.save(recommend);
+        }
     }
 
     private LogDTO.SummaryResponseDTO fetchLogSummary(Instant startTime, Instant endTime, String serviceName) {
@@ -211,14 +237,14 @@ public class LlmService {
                 .block();
     }
 
-    private LogDTO.HourlySummaryResponseDTO fetchHourlySummary() {
+    private LogDTO.HourlySummaryResponseDTO fetchHourlySummary(Long userId) {
         StringBuilder logMessageBuilder = new StringBuilder();
 
         LocalDateTime startOfHour = LocalDateTime.now().withMinute(0).minusSeconds(0);
 
         // 성능 요약 리스트와 어플리케이션 요약 리스트
-        List<Summary> performanceSummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.PERFORMANCE), startOfHour);
-        List<Summary> logSummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.GENERAL, SummaryType.ANOMALY), startOfHour);
+        List<Summary> performanceSummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.PERFORMANCE), userId, startOfHour);
+        List<Summary> logSummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.GENERAL, SummaryType.ANOMALY), userId, startOfHour);
 
         // 성능 요약을 로그 메시지로 변환
         logMessageBuilder.append("### Performance Summary ###\n");
@@ -258,14 +284,14 @@ public class LlmService {
                 .block();
     }
 
-    private LogDTO.DailySummaryResponseDTO fetchDailySummary() {
+    private LogDTO.DailySummaryResponseDTO fetchDailySummary(Long userId) {
         StringBuilder logMessageBuilder = new StringBuilder();
 
         LocalDateTime startOfDay = LocalDateTime.now().with(LocalTime.MIN);
 
         // 성능 요약 리스트와 어플리케이션 요약 리스트
-        List<Summary> performanceSummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.PERFORMANCE), startOfDay);
-        List<Summary> logSummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.GENERAL, SummaryType.ANOMALY), startOfDay);
+        List<Summary> performanceSummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.PERFORMANCE), userId, startOfDay);
+        List<Summary> logSummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.GENERAL, SummaryType.ANOMALY), userId, startOfDay);
 
         // 성능 요약을 로그 메시지로 변환
         logMessageBuilder.append("### Performance Summary ###\n");
@@ -307,12 +333,12 @@ public class LlmService {
                 .block();
     }
 
-    private LogDTO.TrendSummaryResponseDTO fetchTrendSummary(){
+    private LogDTO.TrendSummaryResponseDTO fetchTrendSummary(Long userId){
         StringBuilder logMessageBuilder = new StringBuilder();
 
         // 1주일 전까지의 일일 리포트를 인풋으로 사용
         LocalDateTime startOfDay = LocalDateTime.now().minusWeeks(1).with(LocalTime.MIN);
-        List<Summary> trendSummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.DAILY), startOfDay);
+        List<Summary> trendSummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.DAILY), userId, startOfDay);
 
         logMessageBuilder.append("### Weekly Trend Summaries ###\n\n");
 
@@ -335,13 +361,13 @@ public class LlmService {
                 .block();
     }
 
-    private LogDTO.RecommendationDTO fetchRecommendation() {
+    private LogDTO.RecommendationDTO fetchRecommendation(Long userId) {
         StringBuilder logMessageBuilder = new StringBuilder();
 
         // 6시간 전의 요약들을 인풋으로
         LocalDateTime startOfTime = LocalDateTime.now().minusHours(6);
-        List<Summary> performanceSummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.PERFORMANCE), startOfTime);
-        List<Summary> logSummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.GENERAL, SummaryType.ANOMALY), startOfTime);
+        List<Summary> performanceSummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.PERFORMANCE), userId, startOfTime);
+        List<Summary> logSummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.GENERAL, SummaryType.ANOMALY), userId, startOfTime);
 
         // 성능 요약을 로그 메시지로 변환
         logMessageBuilder.append("### Performance Summary ###\n");

@@ -51,8 +51,8 @@ public class InsightService {
     }
 
     @Transactional(readOnly = true)
-    public List<InsightResponse.SummaryDTO> findSummaryByType(SummaryType type, Pageable pageable){
-        List<Summary> performanceSummaries = summaryRepository.findByType(type, pageable).getContent();
+    public List<InsightResponse.SummaryDTO> findSummaryByType(SummaryType type, Long userId, Pageable pageable){
+        List<Summary> performanceSummaries = summaryRepository.findByType(type, userId, pageable).getContent();
 
         return performanceSummaries.stream()
                 .map(summary -> new InsightResponse.SummaryDTO(

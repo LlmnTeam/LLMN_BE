@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -142,21 +143,19 @@ public class ProjectService {
                 () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
         );
 
-        // 최신 요약은 MySql에서 가져옴
-        LocalDateTime updateTime;
-        String summaryContent;
-
-        Optional<Summary> latestSummary = summaryRepository.findLatestSummaryByProject(project, PageRequest.of(0, 1))
+        // 최신 요약본 가져오기
+        Pageable pageable = PageRequest.of(0, 1, Sort.by(Sort.Direction.DESC, "createdDate"));
+        Optional<Summary> latestSummary = summaryRepository.findLatestSummaryByProject(project, pageable)
                 .getContent()
                 .stream()
                 .findFirst();
 
-        summaryContent = latestSummary.map(Summary::getContent)
+        String summaryContent = latestSummary.map(Summary::getContent)
                 .orElse("로그 요약본이 존재하지 않습니다.");
-        updateTime = latestSummary.map(Summary::getCreatedDate)
+        LocalDateTime updateTime = latestSummary.map(Summary::getCreatedDate)
                 .orElse(null);
 
-        // 최신 로그는 ElasticSearch에서 가져옴
+        // 최신 로그 가져오기
         String recentLog = logService.searchRecentLogInStr(project.getContainerName(), 2L);
 
         if (recentLog.isEmpty()) {
