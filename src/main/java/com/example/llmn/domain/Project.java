@@ -37,13 +37,13 @@ public class Project extends TimeStamp{
     private boolean isUrgent;
 
     @Builder
-    public Project(User user, String projectName, String containerName, String description, ContainerStatus containerStatus) {
+    public Project(User user, String projectName, String containerName, String description, ContainerStatus containerStatus, boolean isUrgent) {
         this.user = user;
         this.projectName = projectName;
         this.containerName = containerName;
         this.containerStatus = containerStatus;
         this.description = description;
-        this.isUrgent = false;
+        this.isUrgent = isUrgent;
     }
 
     public void updateProject(String projectName, String containerName, String description, ContainerStatus containerStatus){

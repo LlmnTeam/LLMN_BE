@@ -182,7 +182,7 @@ public class LlmService {
         // 메모리 메트릭 정보를 추가
         logMessageBuilder.append("\nMemory Metrics:\n");
         for (MetricResponse.MemoryMetricDTO memoryMetric : metricHistory.memoryMetrics()) {
-            logMessageBuilder.append(String.format("- Time: %s, Memory Usage: %d MB\n", memoryMetric.time(), memoryMetric.memoryUsage()));
+            logMessageBuilder.append(String.format("- Time: %s, Memory Usage: %.2f MB\n", memoryMetric.time(), memoryMetric.memoryUsage()));
         }
 
         // 네트워크 In 메트릭 정보를 추가

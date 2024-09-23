@@ -41,6 +41,9 @@ public class ProjectService {
                 ? ContainerStatus.NOT_WORKING
                 : ContainerStatus.NOT_CONNECTED;
 
+        // NOT_CONNECTED면 긴급으로 표시
+        boolean isUrgent = (containerStatus == ContainerStatus.NOT_CONNECTED);
+
         User user = entityManager.getReference(User.class, userId);
         Project project = Project.builder()
                 .user(user)
@@ -48,6 +51,7 @@ public class ProjectService {
                 .containerName(requestDTO.containerName())
                 .description(requestDTO.description())
                 .containerStatus(containerStatus)
+                .isUrgent(isUrgent)
                 .build();
 
         projectRepository.save(project);
