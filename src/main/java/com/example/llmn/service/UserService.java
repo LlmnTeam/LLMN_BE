@@ -125,6 +125,8 @@ public class UserService {
         String memoryUsage = currentMetric.totalMemory() > 0
                 ? String.format("%.2f%%", (currentMetric.usedMemory() / currentMetric.totalMemory()) * 100)
                 : "N/A";
+        String networkReceived = String.format("%.2f MB", currentMetric.networkReceived());
+        String networkSent = String.format("%.2f MB", currentMetric.networkSent());
 
         // 과거 지표
         MetricResponse.FindMetricHistoryDTO metricHistory = metricService.findMetricHistory(24, userId);
@@ -133,8 +135,8 @@ public class UserService {
                 sshInfo.getRemoteHost(),
                 cpuUsage,
                 memoryUsage,
-                currentMetric.networkReceived(),
-                currentMetric.networkSent(),
+                networkReceived,
+                networkSent,
                 "",
                 metricHistory.cpuMetrics(),
                 metricHistory.memoryMetrics(),

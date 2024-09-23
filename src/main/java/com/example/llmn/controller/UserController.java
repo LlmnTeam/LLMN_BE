@@ -2,6 +2,7 @@ package com.example.llmn.controller;
 
 import com.example.llmn.controller.DTO.UserRequest;
 import com.example.llmn.controller.DTO.UserResponse;
+import com.example.llmn.core.security.CustomUserDetails;
 import com.example.llmn.core.utils.ApiUtils;
 import com.example.llmn.service.UserService;
 import jakarta.mail.MessagingException;
@@ -11,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -79,6 +81,12 @@ public class UserController {
     public ResponseEntity<?> checkEmailAndSendCode(@RequestBody @Valid UserRequest.EmailDTO requestDTO) throws MessagingException {
         UserResponse.CheckEmailExistDTO responseDTO = userService.checkEmailExist(requestDTO.email());
         userService.sendCodeWithValidation(requestDTO.email(), CODE_TYPE_JOIN, responseDTO.isValid());
+        return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
+    }
+
+    @GetMapping("/home")
+    public ResponseEntity<?> findDashboard(@AuthenticationPrincipal CustomUserDetails userDetails) throws Exception {
+        UserResponse.FindDashboardDTO responseDTO = userService.findDashboard(userDetails.getUser().getId());
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 }
