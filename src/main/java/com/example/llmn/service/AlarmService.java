@@ -2,6 +2,7 @@ package com.example.llmn.service;
 
 import com.example.llmn.controller.DTO.AlarmResponse;
 import com.example.llmn.core.errors.CustomException;
+import com.example.llmn.core.errors.ExceptionCode;
 import com.example.llmn.domain.Alarm;
 import com.example.llmn.domain.AlarmType;
 import com.example.llmn.domain.User;
@@ -11,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -46,5 +48,21 @@ public class AlarmService {
                 .collect(Collectors.toList());
 
         return new AlarmResponse.FindAlarmListDTO(alarmDTOS);
+    }
+
+    @Transactional
+    public void readAlarm(Long alarmId, Long userId){
+        // 존재하지 않으면 에러
+        Alarm alarm = alarmRepository.findById(alarmId).orElseThrow(
+                () -> new CustomException(ExceptionCode.ALARM_NOT_FOUND)
+        );
+
+        // 권한 없음
+        if(!alarm.getReceiver().getId().equals(userId)){
+            throw new CustomException(ExceptionCode.USER_FORBIDDEN);
+        }
+
+        // 현재 시간을 기준으로 읽었다고 업데이트
+        alarm.updateIsRead(true, LocalDateTime.now());
     }
 }
