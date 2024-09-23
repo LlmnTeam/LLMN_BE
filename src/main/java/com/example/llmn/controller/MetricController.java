@@ -13,7 +13,6 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Date;
 import java.util.Map;
 
 @Controller
@@ -25,11 +24,11 @@ public class MetricController {
     private final SSHService sshService;
     private static final int METRIC_HISTORY_PREVIOUS_HOUR = 24;
 
-    @GetMapping("/metrics")
-    public ResponseEntity<?> findProjectList(@AuthenticationPrincipal CustomUserDetails userDetails) {
+    /*@GetMapping("/metrics/history")
+    public ResponseEntity<?> findMetricHistory(@AuthenticationPrincipal CustomUserDetails userDetails) {
         MetricResponse.FindMetricHistoryDTO responseDTO = metricService.findMetricHistory(METRIC_HISTORY_PREVIOUS_HOUR, userDetails.getUser().getId());
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
-    }
+    }*/
 
     @GetMapping("/metrics/remote")
     public ResponseEntity<?> collectRemoteMetrics(@AuthenticationPrincipal CustomUserDetails userDetails) throws Exception {

@@ -33,10 +33,13 @@ public class InsightService {
                 .collect(Collectors.toMap(Summary::getSummaryType, summary -> summary));
 
         Function<SummaryType, String> getContent = type -> Optional.ofNullable(summaryMap.get(type))
-                .map(Summary::getContent).orElse(null);
+                .map(Summary::getContent)
+                .orElse("");
 
-        Function<SummaryType, LocalDateTime> getUpdatedDate = type -> Optional.ofNullable(summaryMap.get(type))
-                .map(Summary::getUpdatedDate).orElse(null);
+        Function<SummaryType, String> getUpdatedDate = type -> Optional.ofNullable(summaryMap.get(type))
+                .map(Summary::getUpdatedDate)
+                .map(InsightService::formatLocalDateTime)
+                .orElse("");
 
         return new InsightResponse.FindInsightHomeDTO(
                 getContent.apply(SummaryType.PERFORMANCE),

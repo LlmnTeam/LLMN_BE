@@ -7,13 +7,13 @@ public class InsightResponse {
 
     public record FindInsightHomeDTO(
             String performanceSummary,
-            LocalDateTime performanceUpdateTime,
+            String performanceUpdateTime,
             String dailySummary,
-            LocalDateTime dailyUpdateTime,
+            String dailyUpdateTime,
             String trendSummary,
-            LocalDateTime trendUpdateTime,
+            String trendUpdateTime,
             String recommendation,
-            LocalDateTime recommendUpdateTime){}
+            String recommendUpdateTime){}
 
     public record FindSummaryDTO(List<SummaryDTO> summaries){}
 
