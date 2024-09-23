@@ -10,6 +10,8 @@ public class LogDTO {
 
     public record DailySummaryResponseDTO(String dailySummary){}
 
+    public record HourlySummaryResponseDTO(String hourlySummary){}
+
     public record TrendSummaryResponseDTO(String trendSummary){}
 
     public record RecommendationDTO(String recommend){}

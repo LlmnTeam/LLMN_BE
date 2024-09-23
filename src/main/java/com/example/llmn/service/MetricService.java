@@ -172,7 +172,11 @@ public class MetricService {
         List<MetricResponse.MemoryMetricDTO> memoryMetricDTOS = metrics.stream()
                 .map(metric -> {
                     String time = metric.getCreatedDate().format(formatter);
-                    long memoryUsage = (long) metric.getUsedMemory();
+
+                    double memoryUsage = metric.getTotalMemory() > 0
+                            ? metric.getUsedMemory() / metric.getTotalMemory() * 100
+                            : 0.0;
+
                     return new MetricResponse.MemoryMetricDTO(time, memoryUsage);
                 })
                 .toList();

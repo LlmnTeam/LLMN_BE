@@ -10,6 +10,7 @@ public enum SummaryType {
     GENERAL("일반요약"),
     ANOMALY("비정상"),
     PERFORMANCE("성능"),
+    HOURLY("시간별"),
     DAILY("일일"),
     TEND("트렌드"),
     RECOMMENDATION("추천");

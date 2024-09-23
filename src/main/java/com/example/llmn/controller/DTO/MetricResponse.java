@@ -20,7 +20,7 @@ public class MetricResponse {
 
     public record MemoryMetricDTO(
             String time,
-            long memoryUsage) {}
+            double memoryUsage) {}
 
     public record NetworkInMetricDTO(
             String time,

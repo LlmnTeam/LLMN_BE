@@ -450,6 +450,41 @@ async def generate_recommend(content: str):
 
     return recommend
 
+async def generate_hourly_summary(content: str):    
+    prompt = (
+    "### Persona ###\n"
+    "You are an expert system log and performance analyst. Your task is to analyze the following logs and provide concise, one-line summaries highlighting critical issues or performance problems.\n"
+    "The summaries should focus on important errors, performance issues, or warnings that require immediate attention. Each summary should include the time of the event, the criticality level, a brief description of the problem, and a recommended action if necessary.\n"
+    "Each summary should be formatted as follows:\n"
+    "[Criticality] [Event Time]: [Issue Description]. [Recommended Action]\n"
+    "Use appropriate emojis for criticality: ❗ for Critical, ⚠️ for Warning, ℹ️ for Info.\n"
+    "Ensure that the summaries are short, actionable, and easy to understand.\n"
+    "\n"
+    "### Log and Performance Data ###\n"
+    f"{content}\n"
+    "\n"
+    "### One-Line Summaries ###\n"
+    "1. [First summary]\n"
+    "2. [Second summary]\n"
+    "3. [Third summary]\n"
+    "..."
+)
+
+    chatmodel = ChatOpenAI(
+        model="gpt-4o-mini",
+        temperature=0.3,
+        max_tokens=750,
+        openai_api_key=settings.OPENAI_API_KEY
+    )
+    
+    prompt_template = PromptTemplate(input_variables=["prompt"], template="{prompt}")
+    formatted_prompt = prompt_template.format(prompt=prompt)
+
+    response = chatmodel.invoke(formatted_prompt)
+    hourly_summary = response.content  
+
+    return hourly_summary
+
 def read_log_file(file_path: str):
     try:
         with open(file_path, "r", encoding="utf-8") as file:
@@ -525,6 +560,14 @@ async def process_recommend(request: LogRequest):
     
     return {
         "recommend": recommend
+    }
+
+@app.post("/process/hourlySummary")
+async def process_hourly_summary(request: LogRequest):
+    hourly_summary = await generate_hourly_summary(request.content)
+    
+    return {
+        "hourlySummary": hourly_summary
     }
 
 #@app.post("/question")

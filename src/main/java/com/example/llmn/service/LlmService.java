@@ -36,14 +36,17 @@ public class LlmService {
     private static final String LOG_SUMMERY_URI = "http://localhost:8000/process/logSummary";
     private static final String PERFORMANCE_SUMMERY_URI = "http://localhost:8000/process/performanceSummary";
     private static final String DAILY_SUMMERY_URI = "http://localhost:8000/process/dailySummary";
+    private static final String HOURLY_SUMMARY_URI = "http://localhost:8000/process/hourlySummary";
     private static final String TREND_SUMMERY_URI = "http://localhost:8000/process/trendSummary";
     private static final String RECOMMEND_URI = "http://localhost:8000/process/recommend";
     private static final int METRIC_HISTORY_PREVIOUS_HOUR = 1;
 
     @Transactional
-    @Scheduled(cron = "0 5 * * * *") // 매시 5분
+    @Scheduled(cron = "0 0 * * * *") // 매시 0분
     public void summaryProjectLog(){
-        List<Project> projects = projectRepository.findAll();
+        List<Project> projects = projectRepository.findAll().stream()
+                .filter(project -> !project.getContainerStatus().equals(ContainerStatus.NOT_CONNECTED))
+                .toList();
 
         Instant endTime = Instant.now();
         Instant startTime = endTime.minus(30, ChronoUnit.MINUTES);
@@ -78,7 +81,7 @@ public class LlmService {
     }
 
     @Transactional
-    @Scheduled(cron = "0 15 * * * *") // 매시 15분에
+    @Scheduled(cron = "0 5 * * * *") // 매시 5분에
     public void summaryPerformance(){
         List<Long> userIds = userRepository.findIds();
 
@@ -92,6 +95,19 @@ public class LlmService {
 
             summaryRepository.save(performanceSummary);
         }
+    }
+
+    @Transactional
+    @Scheduled(cron = "0 10 * * * *") // 매시 10분에
+    public void summaryHourly(){
+        LogDTO.HourlySummaryResponseDTO hourlySummaryDTO = fetchHourlySummary();
+
+        Summary hourlySummary = Summary.builder()
+                .content(hourlySummaryDTO.hourlySummary())
+                .summaryType(SummaryType.HOURLY)
+                .build();
+
+        summaryRepository.save(hourlySummary);
     }
 
     @Transactional
@@ -192,6 +208,53 @@ public class LlmService {
                 .block();
     }
 
+    private LogDTO.HourlySummaryResponseDTO fetchHourlySummary() {
+        StringBuilder logMessageBuilder = new StringBuilder();
+
+        LocalDateTime startOfHour = LocalDateTime.now().withMinute(0).minusSeconds(0);
+
+        // 성능 요약 리스트와 어플리케이션 요약 리스트
+        List<Summary> performanceSummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.PERFORMANCE), startOfHour);
+        List<Summary> logSummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.GENERAL, SummaryType.ANOMALY), startOfHour);
+
+        // 성능 요약을 로그 메시지로 변환
+        logMessageBuilder.append("### Performance Summary ###\n");
+        if (performanceSummaries.isEmpty()) {
+            logMessageBuilder.append("- 최근에 성능 요약이 없습니다.\n");
+        } else {
+            for (Summary summary : performanceSummaries) {
+                logMessageBuilder.append("Time: ")
+                        .append(summary.getCreatedDate())
+                        .append("\n")
+                        .append(summary.getContent())
+                        .append("\n\n");
+            }
+        }
+
+        // 일반 및 이상 로그 요약을 로그 메시지로 변환
+        logMessageBuilder.append("\n### Application Log Summary ###\n");
+        if (logSummaries.isEmpty()) {
+            logMessageBuilder.append("- 최근에 로그 요약이 없습니다.\n");
+        } else {
+            for (Summary summary : logSummaries) {
+                logMessageBuilder.append("Time: ")
+                        .append(summary.getCreatedDate())
+                        .append("\n")
+                        .append(summary.getContent())
+                        .append("\n\n");
+            }
+        }
+
+        String logMessage = logMessageBuilder.toString();
+
+        return webClient.post()
+                .uri(buildURI(HOURLY_SUMMARY_URI))
+                .bodyValue(new LogDTO.SummaryRequestDTO(logMessage))
+                .retrieve()
+                .bodyToMono(LogDTO.HourlySummaryResponseDTO.class)
+                .block();
+    }
+
     private LogDTO.DailySummaryResponseDTO fetchDailySummary() {
         StringBuilder logMessageBuilder = new StringBuilder();
 
@@ -207,7 +270,7 @@ public class LlmService {
             logMessageBuilder.append("- 오늘의 성능 요약이 없습니다.\n");
         } else {
             for (Summary summary : performanceSummaries) {
-                logMessageBuilder.append("Date: ")
+                logMessageBuilder.append("Time: ")
                         .append(summary.getCreatedDate())
                         .append("\n")
                         .append(summary.getContent())
@@ -221,7 +284,7 @@ public class LlmService {
             logMessageBuilder.append("- 오늘의 로그 요약이 없습니다.\n");
         } else {
             for (Summary summary : logSummaries) {
-                logMessageBuilder.append("Date: ")
+                logMessageBuilder.append("Time: ")
                         .append(summary.getCreatedDate())
                         .append("\n")
                         .append(summary.getContent())
