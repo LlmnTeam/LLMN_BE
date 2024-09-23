@@ -41,4 +41,8 @@ public interface SummaryRepository extends JpaRepository<Summary, Long> {
             "JOIN s.user u " +
             "WHERE s.summaryType IN :types AND u.id = :userId AND s.createdDate >= :startOfDay")
     List<Summary> findByTypeWithinDate(@Param("types") List<SummaryType> types, @Param("userId") Long userId, @Param("startOfDay") LocalDateTime startOfDay);
+
+
+    @Query("DELETE FROM Summary s WHERE s.project.id = :projectId")
+    void deleteByProjectId(@Param("projectId") Long projectId);
 }

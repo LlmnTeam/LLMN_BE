@@ -238,7 +238,8 @@ public class ProjectService {
         if(!project.getUser().getId().equals(userId)){
             throw new CustomException(ExceptionCode.USER_FORBIDDEN);
         }
-
+        
+        summaryRepository.deleteByProjectId(projectId);
         projectRepository.delete(project);
     }
 
