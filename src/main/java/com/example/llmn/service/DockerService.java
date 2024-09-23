@@ -64,14 +64,14 @@ public class DockerService {
     }
 
     // 컨테이너의 사용 리소스 조회
-    public Map<String, Map<String, String>> findContainersResourceUsage(Long userId) throws Exception {
-        // 1. 레디스에서 캐시된 값을 먼저 조회
-        Map<String, Map<String, String>> cachedUsage = getCachedResourceUsage(userId);
-        if(cachedUsage != null){
+    public Map<String, Map<String, String>> findContainersResourceUsage(Long userId, boolean isUsingCache) throws Exception {
+        // 캐시를 사용하면 => 레디스에서 캐시된 값을 먼저 조회
+        Map<String, Map<String, String>> cachedUsage = isUsingCache ? getCachedResourceUsage(userId) : null;
+        if (cachedUsage != null) {
             return cachedUsage;
         }
 
-        // 2. 캐시된 값이 없으면 새로운 Metric 수집 후 저장
+        // 캐시를 사용하지 않거나 캐시된 값이 없음 => 조회해서 사용
         String command = "docker stats --no-stream --format \"{{.Name}}:{{.CPUPerc}}:{{.MemUsage}}\"";
         String commandResponse = sshService.executeCommandOnce(command, userId);
 

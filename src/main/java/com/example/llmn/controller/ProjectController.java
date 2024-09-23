@@ -26,6 +26,8 @@ public class ProjectController {
     private final ProjectService projectService;
     private final DockerService dockerService;
     private static final String SORT_BY_DATE = "createdDate";
+    private static final boolean USING_CACHE = true;
+    private static final boolean NOT_USING_CACHE = false;
 
     @PostMapping("/project")
     public ResponseEntity<?> createProject(@RequestBody ProjectRequest.CreateProjectDTO requestDTO, @AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -49,7 +51,13 @@ public class ProjectController {
 
     @GetMapping("/project")
     public ResponseEntity<?> findProjectList(@AuthenticationPrincipal CustomUserDetails userDetails) throws Exception {
-        ProjectResponse.FindProjectListDTO responseDTO = projectService.findProjectList(userDetails.getUser().getId());
+        ProjectResponse.FindProjectListDTO responseDTO = projectService.findProjectList(userDetails.getUser().getId(), USING_CACHE);
+        return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
+    }
+
+    @GetMapping("/project/refresh")
+    public ResponseEntity<?> findRefreshedProjectList(@AuthenticationPrincipal CustomUserDetails userDetails) throws Exception {
+        ProjectResponse.FindProjectListDTO responseDTO = projectService.findProjectList(userDetails.getUser().getId(), NOT_USING_CACHE);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 
