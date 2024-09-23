@@ -161,6 +161,9 @@ async def generate_log_summary(content: str):
         "   2. [💡 Second recommended action]\n"
         "   3. [💡 Third recommended action]\n"
         "   ...(continue numbering as needed)\n"
+        "\n"
+        "### Urgency Check ###\n"
+        "Based on the logs, determine whether immediate action is required for critical system performance issues. Respond with `true` if urgent, otherwise `false`.\n"
     )
 
     chatmodel = ChatOpenAI(
@@ -182,7 +185,11 @@ async def generate_log_summary(content: str):
     general_summary = response_lines[0].strip() if len(response_lines) > 0 else ""
     anomaly_summary = response_lines[1].strip() if len(response_lines) > 1 else ""
 
-    return general_summary, anomaly_summary
+    # 긴급 체크 부분 파싱
+    is_urgent_line = response_lines[2].strip() if len(response_lines) > 2 else "false"
+    is_urgent = is_urgent_line.lower() == "true"  # 문자열을 boolean으로 변환
+
+    return general_summary, anomaly_summary, is_urgent
 
 async def generate_performance_summary(content: str):    
     prompt = (
@@ -523,12 +530,13 @@ def combine_logs_and_question(log_files_request: LogFilesRequest) -> str:
 
 @app.post("/process/logSummary")
 async def process_log_summary(request: LogRequest):
-    general_summary, anomaly_summary = await generate_log_summary(request.content)
+    general_summary, anomaly_summary, is_urgent = await generate_log_summary(request.content)
     
     # 결과를 JSON으로 반환
     return {
         "generalSummary": general_summary,
-        "anomalySummary": anomaly_summary
+        "anomalySummary": anomaly_summary,
+        "isUrgent": is_urgent
     }
 
 @app.post("/process/performanceSummary")

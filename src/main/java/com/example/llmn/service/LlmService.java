@@ -60,6 +60,9 @@ public class LlmService {
                         return;
                     }
 
+                    // 긴급히 체크해야하는지 여부 업데이트
+                    project.updateIsUrgent(summaryDTO.isUrgent());
+
                     // 일반 요약 저장
                     Summary generalSummary = Summary.builder()
                             .project(project)
