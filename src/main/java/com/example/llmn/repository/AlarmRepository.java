@@ -1,6 +1,7 @@
 package com.example.llmn.repository;
 
 import com.example.llmn.domain.Alarm;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -16,4 +17,8 @@ public interface AlarmRepository extends JpaRepository<Alarm, Long> {
 
     @Query("SELECT a FROM Alarm a WHERE a.readDate <= :date AND a.isRead = TRUE")
     List<Alarm> findReadBeforeDate(@Param("date") LocalDateTime date);
+
+    @EntityGraph(attributePaths = {"receiver"})
+    @Query("SELECT a FROM Alarm a WHERE a.id IN :ids")
+    List<Alarm> findByIdsWithUser(@Param("ids") List<Long> ids);
 }

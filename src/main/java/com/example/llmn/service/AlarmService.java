@@ -1,8 +1,7 @@
 package com.example.llmn.service;
 
+import com.example.llmn.controller.DTO.AlarmRequest;
 import com.example.llmn.controller.DTO.AlarmResponse;
-import com.example.llmn.core.errors.CustomException;
-import com.example.llmn.core.errors.ExceptionCode;
 import com.example.llmn.domain.Alarm;
 import com.example.llmn.domain.AlarmType;
 import com.example.llmn.domain.User;
@@ -45,6 +44,7 @@ public class AlarmService {
                         alarm.getId(),
                         alarm.getContent(),
                         alarm.getReadDate(),
+                        alarm.getAlarmType(),
                         alarm.isRead() ))
                 .collect(Collectors.toList());
 
@@ -52,23 +52,25 @@ public class AlarmService {
     }
 
     @Transactional
-    public void readAlarm(Long alarmId, Long userId){
-        // 존재하지 않으면 에러
-        Alarm alarm = alarmRepository.findById(alarmId).orElseThrow(
-                () -> new CustomException(ExceptionCode.ALARM_NOT_FOUND)
-        );
+    public void readAlarm(AlarmRequest.ReadAlarmDTO readAlarmDTO, Long userId) {
+        LocalDateTime now = LocalDateTime.now();
 
-        // 권한 없음
-        if(!alarm.getReceiver().getId().equals(userId)){
-            throw new CustomException(ExceptionCode.USER_FORBIDDEN);
+        List<Long> alarmIds = readAlarmDTO.alarmIds();
+        List<Alarm> alarms = alarmRepository.findByIdsWithUser(alarmIds);
+
+        for (Alarm alarm : alarms) {
+            // 권한 없음
+            if (!alarm.getReceiver().getId().equals(userId)) {
+                continue;
+            }
+
+            // 현재 시간을 기준으로 읽었다고 업데이트
+            alarm.updateIsRead(true, now);
         }
-
-        // 현재 시간을 기준으로 읽었다고 업데이트
-        alarm.updateIsRead(true, LocalDateTime.now());
     }
 
     @Transactional
-    @Scheduled(cron = "0 5 0 * * MON")
+    @Scheduled(cron = "0 5 0 * * *")
     public void deleteReadAlarm(){
         // 일주일이 지난 이미 읽은 알람들
         LocalDateTime previousWeekDate = LocalDateTime.now().minusWeeks(1);
