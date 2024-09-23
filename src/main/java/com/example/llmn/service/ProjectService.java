@@ -109,15 +109,22 @@ public class ProjectService {
                                 : ContainerStatus.NOT_WORKING;
                     }
 
+                    // CPU 및 메모리 사용량 값이 없을 경우 "N/A"로 처리
+                    String cpuUsage = Optional.ofNullable(containersResourceUsageMap.get(project.getContainerName()))
+                            .map(resourceMap -> resourceMap.get("CPU"))
+                            .orElse("N/A");
+                    String memoryUsage = Optional.ofNullable(containersResourceUsageMap.get(project.getContainerName()))
+                            .map(resourceMap -> resourceMap.get("Memory"))
+                            .orElse("N/A");
+
                     return new ProjectResponse.ProjectDTO(
                         project.getId(),
                         project.isUrgent(),
                         project.getProjectName(),
                         project.getDescription(),
-                        project.getUpdatedDate(),
                         containerStatus,
-                        containersResourceUsageMap.get(project.getContainerName()).get("CPU"),
-                        containersResourceUsageMap.get(project.getContainerName()).get("Memory"));
+                        cpuUsage,
+                        memoryUsage);
                 })
                 .toList();
 

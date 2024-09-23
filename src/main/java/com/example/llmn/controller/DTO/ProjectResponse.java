@@ -23,7 +23,6 @@ public class ProjectResponse {
             boolean isUrgent,
             String name,
             String description,
-            LocalDateTime updateTime,
             ContainerStatus containerStatus,
             String cpuUsage,
             String memoryUsage) {}
