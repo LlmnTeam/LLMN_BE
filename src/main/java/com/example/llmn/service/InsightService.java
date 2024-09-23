@@ -52,9 +52,9 @@ public class InsightService {
 
     @Transactional(readOnly = true)
     public List<InsightResponse.SummaryDTO> findSummaryByType(SummaryType type, Pageable pageable){
-        List<Summary> performanceSummaries = summaryRepository.findSummaryByType(type, pageable).getContent();
+        List<Summary> performanceSummaries = summaryRepository.findByType(type, pageable).getContent();
 
-        List<InsightResponse.SummaryDTO> summaryDTOS = performanceSummaries.stream()
+        return performanceSummaries.stream()
                 .map(summary -> new InsightResponse.SummaryDTO(
                         summary.getId(),
                         formatLocalDateTime(summary.getCreatedDate()),
@@ -62,8 +62,6 @@ public class InsightService {
                         summary.isChecked()
                 ))
                 .toList();
-
-        return summaryDTOS;
     }
 
     public static String formatLocalDateTime(LocalDateTime localDateTime) {

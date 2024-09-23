@@ -7,8 +7,11 @@ import com.example.llmn.core.errors.CustomException;
 import com.example.llmn.core.errors.ExceptionCode;
 import com.example.llmn.core.security.JWTProvider;
 import com.example.llmn.domain.SshInfo;
+import com.example.llmn.domain.Summary;
+import com.example.llmn.domain.SummaryType;
 import com.example.llmn.domain.User;
 import com.example.llmn.repository.SshInfoRepository;
+import com.example.llmn.repository.SummaryRepository;
 import com.example.llmn.repository.UserRepository;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
@@ -16,6 +19,10 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseCookie;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
@@ -41,6 +48,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final SshInfoRepository sshInfoRepository;
     private final RedisService redisService;
+    private final SummaryRepository summaryRepository;
     private final MetricService metricService;
     private final JavaMailSender mailSender;
     private final SpringTemplateEngine templateEngine;
@@ -131,13 +139,17 @@ public class UserService {
         // 과거 지표
         MetricResponse.FindMetricHistoryDTO metricHistory = metricService.findMetricHistory(24, userId);
 
+        // 시간별 요약
+        String summary = getLatestHourlySummary()
+                .orElse("요약된 내용이 존재하지 않습니다.");
+
         return new UserResponse.FindDashboardDTO(
                 sshInfo.getRemoteHost(),
                 cpuUsage,
                 memoryUsage,
                 networkReceived,
                 networkSent,
-                "",
+                summary,
                 metricHistory.cpuMetrics(),
                 metricHistory.memoryMetrics(),
                 metricHistory.networkInMetrics(),
@@ -227,5 +239,11 @@ public class UserService {
         helper.setSubject(subject);
 
         mailSender.send(message);
+    }
+
+    private Optional<String> getLatestHourlySummary(){
+        Pageable pageable = PageRequest.of(0, 1, Sort.by(Sort.Direction.DESC, "createdDate"));
+        Page<String> page = summaryRepository.findContentByType(SummaryType.HOURLY, pageable);
+        return page.hasContent() ? Optional.of(page.getContent().get(0)) : Optional.empty();
     }
 }

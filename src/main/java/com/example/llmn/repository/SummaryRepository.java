@@ -22,7 +22,7 @@ public interface SummaryRepository extends JpaRepository<Summary, Long> {
     @Query("SELECT s FROM Summary s " +
             "JOIN s.project p " +
             "WHERE p.id = :projectId")
-    Page<Summary> findSummaryByProjectId(@Param("projectId") Long projectId, Pageable pageable);
+    Page<Summary> findByProjectId(@Param("projectId") Long projectId, Pageable pageable);
 
     @Query("SELECT s FROM Summary s " +
             "WHERE s.summaryType IN :types " +
@@ -31,7 +31,11 @@ public interface SummaryRepository extends JpaRepository<Summary, Long> {
 
     @Query("SELECT s FROM Summary s " +
             "WHERE s.summaryType = :type")
-    Page<Summary> findSummaryByType(@Param("type") SummaryType type, Pageable pageable);
+    Page<Summary> findByType(@Param("type") SummaryType type, Pageable pageable);
+
+    @Query("SELECT s.content FROM Summary s " +
+            "WHERE s.summaryType = :type")
+    Page<String> findContentByType(@Param("type") SummaryType type, Pageable pageable);
 
     @Query("SELECT s FROM Summary s WHERE s.summaryType IN :types AND s.createdDate >= :startOfDay")
     List<Summary> findByTypeWithinDate(@Param("types") List<SummaryType> types, @Param("startOfDay") LocalDateTime startOfDay);

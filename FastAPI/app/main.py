@@ -454,6 +454,7 @@ async def generate_hourly_summary(content: str):
     prompt = (
     "### Persona ###\n"
     "You are an expert system log and performance analyst. Your task is to analyze the following logs and provide concise, one-line summaries highlighting critical issues or performance problems.\n"
+    "Only include the most important information that requires immediate attention. Ignore minor issues or events that do not significantly impact system performance.\n"
     "The summaries should focus on important errors, performance issues, or warnings that require immediate attention. Each summary should include the time of the event, the criticality level, a brief description of the problem, and a recommended action if necessary.\n"
     "Each summary should be formatted as follows:\n"
     "[Criticality] [Event Time]: [Issue Description]. [Recommended Action]\n"
