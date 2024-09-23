@@ -22,28 +22,25 @@ public class Alarm extends TimeStamp {
     @JoinColumn(name = "user_id")
     private User receiver;
 
-    @Column(columnDefinition="TEXT")
-    private String content;
-
-    @Column
-    private String redirectURL;
-
-    @Column
-    private Boolean isRead = false;
-
-    @Column
-    private LocalDateTime readDate;
-
     @Column(length = 20)
     @Enumerated(EnumType.STRING)
     private AlarmType alarmType;
 
+    @Column(columnDefinition="TEXT")
+    private String content;
+
+    @Column
+    private boolean isRead;
+
+    @Column
+    private LocalDateTime readDate;
+
     @Builder
-    public Alarm(User receiver, String content, String redirectURL, AlarmType alarmType) {
+    public Alarm(User receiver, String content, AlarmType alarmType) {
         this.receiver = receiver;
         this.content = content;
-        this.redirectURL = redirectURL;
         this.alarmType = alarmType;
+        this.isRead = false;
     }
 
     public void updateIsRead(Boolean isRead, LocalDateTime readDate){
