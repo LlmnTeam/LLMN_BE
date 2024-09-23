@@ -1,5 +1,8 @@
 package com.example.llmn.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -13,6 +16,11 @@ import java.util.stream.Collectors;
 public class DockerService {
 
     private final SSHService sshService;
+    private final RedisService redisService;
+    private final ObjectMapper objectMapper;
+
+    private static final String RESOURCE_KEY = "resource";
+    private static final Long RESOURCE_EXP = 10 * 60 * 1000L; // 10분
 
     // 도커 컨테이너 종료
     public boolean stopContainerByName(String containerName, Long userId) throws Exception {
@@ -57,6 +65,13 @@ public class DockerService {
 
     // 컨테이너의 사용 리소스 조회
     public Map<String, Map<String, String>> findContainersResourceUsage(Long userId) throws Exception {
+        // 1. 레디스에서 캐시된 값을 먼저 조회
+        Map<String, Map<String, String>> cachedUsage = getCachedResourceUsage(userId);
+        if(cachedUsage != null){
+            return cachedUsage;
+        }
+
+        // 2. 캐시된 값이 없으면 새로운 Metric 수집 후 저장
         String command = "docker stats --no-stream --format \"{{.Name}}:{{.CPUPerc}}:{{.MemUsage}}\"";
         String commandResponse = sshService.executeCommandOnce(command, userId);
 
@@ -85,6 +100,9 @@ public class DockerService {
             }
         }
 
+        // 유효 시간은 10분
+        redisService.storeValue(RESOURCE_KEY, userId.toString(), objectMapper.writeValueAsString(containerUsageMap), RESOURCE_EXP);
+
         return containerUsageMap;
     }
 
@@ -103,6 +121,25 @@ public class DockerService {
         int exitCode = process.waitFor();
         if (exitCode != 0) {
             throw new RuntimeException("명령어 실행 실패: " + exitCode);
+        }
+    }
+
+    private Map<String, Map<String, String>> getCachedResourceUsage(Long userId) {
+        String cachedValue = redisService.getDataInStr(RESOURCE_KEY, userId.toString());
+
+        // 캐시된 값이 없으면 null 반환
+        if (cachedValue == null) {
+            return null;
+        }
+
+        return convertStringToMetricMap(cachedValue);
+    }
+
+    private Map<String, Map<String, String>> convertStringToMetricMap(String cachedValue) {
+        try {
+            return objectMapper.readValue(cachedValue, new TypeReference<Map<String, Map<String, String>>>() {});
+        } catch (JsonProcessingException e) {
+            return null;
         }
     }
 }

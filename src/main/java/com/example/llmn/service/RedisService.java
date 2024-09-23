@@ -134,5 +134,4 @@ public class RedisService {
     private String buildKey(String type, String id){
         return type + ":" + id;
     }
-
 }

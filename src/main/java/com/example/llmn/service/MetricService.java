@@ -147,7 +147,7 @@ public class MetricService {
         );
 
         // 유효 시간은 10분
-        redisService.storeValue(METRIC_KEY, userId.toString() ,metricDTO.toString(), METRIC_EXP);
+        redisService.storeValue(METRIC_KEY, userId.toString(), objectMapper.writeValueAsString(metricDTO), METRIC_EXP);
 
         return metricDTO;
     }
