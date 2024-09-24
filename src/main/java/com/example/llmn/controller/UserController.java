@@ -89,4 +89,10 @@ public class UserController {
         UserResponse.FindDashboardDTO responseDTO = userService.findDashboard(userDetails.getUser().getId());
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
+
+    @PatchMapping("/accounts")
+    public ResponseEntity<?> updateConfiguration(@RequestBody @Valid UserRequest.UpdateConfigurationDTO requestDTO, @AuthenticationPrincipal CustomUserDetails userDetails) throws Exception {
+        userService.updateConfiguration(requestDTO, userDetails.getUser().getId());
+        return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, null));
+    }
 }
