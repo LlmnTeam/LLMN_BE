@@ -57,7 +57,7 @@ public class LogService {
         updateToElasticSearch(updatedLogMaps);
 
         // 4. .txt 파일로도 로그 저장
-        writeLogsToFile(updatedLogMaps);
+        saveLogsToFile(updatedLogMaps);
 
         log.info("업데이트 완료");
     }
@@ -363,43 +363,30 @@ public class LogService {
         client.deleteByQuery(deleteRequest);
     }
 
-    private void writeLogsToFile(List<Map<String, Object>> logs) throws IOException {
+    private void saveLogsToFile(List<Map<String, Object>> logs) throws IOException {
         if (logs.isEmpty()) {
             return;
         }
 
         // 1. 서비스별로 로그를 그룹화
-        Map<String, List<Map<String, Object>>> logsByService = logs.stream()
+        Map<String, List<Map<String, Object>>> logsByContainerName = logs.stream()
                 .collect(Collectors.groupingBy(log -> (String) log.getOrDefault("container_name", "unknown")));
 
-        // 2. 서비스별로 로그 파일 생성 및 기록
-        for (Map.Entry<String, List<Map<String, Object>>> entry : logsByService.entrySet()) {
-            String containerName = entry.getKey();
-            List<Map<String, Object>> serviceLogs = entry.getValue();
+        // 2. 로그를 저장할 디렉토리가 없으면 생성
+        createLogDirectoryIfNotExist();
 
-            // 현재 시간에 따라 파일 이름 생성 (서비스 이름 포함, 시 단위로 설정)
-            String timestamp = new SimpleDateFormat("yyyy-MM-dd_HH").format(new Date()); // 시 단위까지 포함
-            String logFileName = "logs/" + containerName + "-log-" + timestamp + ".txt";
+        // 3. 로그 파일 저장
+        String timestamp = new SimpleDateFormat("yyyy-MM-dd_HH").format(new Date()); // 시 단위까지 포함
 
-            // 디렉터리가 존재하는지 확인하고 없으면 생성
-            createLogDirectoryIfNotExist();
+        logsByContainerName.forEach((containerName, logMaps) -> {
+            String logFileName = String.format("logs/%s-log-%s.txt", containerName, timestamp);
 
-            // 파일에 기록하기 위한 BufferedWriter 생성 (1시간 동안 같은 파일에 기록)
-            try (BufferedWriter writer = new BufferedWriter(new FileWriter(Paths.get(logFileName).toFile(), true))) {
-                for (Map<String, Object> logEntry : serviceLogs) {
-                    String logMessage = formatLogEntry(logEntry);
-
-                    if (logMessage != null) {
-                        writer.write(logMessage);
-                        writer.newLine();
-                        writer.newLine();  // 가독성을 위해 빈 줄 추가
-                    }
-                }
+            try {
+                writeBufferAsFile(logFileName, logMaps);
             } catch (IOException e) {
                 log.error("로그 파일에 기록하는 중 오류 발생", e);
-                throw e;
             }
-        }
+        });
     }
 
     private void createLogDirectoryIfNotExist() throws IOException {
@@ -409,11 +396,26 @@ public class LogService {
         }
     }
 
-    private String formatLogEntry(Map<String, Object> logEntry) {
+    private void writeBufferAsFile(String logFileName, List<Map<String, Object>> logMaps) throws IOException {
+        // 파일에 기록하기 위한 BufferedWriter 생성
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(logFileName, true))) {
+            for (Map<String, Object> logMap : logMaps) {
+                String logMessage = formatLogMap(logMap);
+
+                if (logMessage != null) {
+                    writer.write(logMessage);
+                    writer.newLine();
+                    writer.newLine();  // 가독성을 위해 빈 줄 추가
+                }
+            }
+        }
+    }
+
+    private String formatLogMap(Map<String, Object> logMap) {
         // 필요한 로그 데이터만 추출하여 포맷팅
-        Object timestamp = logEntry.get("@timestamp");
-        Object logLevel = logEntry.get("log_level");
-        Object message = logEntry.get("message");
+        Object timestamp = logMap.get("@timestamp");
+        Object logLevel = logMap.get("log_level");
+        Object message = logMap.get("message");
 
         // timestamp 또는 message가 없으면 해당 로그는 무시
         if (timestamp == null || message == null) {
