@@ -6,6 +6,7 @@ import com.example.llmn.domain.Summary;
 import com.example.llmn.repository.ProjectRepository;
 import com.example.llmn.repository.SummaryRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,18 +15,22 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class SearchService {
 
     private final LogService logService;
     private final ProjectRepository projectRepository;
     private final SummaryRepository summaryRepository;
+    private static final String LOG_FILE_URL_TEMPLATE = "/project/%d/%s";
 
     @Transactional(readOnly = true)
-    public SearchResponse.SearchDTO search(Long userId, LocalDateTime startDate, LocalDateTime endDate, String keyword){
+    public SearchResponse.SearchDTO search(String keyword, LocalDateTime startDate, LocalDateTime endDate, Long userId){
         // 대소문자 구분없이 검색하기 위해 소문자로 변환
         String lowerCaseKeyword = keyword.toLowerCase();
 
@@ -55,7 +60,16 @@ public class SearchService {
         // 2. 인사이트 기록 검색
         List<Summary> summaries = new ArrayList<>();
 
-        for(Project project : projects) {
+        // 검색 키워드와 연관된 프로젝트 검색
+        List<Project> searchedProjects = projects.stream()
+                .filter(project -> project.getProjectName().toLowerCase().contains(lowerCaseKeyword)
+                        || project.getContainerName().toLowerCase().contains(lowerCaseKeyword)
+                        || lowerCaseKeyword.contains(project.getProjectName().toLowerCase())
+                        || lowerCaseKeyword.contains(project.getContainerName().toLowerCase()))
+                .toList();
+
+        // 검색된 프로젝트의 인사이트 목록 조회
+        for(Project project : searchedProjects) {
             List<Summary> foundSummaries = summaryRepository.findByProjectAndDateRange(project, startDate, endDate);
             summaries.addAll(foundSummaries);
         }
@@ -88,30 +102,28 @@ public class SearchService {
             return null;
         }
 
-        // 파일 이름을 '-'로 분리
-        String[] parts = logFileName.split("-");
-        if (parts.length < 3) {
+        // 파일 이름에서 날짜와 시간을 추출하는 정규식
+        String regex = ".*-log-(\\d{4}-\\d{2}-\\d{2})_(\\d{2})\\.txt";
+        Pattern pattern = Pattern.compile(regex);
+        Matcher matcher = pattern.matcher(logFileName);
+
+        if (matcher.matches()) {
+            String datePart = matcher.group(1); // yyyy-MM-dd
+            String hourPart = matcher.group(2); // HH
+
+            // '2024-09-13 20' 형태로 날짜와 시간을 합침
+            String dateTimeString = datePart + " " + hourPart;
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH");
+
+            return LocalDateTime.parse(dateTimeString, formatter);
+        } else {
+            log.info("로그 파일 목록 중 잘못된 형식의 파일이 존재.");
             return null;
         }
-
-        // 날짜 부분은 세 번째 요소, 시간은 언더스코어(_)로 구분
-        String[] dateTimePart = parts[2].split("_");
-        if (dateTimePart.length < 2) {
-            return null;
-        }
-
-        // '2024-09-22 14'와 같은 형태로 날짜와 시간을 하나로 합침
-        String dateTimeString = dateTimePart[0] + " " + dateTimePart[1];
-
-        // LocalDateTime으로의 파싱을 위한 포맷터
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH");
-
-        return LocalDateTime.parse(dateTimeString, formatter);
     }
 
-    private String buildLogfileRedirectURL(Long projectId, String fileName){
-        String redirectURL = "/project/" + projectId + "/" + fileName;
-        return redirectURL;
+    private String buildLogfileRedirectURL(Long projectId, String fileName) {
+        return String.format(LOG_FILE_URL_TEMPLATE, projectId, fileName);
     }
 
     private String formatLocalDateTime(LocalDateTime localDateTime) {
