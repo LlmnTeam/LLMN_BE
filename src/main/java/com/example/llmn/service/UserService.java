@@ -30,9 +30,16 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 import org.thymeleaf.context.Context;
 import org.thymeleaf.spring6.SpringTemplateEngine;
 
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.FileAlreadyExistsException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.security.SecureRandom;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -58,6 +65,7 @@ public class UserService {
     private static final String EMAIL_CODE_KEY_PREFIX = "code:";
     private static final String MAIL_TEMPLATE_FOR_CODE = "verification_code_email.html";
     private static final String UTF_EIGHT_ENCODING = "UTF-8";
+    private static final String UPLOAD_DIR = "ssh";
 
     @Transactional
     public Map<String, String> login(UserRequest.@Valid LoginDTO requestDTO, HttpServletRequest request) throws MessagingException {
@@ -120,6 +128,30 @@ public class UserService {
         if(isValid){
             sendCodeByEmail(email, codeType);
         }
+    }
+
+    public Path uploadSSHKey(MultipartFile file) throws IOException {
+        if (file.isEmpty()) {
+            throw new IllegalArgumentException("파일이 없습니다.");
+        }
+
+        // 디렉토리가 없으면 생성
+        Path uploadPath = Paths.get(UPLOAD_DIR);
+        if (!Files.exists(uploadPath)) {
+            Files.createDirectories(uploadPath);
+        }
+
+        String fileName = file.getOriginalFilename();
+        Path path = Paths.get(UPLOAD_DIR + File.separator + fileName);
+
+        // 파일이 이미 존재하는지 확인
+        if (Files.exists(path)) {
+            throw new FileAlreadyExistsException("파일이 이미 존재합니다.");
+        }
+
+        Files.write(path, file.getBytes());
+
+        return path;
     }
 
     @Transactional(readOnly = true)

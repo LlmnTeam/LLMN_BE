@@ -18,6 +18,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -46,33 +47,16 @@ public class UserController {
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.CREATED, null));
     }
 
-    @PostMapping("/accounts/ssh")
+    @PostMapping("/ssh")
     public ResponseEntity<?> uploadSSHKey(@RequestParam("file") MultipartFile file) {
-        // 파일이 빈 경우 오류 처리
-        if (file.isEmpty()) {
-            return ResponseEntity.ok().body(ApiUtils.error("파일이 없습니다.", HttpStatus.BAD_REQUEST));
-        }
-
         try {
-            // 디렉토리가 없으면 생성
-            Path uploadPath = Paths.get(UPLOAD_DIR);
-            if (!Files.exists(uploadPath)) {
-                Files.createDirectories(uploadPath); // 디렉토리가 없으면 생성
-            }
-
-            String fileName = file.getOriginalFilename();
-            Path path = Paths.get(UPLOAD_DIR + File.separator + fileName);
-
-            // 파일이 이미 존재하는지 확인
-            if (Files.exists(path)) {
-                return ResponseEntity.ok().body(ApiUtils.error("파일이 이미 존재합니다.", HttpStatus.CONFLICT));
-            }
-
-            Files.write(path, file.getBytes());
-
+            Path path = userService.uploadSSHKey(file);
             return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.CREATED, path));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.ok().body(ApiUtils.error(e.getMessage(), HttpStatus.BAD_REQUEST));
+        } catch (FileAlreadyExistsException e) {
+            return ResponseEntity.ok().body(ApiUtils.error(e.getMessage(), HttpStatus.CONFLICT));
         } catch (IOException e) {
-            e.printStackTrace();
             return ResponseEntity.ok().body(ApiUtils.error("파일 업로드 중 오류가 발생했습니다.", HttpStatus.INTERNAL_SERVER_ERROR));
         }
     }
