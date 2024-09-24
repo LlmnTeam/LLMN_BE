@@ -36,7 +36,6 @@ import java.util.stream.Stream;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-@Transactional(readOnly = true)
 public class LogService {
 
     private final ElasticsearchClient client;

@@ -5,6 +5,7 @@ import com.example.llmn.domain.Summary;
 import com.example.llmn.domain.SummaryType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -40,8 +41,15 @@ public interface SummaryRepository extends JpaRepository<Summary, Long> {
     @Query("SELECT s FROM Summary s " +
             "JOIN s.user u " +
             "WHERE s.summaryType IN :types AND u.id = :userId AND s.createdDate >= :startOfDay")
-    List<Summary> findByTypeWithinDate(@Param("types") List<SummaryType> types, @Param("userId") Long userId, @Param("startOfDay") LocalDateTime startOfDay);
+    List<Summary> findByTypeWithinDate(@Param("types") List<SummaryType> types,
+                                       @Param("userId") Long userId,
+                                       @Param("startOfDay") LocalDateTime startOfDay);
 
+    @EntityGraph(attributePaths = {"project"})
+    @Query("SELECT s FROM Summary s WHERE s.project = :project AND s.createdDate BETWEEN :startDate AND :endDate")
+    List<Summary> findByProjectAndDateRange(@Param("project") Project project,
+                                                     @Param("startDate") LocalDateTime startDate,
+                                                     @Param("endDate") LocalDateTime endDate);
 
     @Query("DELETE FROM Summary s WHERE s.project.id = :projectId")
     void deleteByProjectId(@Param("projectId") Long projectId);

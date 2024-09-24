@@ -17,8 +17,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Query("SELECT u FROM User u WHERE u.email = :email")
     Optional<User> findByEmail(@Param("email") String email);
 
-    @EntityGraph("sshInfo")
-    @Query("SELECT u FROM User u WHERE u.id = :id")
+    @Query("SELECT u FROM User u " +
+            "LEFT JOIN FETCH u.sshInfo " +
+            "WHERE u.id = :id")
     Optional<User> findByIdWithSshInfo(@Param("id") Long id);
 
     @Query("SELECT u.id FROM User u")
