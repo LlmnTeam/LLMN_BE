@@ -31,4 +31,10 @@ public class SshInfo extends TimeStamp{
         this.remoteHost = remoteHost;
         this.remoteKeyPath = remoteKeyPath;
     }
+
+    public void updateSshInfo(String remoteHost, String remoteName, String remoteKeyPath){
+        this.remoteHost = remoteHost;
+        this.remoteName = remoteName;
+        this.remoteKeyPath = remoteKeyPath;
+    }
 }

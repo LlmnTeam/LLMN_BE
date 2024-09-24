@@ -157,6 +157,21 @@ public class UserService {
                 metricHistory.networkOutMetrics());
     }
 
+    @Transactional
+    public void updateConfiguration(UserRequest.UpdateConfigurationDTO requestDTO, Long userId){
+        // SshInfo 패치조인
+        User user = userRepository.findByIdWithSshInfo(userId).orElseThrow(
+                () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
+        );
+
+        // SSH 정보 업데이트
+        SshInfo sshInfo = user.getSshInfo();
+        sshInfo.updateSshInfo(requestDTO.remoteHost(), requestDTO.remoteName(), requestDTO.remoteKeyPath());
+
+        // 유저 정보 업데이트
+        user.updateConfiguration(requestDTO.nickName(), requestDTO.receivingAlarm());
+    }
+
     private Map<String, String> createToken(User user){
         String accessToken = JWTProvider.createAccessToken(user);
         String refreshToken = JWTProvider.createRefreshToken(user);

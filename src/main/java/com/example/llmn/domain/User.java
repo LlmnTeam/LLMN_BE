@@ -46,4 +46,9 @@ public class User extends TimeStamp {
     public void updatePassword (String password) {
         this.password  = password;
     }
+
+    public void updateConfiguration(String nickName, boolean receivingAlarm){
+        this.nickName = nickName;
+        this.receivingAlarm = receivingAlarm;
+    }
 }
