@@ -30,10 +30,10 @@ public class UserRequest {
                 String password,
                 @NotBlank(message = "비밀번호를 입력해주세요.")
                 String passwordConfirm,
-                boolean isLocal,
                 String remoteName,
                 String remoteHost,
-                String remoteKeyPath) {}
+                String remoteKeyPath,
+                boolean receivingAlarm) {}
 
         public record EmailDTO(
                 @NotBlank(message = "이메일을 입력해주세요.")

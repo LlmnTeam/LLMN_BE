@@ -97,6 +97,7 @@ public class UserService {
                 .email(requestDTO.email())
                 .password(passwordEncoder.encode(requestDTO.password()))
                 .sshInfo(sshInfo)
+                .receivingAlarm(requestDTO.receivingAlarm())
                 .build();
 
         userRepository.save(user);
