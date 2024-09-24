@@ -19,4 +19,11 @@ public class UserResponse {
             List<MetricResponse.MemoryMetricDTO> memoryHistory,
             List<MetricResponse.NetworkInMetricDTO> networkInHistory,
             List<MetricResponse.NetworkOutMetricDTO> networkOutHistory){}
+
+    public record FindConfigurationInfoDTO(
+            String nickName,
+            String remoteName,
+            String remoteHost,
+            String remoteKeyPath,
+            boolean receivingAlarm){}
 }

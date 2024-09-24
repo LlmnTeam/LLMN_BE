@@ -157,6 +157,23 @@ public class UserService {
                 metricHistory.networkOutMetrics());
     }
 
+    @Transactional(readOnly = true)
+    public UserResponse.FindConfigurationInfoDTO findConfigurationInfo(Long userId){
+        // SshInfo 패치조인
+        User user = userRepository.findByIdWithSshInfo(userId).orElseThrow(
+                () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
+        );
+
+        SshInfo sshInfo = user.getSshInfo();
+
+        return new UserResponse.FindConfigurationInfoDTO(
+                user.getNickName(),
+                sshInfo.getRemoteName(),
+                sshInfo.getRemoteHost(),
+                sshInfo.getRemoteKeyPath(),
+                user.isReceivingAlarm());
+    }
+
     @Transactional
     public void updateConfiguration(UserRequest.UpdateConfigurationDTO requestDTO, Long userId){
         // SshInfo 패치조인
