@@ -382,10 +382,7 @@ public class LogService {
             String logFileName = "logs/" + containerName + "-log-" + timestamp + ".txt";
 
             // 디렉터리가 존재하는지 확인하고 없으면 생성
-            Path logDirPath = Paths.get("logs");
-            if (!Files.exists(logDirPath)) {
-                Files.createDirectories(logDirPath);
-            }
+            createLogDirectoryIfNotExist();
 
             // 파일에 기록하기 위한 BufferedWriter 생성 (1시간 동안 같은 파일에 기록)
             try (BufferedWriter writer = new BufferedWriter(new FileWriter(Paths.get(logFileName).toFile(), true))) {
@@ -402,6 +399,13 @@ public class LogService {
                 log.error("로그 파일에 기록하는 중 오류 발생", e);
                 throw e;
             }
+        }
+    }
+
+    private void createLogDirectoryIfNotExist() throws IOException {
+        Path logDirPath = Paths.get(LOGS_DIRECTORY);
+        if (!Files.exists(logDirPath)) {
+            Files.createDirectories(logDirPath);
         }
     }
 
