@@ -50,7 +50,7 @@ public class LogService {
         List<Map<String, Object>> logMaps = convertResponseToMap(searchResponse);
         log.info("로그 데이터 변환 완료. 총 {}개의 로그가 변환됨.", logMaps.size());
 
-        // 2. 로그 map의 필드 업데이트
+        // 2. map의 필드 업데이트 (원하는 형태로)
         List<Map<String, Object>> updatedLogMaps = updateLogFields(logMaps);
 
         // 3. 필드 업데이트 한 데이터를 Elasticsearch에도 반영
@@ -330,20 +330,12 @@ public class LogService {
     }
 
     // 로그 메시지에서 로그 레벨 추출
-    private String extractLogLevelFromMessage(String message) {
-        if (message == null) {
-            return "UNKNOWN";
-        }
-
-        if (message.contains("INFO")) {
-            return "INFO";
-        } else if (message.contains("ERROR")) {
-            return "ERROR";
-        } else if (message.contains("WARN")) {
-            return "WARN";
-        }
-
-        return "UNKNOWN";
+    private String extractLogLevel(String message) {
+        return (message == null) ? "UNKNOWN" :
+                Stream.of("INFO", "ERROR", "WARN")
+                        .filter(message::contains)
+                        .findFirst()
+                        .orElse("UNKNOWN");
     }
 
     // 오늘 날짜를 기반으로 인덱스 이름 생성
