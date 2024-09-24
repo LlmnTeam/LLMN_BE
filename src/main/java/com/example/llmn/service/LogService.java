@@ -17,7 +17,6 @@ import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.io.BufferedWriter;
 import java.io.FileWriter;
@@ -39,23 +38,26 @@ import java.util.stream.Stream;
 public class LogService {
 
     private final ElasticsearchClient client;
-    private final RedisService redisService;
+
     private static final String LOGS_DIRECTORY = "logs";
 
     @Scheduled(fixedRate = 60000)  // 1분마다 실행
     public void processAndUpdateLogs() throws IOException {
-        // 1. Elasticsearch에서 기존 로그 데이터 조회
-        List<Map<String, Object>> logs = fetchAndProcessLogs();
+        // 1. Elasticsearch에서 로그 데이터를 검색
+        SearchResponse<Map> searchResponse = searchFromElasticSearch();
 
-        // 2. 조회한 로그 데이터를 가공
-        List<Map<String, Object>> processedLogs = transformLogs(logs);
+        // 2. 검색 결과를 맵으로 변환
+        List<Map<String, Object>> logMaps = convertResponseToMap(searchResponse);
+        log.info("로그 데이터 변환 완료. 총 {}개의 로그가 변환됨.", logMaps.size());
 
-        // 3. 가공된 데이터를 Elasticsearch에서 기존 문서로 업데이트
-        updateProcessedLogs(processedLogs);
+        // 2. 로그 map의 필드 업데이트
+        List<Map<String, Object>> updatedLogMaps = updateLogFields(logMaps);
 
-        // 4. 텍스트 파일에 로그 기록
-        writeLogsToFile(processedLogs);
+        // 3. 필드 업데이트 한 데이터를 Elasticsearch에도 반영
+        updateToElasticSearch(updatedLogMaps);
 
+        // 4. .txt 파일로도 로그 저장
+        writeLogsToFile(updatedLogMaps);
         log.info("업데이트 완료");
     }
 
@@ -192,11 +194,13 @@ public class LogService {
 
         // 디렉토리 내의 모든 파일 목록을 가져오고, ".txt" 확장자를 가진 파일들만 필터링
         try (Stream<Path> filePathStream = Files.list(logDirPath)) {
-            return filePathStream
-                    .filter(Files::isRegularFile) // 일반 파일만 필터링
+            List<String> fileNames = filePathStream
+                    .filter(Files::isRegularFile) // 일반 파일만 가져옴
                     .filter(path -> path.toString().endsWith(".txt")) // .txt 파일만 가져옴
-                    .map(path -> path.getFileName().toString()) // 파일 이름만 가져옴
-                    .collect(Collectors.toList());
+                    .map(path -> path.getFileName().toString())
+                    .toList();
+
+            return fileNames;
         } catch (IOException e) {
             throw new CustomException(ExceptionCode.LOG_FILE_LIST_READ_FAIL);
         }
@@ -254,13 +258,12 @@ public class LogService {
         return rawMessage != null ? rawMessage : "";
     }
 
-    private List<Map<String, Object>> fetchAndProcessLogs() throws IOException {
+    private SearchResponse<Map> searchFromElasticSearch() throws IOException {
         // 오늘 날짜의 인덱스 이름을 생성하여 사용
         String indexName = getTodayIndexName();
-        List<Map<String, Object>> logs = new ArrayList<>();
 
         try {
-            // Elasticsearch에서 변환되지 않은 로그 조회 (is_processed가 false 또는 존재하지 않는 로그)
+            // is_processed가 false인 데이터 검색
             SearchRequest searchRequest = new SearchRequest.Builder()
                     .index(indexName)
                     .query(q -> q.bool(b -> b
@@ -270,40 +273,36 @@ public class LogService {
                     .size(1000)  // 최대 1000개의 로그를 가져옴
                     .build();
 
-            SearchResponse<Map> searchResponse = client.search(searchRequest, Map.class);
-            logs = searchResponse.hits().hits().stream()
-                    .map(hit -> {
-                        Map<String, Object> log = hit.source();
-                        log.put("_id", hit.id());
-                        return log;
-                    })
-                    .collect(Collectors.toList());
-
-            log.info("로그 데이터 변환 완료. 총 {}개의 로그가 변환됨.", logs.size());
+            return client.search(searchRequest, Map.class);
         } catch (ElasticsearchException e) { // 인덱스가 없을 경우 생성
             createIndexIfNotExists(indexName);
+            return new SearchResponse.Builder<Map>().build();
         }
-
-        return logs;
     }
 
-    private List<Map<String, Object>> transformLogs(List<Map<String, Object>> logs) {
+    private List<Map<String, Object>> convertResponseToMap(SearchResponse<Map> searchResponse){
+        return searchResponse
+                .hits().hits().stream()
+                .map(hit -> {
+                    Map<String, Object> logMap = hit.source();
+                    logMap.put("_id", hit.id());
+                    return logMap;
+                })
+                .collect(Collectors.toList());
+    }
+
+    private List<Map<String, Object>> updateLogFields(List<Map<String, Object>> logs) {
         return logs.stream()
                 .map(log -> {
-                    // 기존 데이터 가공
+                    // 맵에서 기존 데이터 추출
                     Map<String, Object> container = (Map<String, Object>) log.get("container");
                     String serviceName = container != null ? (String) container.get("name") : "unknown_service";
                     String message = (String) log.get("message");
 
                     // 로그 레벨 추출
-                    String logLevel = extractLogLevelFromMessage(message);
+                    String logLevel = extractLogLevel(message);
 
-                    // 등록 서비스 목록에 추가
-                    if(!redisService.isSetElementExists("service_name", serviceName)){
-                        redisService.addSetElement("service_name", serviceName);
-                    }
-
-                    // 변환된 로그 데이터를 업데이트
+                    // 맵에 필드 추가
                     log.put("log_level", logLevel);
                     log.put("service_name", serviceName);
                     log.put("is_processed", true);
@@ -314,16 +313,16 @@ public class LogService {
                 .collect(Collectors.toList());
     }
 
-    private void updateProcessedLogs(List<Map<String, Object>> processedLogs) throws IOException {
+    private void updateToElasticSearch(List<Map<String, Object>> updatedLogMaps) throws IOException {
         String indexName = getTodayIndexName();
 
-        for (Map<String, Object> log : processedLogs) {
-            String id = (String) log.remove("_id");
+        for (Map<String, Object> logMap : updatedLogMaps) {
+            String id = (String) logMap.remove("_id");
 
             UpdateRequest<Map<String, Object>, Map<String, Object>> updateRequest = new UpdateRequest.Builder<Map<String, Object>, Map<String, Object>>()
                     .index(indexName)
                     .id(id)
-                    .doc(log)
+                    .doc(logMap)
                     .build();
 
             client.update(updateRequest, Map.class);
@@ -432,7 +431,7 @@ public class LogService {
         try {
             CreateIndexRequest createIndexRequest = new CreateIndexRequest.Builder()
                     .index(indexName)
-                    .mappings(m -> m // 기본적으로 사용할 필드 매핑 정의
+                    .mappings(m -> m
                             .properties("is_processed", p -> p.boolean_(b -> b))
                             .properties("@timestamp", p -> p.date(d -> d))
                             .properties("log_level", p -> p.keyword(k -> k))
@@ -440,8 +439,8 @@ public class LogService {
                             .properties("message", p -> p.text(t -> t))
                     )
                     .build();
-            client.indices().create(createIndexRequest);
 
+            client.indices().create(createIndexRequest);
             log.info("인덱스 {} 생성 완료", indexName);
         } catch (ElasticsearchException e) {
             throw new IOException("Elasticsearch 인덱스 생성 중 오류 발생", e);
