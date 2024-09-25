@@ -68,9 +68,12 @@ public class UserService {
     private static final String REDIS_KEY_SESSION_ID = "sessionId";
     private static final String REDIS_KEY_REFRESH_TOKEN = "refreshToken";
     private static final String REDIS_KEY_ACCESS_TOKEN = "accessToken";
+    private static final String REDIS_SSH_KEY = "SSH";
     private static final String COOKIE_KEY_REFRESH_TOKEN = "refreshToken";
     private static final String SORT_BY_DATE = "createdDate";
     private static final String MODEL_KEY_CODE = "code";
+    private static final String DELIMITER = "-";
+    public static final Long REDIS_SSH_KEY_EXP = 60L * 60 * 24 * 180; // 180일
 
     @Transactional
     public Map<String, String> login(UserRequest.@Valid LoginDTO requestDTO, HttpServletRequest request) throws MessagingException {
@@ -221,6 +224,9 @@ public class UserService {
         // SSH 정보 업데이트
         SshInfo sshInfo = user.getSshInfo();
         sshInfo.updateSshInfo(requestDTO.remoteHost(), requestDTO.remoteName(), requestDTO.remoteKeyPath());
+
+        String combinedInfo = String.join(DELIMITER, requestDTO.remoteHost(), requestDTO.remoteName(), requestDTO.remoteKeyPath());
+        redisService.storeValue(REDIS_SSH_KEY, userId.toString(), combinedInfo, REDIS_SSH_KEY_EXP);
 
         // 유저 정보 업데이트
         user.updateConfiguration(requestDTO.nickName(), requestDTO.receivingAlarm());

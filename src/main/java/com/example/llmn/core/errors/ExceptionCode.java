@@ -37,7 +37,10 @@ public enum ExceptionCode {
     ALARM_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 알람입니다."),
 
     // 프로젝트 관련 에러
-    PROJECT_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 프로젝트를 찾을 수 없습니다.");
+    PROJECT_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 프로젝트를 찾을 수 없습니다."),
+
+    // 셀 관련 에러
+    SHELL_CONNECT_FAIL(HttpStatus.INTERNAL_SERVER_ERROR, "Shell 채널 초기화 실패");
 
     private final HttpStatus httpStatus;
     private final String message;
