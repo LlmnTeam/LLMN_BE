@@ -2,12 +2,14 @@ package com.example.llmn.core.utils;
 
 import com.example.llmn.core.errors.CustomException;
 import com.example.llmn.core.errors.ExceptionCode;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.sshd.client.SshClient;
 import org.apache.sshd.client.channel.ClientChannel;
 import org.apache.sshd.client.channel.ClientChannelEvent;
 import org.apache.sshd.client.future.ConnectFuture;
 import org.apache.sshd.client.session.ClientSession;
 import org.apache.sshd.common.channel.PtyChannelConfiguration;
+import org.springframework.web.socket.WebSocketSession;
 import redis.clients.jedis.Jedis;
 
 import java.io.*;
@@ -20,6 +22,7 @@ import java.util.EnumSet;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
+@Slf4j
 public class SSHCommandExecutor {
     private final SshClient client;
     private final ClientSession session;
@@ -27,11 +30,13 @@ public class SSHCommandExecutor {
     private final OutputStream pipedIn;
     private final InputStream pipedOut;
     private final Jedis jedis;
-    private static final String REDIS_CHANNEL = "ssh-command-output"; // 고정된 Redis 채널 이름
+
+    private static final int REDIS_PORT = 6379;
     private static final String REDIS_HOST = "localhost";
+    private static final int REDIS_TIMEOUT = 60000; // 1분
+    private static final String REDIS_CHANNEL = "ssh-command-output"; // 고정된 Redis 채널 이름
     private static final String PROMPT_UBUNTU = "ubuntu@";
     private static final String PROMPT_DOLLAR = "$ ";
-    private static final int REDIS_PORT = 6379;
     private static final int SSH_PORT = 22;
 
     public SSHCommandExecutor(String host, String username, String privateKeyPath) throws Exception {
@@ -56,13 +61,13 @@ public class SSHCommandExecutor {
         // 4. 세션 인증 수행 (인증이 10초 내에 성공하지 않으면 타임아웃 발생)
         session.auth().verify(10, TimeUnit.SECONDS);
 
-        // 5. Redis 연결
-        jedis = new Jedis(REDIS_HOST, REDIS_PORT);
+        // 5. Jedis 객체 초기화
+        jedis = new Jedis(REDIS_HOST, REDIS_PORT, REDIS_TIMEOUT);
 
         // 6. Shell 채널 설정을 위한 PtyChannelConfiguration 객체
         PtyChannelConfiguration ptyConfig = new PtyChannelConfiguration();
         ptyConfig.setPtyType("xterm");  // 터미널 유형 설정
-        ptyConfig.setPtyColumns(80);    // 터미널 너비 설정
+        ptyConfig.setPtyColumns(160);    // 터미널 너비 설정
         ptyConfig.setPtyLines(24);      // 터미널 높이 설정
         ptyConfig.setPtyWidth(640);     // 실제 창 너비 설정
         ptyConfig.setPtyHeight(480);    // 실제 창 높이 설정
@@ -83,8 +88,7 @@ public class SSHCommandExecutor {
 
     // 각 스레드가 동시에 동일한 SSH 세션에 접근하여 명령어를 실행하고, 동일한 pipedIn과 pipedOut 스트림에 동시 접근할 수 있는 문제 방지를 위해 syschronizrd 사용
     public synchronized String executeCommandInShell(String command) throws Exception {
-        // 초기 로그인 메시지 처리 => 데이터를 읽되 저장하지 않고 버림
-        discardInitialMessages();
+        clearOutputStream();
 
         // 명령어를 지속적으로 입력받아 실행
         pipedIn.write((command + "\n").getBytes());
@@ -129,7 +133,7 @@ public class SSHCommandExecutor {
         return resultBuilder.toString();
     }
 
-    public void close() throws Exception {
+    public void close()  {
         if (shellChannel != null) {
             shellChannel.close(false);
         }
@@ -139,7 +143,8 @@ public class SSHCommandExecutor {
         if (client != null) {
             client.stop();
         }
-        System.out.println("SSH 세션 및 Shell 채널 종료.");
+
+        log.info("SSH 세션 및 Shell 채널 종료.");
     }
 
     // SSH 세션이 연결되어 있는지 확인
@@ -147,7 +152,7 @@ public class SSHCommandExecutor {
         return session != null && session.isOpen();
     }
 
-    private void discardInitialMessages() throws IOException {
+    private void clearOutputStream() throws IOException {
         if (pipedOut.available() > 0) {
             byte[] buffer = new byte[4096];
 
