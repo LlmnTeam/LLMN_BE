@@ -7,7 +7,6 @@ import com.example.llmn.core.errors.CustomException;
 import com.example.llmn.core.errors.ExceptionCode;
 import com.example.llmn.core.security.JWTProvider;
 import com.example.llmn.domain.SshInfo;
-import com.example.llmn.domain.Summary;
 import com.example.llmn.domain.SummaryType;
 import com.example.llmn.domain.User;
 import com.example.llmn.repository.SshInfoRepository;
@@ -62,10 +61,16 @@ public class UserService {
 
     @Value("${spring.mail.username}")
     private String SERVICE_MAIL_ACCOUNT;
-    private static final String EMAIL_CODE_KEY_PREFIX = "code:";
+    private static final String REDIS_KEY_EMAIL_CODE = "code:";
     private static final String MAIL_TEMPLATE_FOR_CODE = "verification_code_email.html";
     private static final String UTF_EIGHT_ENCODING = "UTF-8";
     private static final String UPLOAD_DIR = "ssh";
+    private static final String REDIS_KEY_SESSION_ID = "sessionId";
+    private static final String REDIS_KEY_REFRESH_TOKEN = "refreshToken";
+    private static final String REDIS_KEY_ACCESS_TOKEN = "accessToken";
+    private static final String COOKIE_KEY_REFRESH_TOKEN = "refreshToken";
+    private static final String SORT_BY_DATE = "createdDate";
+    private static final String MODEL_KEY_CODE = "code";
 
     @Transactional
     public Map<String, String> login(UserRequest.@Valid LoginDTO requestDTO, HttpServletRequest request) throws MessagingException {
@@ -120,7 +125,7 @@ public class UserService {
     @Async
     public void sendCodeWithValidation(String email, String codeType, boolean isValid) throws MessagingException {
         // TTL 체크
-        if(redisService.isDateExist(EMAIL_CODE_KEY_PREFIX + codeType, email)){
+        if(redisService.isDateExist(REDIS_KEY_EMAIL_CODE + codeType, email)){
             throw new CustomException(ExceptionCode.ALREADY_SEND_EMAIL);
         }
 
@@ -226,24 +231,24 @@ public class UserService {
         String refreshToken = JWTProvider.createRefreshToken(user);
 
         // Access Token 갱신
-        redisService.storeValue("accessToken", String.valueOf(user.getId()), accessToken, JWTProvider.ACCESS_EXP_MILLI);
+        redisService.storeValue(REDIS_KEY_ACCESS_TOKEN, String.valueOf(user.getId()), accessToken, JWTProvider.ACCESS_EXP_MILLI);
 
         // Refresh Token 갱신
-        redisService.storeValue("refreshToken", String.valueOf(user.getId()), refreshToken, JWTProvider.REFRESH_EXP_MILLI);
+        redisService.storeValue(REDIS_KEY_REFRESH_TOKEN, String.valueOf(user.getId()), refreshToken, JWTProvider.REFRESH_EXP_MILLI);
 
         // 로그인 ID를 세션으로 저장
-        redisService.storeValue("sessionId", user.getId().toString());
+        redisService.storeValue(REDIS_KEY_SESSION_ID, user.getId().toString());
 
         // Map으로 토큰들을 담아 반환
         Map<String, String> tokens = new HashMap<>();
-        tokens.put("accessToken", accessToken);
-        tokens.put("refreshToken", refreshToken);
+        tokens.put(REDIS_KEY_ACCESS_TOKEN, accessToken);
+        tokens.put(REDIS_KEY_REFRESH_TOKEN, refreshToken);
 
         return tokens;
     }
 
     public String createRefreshTokenCookie(String refreshToken) {
-        return ResponseCookie.from("refreshToken", refreshToken)
+        return ResponseCookie.from(COOKIE_KEY_REFRESH_TOKEN, refreshToken)
                 .httpOnly(true)
                 .secure(false)
                 .path("/")
@@ -281,11 +286,11 @@ public class UserService {
 
         // 메일 전송 템플릿 보낼 데이터는 map에 담음
         Map<String, Object> model = new HashMap<>();
-        model.put("code", verificationCode);
+        model.put(MODEL_KEY_CODE, verificationCode);
 
         sendMail(email, VERIFICATION_CODE.getSubject(), MAIL_TEMPLATE_FOR_CODE, model);
 
-        redisService.storeValue(EMAIL_CODE_KEY_PREFIX + codeType, email, verificationCode, 175 * 1000L); // 3분 동안 유효
+        redisService.storeValue(REDIS_KEY_EMAIL_CODE + codeType, email, verificationCode, 175 * 1000L); // 3분 동안 유효
     }
 
     @Async
@@ -307,7 +312,7 @@ public class UserService {
     }
 
     private Optional<String> getLatestHourlySummary(){
-        Pageable pageable = PageRequest.of(0, 1, Sort.by(Sort.Direction.DESC, "createdDate"));
+        Pageable pageable = PageRequest.of(0, 1, Sort.by(Sort.Direction.DESC, SORT_BY_DATE));
         Page<String> page = summaryRepository.findContentByType(SummaryType.HOURLY, pageable);
         return page.hasContent() ? Optional.of(page.getContent().get(0)) : Optional.empty();
     }

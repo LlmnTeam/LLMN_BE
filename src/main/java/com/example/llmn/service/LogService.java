@@ -445,7 +445,7 @@ public class LogService {
                 message.toString());
     }
 
-    private void createIndexIfNotExists(String indexName) throws IOException {
+    private void createIndexIfNotExists(String indexName)  {
         try {
             CreateIndexRequest createIndexRequest = new CreateIndexRequest.Builder()
                     .index(indexName)
@@ -460,8 +460,8 @@ public class LogService {
 
             client.indices().create(createIndexRequest);
             log.info("인덱스 {} 생성 완료", indexName);
-        } catch (ElasticsearchException e) {
-            throw new IOException("Elasticsearch 인덱스 생성 중 오류 발생", e);
+        } catch (IOException e) {
+            log.info("ElasticSearch 인덱스 생성 실패!");
         }
     }
 }

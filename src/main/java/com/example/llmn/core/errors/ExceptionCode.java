@@ -22,6 +22,7 @@ public enum ExceptionCode {
 
     // ElasticSearch 오류
     ELASTIC_SEARCH_ERROR(HttpStatus.NOT_FOUND, "ElasticSearch에 문제가 발생했습니다."),
+    ELASTIC_CREATE_INDEX_FAIL(HttpStatus.INTERNAL_SERVER_ERROR, "Elasticsearch 인덱스 생성 중 오류 발생"),
 
     // 로그 파일 관련 에러
     LOG_DIRECTORY_NOT_FOUND(HttpStatus.NOT_FOUND, "로그 디렉토리가 존재하지 않거나 디렉토리가 아닙니다."),
