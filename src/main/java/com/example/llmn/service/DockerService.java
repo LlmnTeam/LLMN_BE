@@ -41,14 +41,14 @@ public class DockerService {
         String command = COMMAND_DOCKER_RESTART + containerName;
         String commandResponse = sshService.executeCommandOnce(command, userId);
 
-        return commandResponse.trim().equals(containerName);
+        return commandResponse.trim().equals(containerName); // 성공 여부 true/false로 리턴
     }
 
     // 실행중인 도커 컨테이너 목록 조회
     public List<String> findRunningContainerList(Long userId) throws Exception {
         String commandResponse = sshService.executeCommandOnce(COMMAND_DOCKER_PS, userId);
 
-        // 응답을 줄 단위로 나눠서 리스트로 변환
+        // 줄 단위로 나눠서 리스트로 변환
         List<String> containerNames = Arrays.asList(commandResponse.split("\n"));
 
         // 각 항목의 앞뒤 공백을 제거
@@ -70,39 +70,15 @@ public class DockerService {
 
     // 컨테이너의 사용 리소스 조회
     public Map<String, Map<String, String>> findContainersResourceUsage(Long userId, boolean isUsingCache) throws Exception {
-        // 캐시를 사용하면 => 레디스에서 캐시된 값을 먼저 조회
+        // 1. 캐시를 사용하면 => 레디스에서 캐시된 값을 먼저 조회
         Map<String, Map<String, String>> cachedUsage = isUsingCache ? getCachedResourceUsage(userId) : null;
         if (cachedUsage != null) {
             return cachedUsage;
         }
 
-        // 캐시를 사용하지 않거나 캐시된 값이 없음 => 조회해서 사용
+        // 2. 캐시를 사용하지 않거나 캐시된 값이 없음 => 명령어를 통해 조회
         String commandResponse = sshService.executeCommandOnce(COMMAND_DOCKER_STATS, userId);
-
-        // 결과를 줄 단위로 나눔
-        String[] lines = commandResponse.split("\n");
-
-        // 컨테이너 이름을 키로 하고, CPU와 메모리 사용량을 담은 맵을 값으로 하는 바깥쪽 맵 생성
-        Map<String, Map<String, String>> containerUsageMap = new HashMap<>();
-
-        // 각 줄을 ':'로 나누어 컨테이너 이름, CPU, 메모리 사용량을 추출
-        for (String line : lines) {
-            String[] parts = line.split(":");
-
-            // 예상되는 3개의 요소가 모두 있는지 확인
-            if (parts.length == 3) {
-                String containerName = parts[0].trim();
-                String cpuUsage = parts[1].trim();
-                String memUsage = parts[2].trim();
-
-                // 내부 맵 생성 후 CPU와 메모리 사용량 추가
-                Map<String, String> resourceUsage = new HashMap<>();
-                resourceUsage.put(DOCKER_RESOURCE_KEY_CPU, cpuUsage);
-                resourceUsage.put(DOCKER_RESOURCE_KEY_MEMORY, memUsage);
-
-                containerUsageMap.put(containerName, resourceUsage);
-            }
-        }
+        Map<String, Map<String, String>> containerUsageMap = parseCommandResponse(commandResponse);
 
         // 유효 시간은 10분
         redisService.storeValue(RESOURCE_KEY, userId.toString(), objectMapper.writeValueAsString(containerUsageMap), RESOURCE_EXP);
@@ -145,5 +121,30 @@ public class DockerService {
         } catch (JsonProcessingException e) {
             return null;
         }
+    }
+
+    private Map<String, Map<String, String>> parseCommandResponse(String commandResponse) {
+        Map<String, Map<String, String>> containerUsageMap = new HashMap<>();
+
+        // command 결과를 줄 단위로 나눔
+        String[] lines = commandResponse.split("\n");
+
+        // 각 줄을 ':'로 나누어 컨테이너 이름, CPU, 메모리 사용량을 추출
+        for (String line : lines) {
+            String[] parts = line.split(":");
+
+            if (parts.length == 3) {
+                String containerName = parts[0].trim();
+                String cpuUsage = parts[1].trim();
+                String memUsage = parts[2].trim();
+
+                Map<String, String> resourceUsageMap = new HashMap<>();
+                resourceUsageMap.put(DOCKER_RESOURCE_KEY_CPU, cpuUsage);
+                resourceUsageMap.put(DOCKER_RESOURCE_KEY_MEMORY, memUsage);
+
+                containerUsageMap.put(containerName, resourceUsageMap);
+            }
+        }
+        return containerUsageMap;
     }
 }
