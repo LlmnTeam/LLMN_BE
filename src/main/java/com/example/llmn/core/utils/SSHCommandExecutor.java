@@ -28,7 +28,7 @@ public class SSHCommandExecutor {
     private final ClientSession session;
     private final ClientChannel shellChannel;
     private final OutputStream pipedIn;
-    private final InputStream pipedOut;
+    private  InputStream pipedOut;
     private final Jedis jedis;
 
     private static final int REDIS_PORT = 6379;
@@ -58,7 +58,7 @@ public class SSHCommandExecutor {
         KeyPair keyPair = KeyPairUtils.loadKeyPair(privateKeyPath);
         session.addPublicKeyIdentity(keyPair);
 
-        // 4. 세션 인증 수행 (인증이 10초 내에 성공하지 않으면 타임아웃 발생)
+        // 4. 세션 인증 수행
         session.auth().verify(10, TimeUnit.SECONDS);
 
         // 5. Jedis 객체 초기화
@@ -84,6 +84,9 @@ public class SSHCommandExecutor {
         } else {
             throw new CustomException(ExceptionCode.SHELL_CONNECT_FAIL);
         }
+
+        // 9. 리눅스 인사 메시지 삭제
+        flushInitialMessage();
     }
 
     // 각 스레드가 동시에 동일한 SSH 세션에 접근하여 명령어를 실행하고, 동일한 pipedIn과 pipedOut 스트림에 동시 접근할 수 있는 문제 방지를 위해 syschronizrd 사용
@@ -179,5 +182,24 @@ public class SSHCommandExecutor {
 
     private boolean checkIfCommandCompleted(String result) {
         return result.contains(PROMPT_UBUNTU) || result.endsWith(PROMPT_DOLLAR);
+    }
+
+    private void flushInitialMessage() throws IOException {
+        StringBuilder resultBuilder = new StringBuilder();
+        byte[] buffer = new byte[4096];
+        boolean flushCompleted = false;
+
+        while (!flushCompleted) {
+            while (pipedOut.available() > 0) {
+                int bytesRead = pipedOut.read(buffer);
+
+                if (bytesRead != -1) {
+                    String output = new String(buffer, 0, bytesRead, StandardCharsets.UTF_8);
+                    resultBuilder.append(output);
+                }
+            }
+
+            flushCompleted = checkIfCommandCompleted(resultBuilder.toString());
+        }
     }
 }
