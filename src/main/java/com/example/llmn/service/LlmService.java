@@ -202,9 +202,9 @@ public class LlmService {
         }
     }
 
-    private LogDTO.SummaryResponseDTO fetchLogSummary(Instant startTime, Instant endTime, String serviceName) {
+    private LogDTO.SummaryResponseDTO fetchLogSummary(Instant startTime, Instant endTime, String containerName) {
         // 로그 메시지는 ElasticSearch에서 가져온다
-        String logMessage = logService.searchLogInStr(startTime, endTime, serviceName);
+        String logMessage = logService.searchLogInStr(startTime, endTime, containerName);
 
         // 검색 결과가 빈 값이면 null을 반환
         if (logMessage == null || logMessage.isEmpty()) {

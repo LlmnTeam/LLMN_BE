@@ -40,6 +40,20 @@ public class LogService {
     private final ElasticsearchClient client;
 
     private static final String LOGS_DIRECTORY = "logs";
+    private static final String LOG_LEVEL_INFO = "INFO";
+    private static final String LOG_LEVEL_WARN = "WARN";
+    private static final String LOG_LEVEL_ERROR = "ERROR";
+    private static final String LOG_LEVEL_UNKNOWN = "UNKNOWN";
+    private static final String LOG_KEY_TIMESTAMP = "@timestamp";
+    private static final String LOG_KEY_LEVEL = "log_level";
+    private static final String LOG_KEY_CONTAINER_NAME = "container_name";
+    private static final String LOG_KEY_CONTAINER = "container";
+    private static final String LOG_KEY_MESSAGE = "message";
+    private static final String LOG_KEY_PROCESSED = "is_processed";
+    private static final String LOG_KEY_ID = "_id";
+    private static final String CONTAINER_KEY_NAME = "name";
+    private static final String UNKNOWN_CONTAINER = "unknown_container";
+    private static final String NO_MESSAGE = "No message";
 
     @Scheduled(fixedRate = 60000)  // 1분마다 실행
     public void processAndUpdateLogs() throws IOException {
@@ -72,7 +86,7 @@ public class LogService {
 
                         // 시간 범위 필터
                         boolQuery.must(m -> m.range(r -> r
-                                .field("@timestamp")
+                                .field(LOG_KEY_TIMESTAMP)
                                 .gte(JsonData.of(startTime.toString()))
                                 .lte(JsonData.of(endTime.toString()))
                         ));
@@ -80,7 +94,7 @@ public class LogService {
                         // 로그 레벨 필터 (필터 값이 null이 아닐 때만 추가)
                         if (logLevel != null) {
                             boolQuery.filter(f -> f.term(t -> t
-                                    .field("log_level")
+                                    .field(LOG_KEY_LEVEL)
                                     .value(logLevel)
                             ));
                         }
@@ -88,7 +102,7 @@ public class LogService {
                         // 서비스 이름 필터
                         if (containerName != null) {
                             boolQuery.filter(f -> f.term(t -> t
-                                    .field("container_name")
+                                    .field(LOG_KEY_CONTAINER_NAME)
                                     .value(containerName)
                             ));
                         }
@@ -119,7 +133,7 @@ public class LogService {
 
                         // 시간 범위 필터
                         boolQuery.must(m -> m.range(r -> r
-                                .field("@timestamp")
+                                .field(LOG_KEY_TIMESTAMP)
                                 .gte(JsonData.of(startTime.toString()))
                                 .lte(JsonData.of(endTime.toString()))
                         ));
@@ -127,7 +141,7 @@ public class LogService {
                         // 서비스 이름 필터
                         if (containerName != null) {
                             boolQuery.filter(f -> f.term(t -> t
-                                    .field("container_name")
+                                    .field(LOG_KEY_CONTAINER_NAME)
                                     .value(containerName)
                             ));
                         }
@@ -156,13 +170,13 @@ public class LogService {
                     .index("docker-logs-*")
                     .query(q -> q.bool(b -> b
                             .filter(f -> f.term(t -> t
-                                    .field("container_name")
+                                    .field(LOG_KEY_CONTAINER_NAME)
                                     .value(containerName)
                             ))
                     ))
                     .sort(s -> s
                             .field(f -> f
-                                    .field("@timestamp")  // 타임스탬프 기준으로 정렬
+                                    .field(LOG_KEY_TIMESTAMP)  // 타임스탬프 기준으로 정렬
                                     .order(SortOrder.Desc)  // 가장 최근 순으로 정렬 (내림차순)
                             )
                     )
@@ -238,24 +252,25 @@ public class LogService {
     }
 
     private LogData convertToLogData(Map<String, Object> source) {
-        Map<String, Object> container = (Map<String, Object>) source.get("container");
-        String containerName = container != null ? (String) container.get("name") : null;
+        String containerName = Optional.ofNullable((String) source.get(LOG_KEY_CONTAINER_NAME))
+                .orElse(UNKNOWN_CONTAINER);
 
-        String timestampStr = (String) source.get("@timestamp");
-        Instant timestamp = timestampStr != null ? Instant.parse(timestampStr) : null;
+        String timestampInStr = (String) source.get(LOG_KEY_TIMESTAMP);
+        Instant timestamp = timestampInStr != null ? Instant.parse(timestampInStr) : null;
 
-        String rawMessage = (String) source.get("message");
-        String formattedMessage = rawMessage != null ? LogDataParser.formatMessage(rawMessage) : "";
+        String rawMessage = (String) source.get(LOG_KEY_MESSAGE);
+        String formattedMessage = rawMessage != null ? LogDataParser.formatMessage(rawMessage) : NO_MESSAGE;
 
-        boolean isProcessed = (boolean) source.get("is_processed");
+        boolean isProcessed = (boolean) source.get(LOG_KEY_PROCESSED);
 
-        String logLevel = source.get("log_level") != null ? (String) source.get("log_level") : "UNKNOWN";
+        String logLevel = Optional.ofNullable((String) source.get(LOG_KEY_LEVEL))
+                .orElse(LOG_LEVEL_UNKNOWN);
 
         return new LogData(containerName, timestamp, formattedMessage, isProcessed, logLevel);
     }
 
     private String convertToString(Map<String, Object> source) {
-        String rawMessage = (String) source.get("message");
+        String rawMessage = (String) source.get(LOG_KEY_MESSAGE);
         return rawMessage != null ? rawMessage : "";
     }
 
@@ -268,8 +283,8 @@ public class LogService {
             SearchRequest searchRequest = new SearchRequest.Builder()
                     .index(indexName)
                     .query(q -> q.bool(b -> b
-                            .should(s -> s.term(t -> t.field("is_processed").value(false)))  // is_processed가 false인 로그
-                            .should(s -> s.bool(bs -> bs.mustNot(mn -> mn.exists(e -> e.field("is_processed")))))  // is_processed 필드가 없는 로그
+                            .should(s -> s.term(t -> t.field(LOG_KEY_PROCESSED).value(false)))  // is_processed가 false인 로그
+                            .should(s -> s.bool(bs -> bs.mustNot(mn -> mn.exists(e -> e.field(LOG_KEY_PROCESSED)))))  // is_processed 필드가 없는 로그
                     ))
                     .size(1000)  // 최대 1000개의 로그를 가져옴
                     .build();
@@ -286,7 +301,7 @@ public class LogService {
                 .hits().hits().stream()
                 .map(hit -> {
                     Map<String, Object> logMap = hit.source();
-                    logMap.put("_id", hit.id());
+                    logMap.put(LOG_KEY_ID, hit.id());
                     return logMap;
                 })
                 .collect(Collectors.toList());
@@ -296,21 +311,22 @@ public class LogService {
         return logs.stream()
                 .map(log -> {
                     // 맵에서 기존 데이터 추출
-                    Map<String, Object> container = (Map<String, Object>) log.get("container");
-                    String containerName = container != null ? (String) container.get("name") : "unknown_service";
-                    String message = (String) log.get("message");
+                    Map<String, Object> container = (Map<String, Object>) log.get(LOG_KEY_CONTAINER);
+                    String containerName = container != null ? (String) container.get(CONTAINER_KEY_NAME) : UNKNOWN_CONTAINER;
+                    String message = Optional.ofNullable((String) log.get(LOG_KEY_MESSAGE))
+                            .orElse(NO_MESSAGE);
 
                     // 로그 레벨 추출
                     String logLevel = extractLogLevel(message);
 
                     // 맵에 필드 추가
-                    log.put("log_level", logLevel);
-                    log.put("container_name", containerName);
-                    log.put("is_processed", true);
-                    log.put("message", message != null ? message : "No message");
+                    log.put(LOG_KEY_LEVEL, logLevel);
+                    log.put(LOG_KEY_CONTAINER_NAME, containerName);
+                    log.put(LOG_KEY_PROCESSED, true);
+                    log.put(LOG_KEY_MESSAGE, message);
 
                     // container 필드는 삭제
-                    log.remove("container");
+                    log.remove(LOG_KEY_CONTAINER);
 
                     return log;
                 })
@@ -321,7 +337,7 @@ public class LogService {
         String indexName = getTodayIndexName();
 
         for (Map<String, Object> logMap : updatedLogMaps) {
-            String id = (String) logMap.remove("_id");
+            String id = (String) logMap.remove(LOG_KEY_ID);
 
             UpdateRequest<Map<String, Object>, Map<String, Object>> updateRequest = new UpdateRequest.Builder<Map<String, Object>, Map<String, Object>>()
                     .index(indexName)
@@ -335,11 +351,11 @@ public class LogService {
 
     // 로그 메시지에서 로그 레벨 추출
     private String extractLogLevel(String message) {
-        return (message == null) ? "UNKNOWN" :
-                Stream.of("INFO", "ERROR", "WARN")
+        return (message == null) ? LOG_LEVEL_UNKNOWN :
+                Stream.of(LOG_LEVEL_INFO, LOG_LEVEL_ERROR, LOG_LEVEL_WARN)
                         .filter(message::contains)
                         .findFirst()
-                        .orElse("UNKNOWN");
+                        .orElse(LOG_LEVEL_INFO);
     }
 
     // 오늘 날짜를 기반으로 인덱스 이름 생성
@@ -354,7 +370,7 @@ public class LogService {
         DeleteByQueryRequest deleteRequest = DeleteByQueryRequest.of(d -> d
                 .index("docker-logs-*")
                 .query(q -> q.range(r -> r
-                        .field("@timestamp")
+                        .field(LOG_KEY_TIMESTAMP)
                         .lte(JsonData.of(lastCollectedTime.toString()))
                 ))
         );
@@ -370,7 +386,7 @@ public class LogService {
 
         // 1. 서비스별로 로그를 그룹화
         Map<String, List<Map<String, Object>>> logsByContainerName = logs.stream()
-                .collect(Collectors.groupingBy(log -> (String) log.getOrDefault("container_name", "unknown")));
+                .collect(Collectors.groupingBy(log -> (String) log.getOrDefault(LOG_KEY_CONTAINER_NAME, UNKNOWN_CONTAINER)));
 
         // 2. 로그를 저장할 디렉토리가 없으면 생성
         createLogDirectoryIfNotExist();
@@ -400,7 +416,7 @@ public class LogService {
         // 파일에 기록하기 위한 BufferedWriter 생성
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(logFileName, true))) {
             for (Map<String, Object> logMap : logMaps) {
-                String logMessage = formatLogMap(logMap);
+                String logMessage = formatLogToStr(logMap);
 
                 if (logMessage != null) {
                     writer.write(logMessage);
@@ -411,11 +427,11 @@ public class LogService {
         }
     }
 
-    private String formatLogMap(Map<String, Object> logMap) {
+    private String formatLogToStr(Map<String, Object> logMap) {
         // 필요한 로그 데이터만 추출하여 포맷팅
-        Object timestamp = logMap.get("@timestamp");
-        Object logLevel = logMap.get("log_level");
-        Object message = logMap.get("message");
+        Object timestamp = logMap.get(LOG_KEY_TIMESTAMP);
+        Object logLevel = logMap.get(LOG_KEY_LEVEL);
+        Object message = logMap.get(LOG_KEY_MESSAGE);
 
         // timestamp 또는 message가 없으면 해당 로그는 무시
         if (timestamp == null || message == null) {
@@ -425,7 +441,7 @@ public class LogService {
         // 로그 데이터를 원하는 형식으로 포맷
         return String.format("[%s] %s: %s",
                 timestamp.toString(),
-                logLevel != null ? logLevel.toString() : "INFO", // log_level이 없으면 기본값으로 INFO 사용
+                logLevel != null ? logLevel.toString() : LOG_LEVEL_INFO,
                 message.toString());
     }
 
@@ -434,11 +450,11 @@ public class LogService {
             CreateIndexRequest createIndexRequest = new CreateIndexRequest.Builder()
                     .index(indexName)
                     .mappings(m -> m
-                            .properties("is_processed", p -> p.boolean_(b -> b))
-                            .properties("@timestamp", p -> p.date(d -> d))
-                            .properties("log_level", p -> p.keyword(k -> k))
-                            .properties("container_name", p -> p.keyword(k -> k))
-                            .properties("message", p -> p.text(t -> t))
+                            .properties(LOG_KEY_PROCESSED, p -> p.boolean_(b -> b))
+                            .properties(LOG_KEY_TIMESTAMP, p -> p.date(d -> d))
+                            .properties(LOG_KEY_LEVEL, p -> p.keyword(k -> k))
+                            .properties(LOG_KEY_CONTAINER_NAME, p -> p.keyword(k -> k))
+                            .properties(LOG_KEY_MESSAGE, p -> p.text(t -> t))
                     )
                     .build();
 
