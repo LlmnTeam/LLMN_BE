@@ -1,6 +1,7 @@
 package com.example.llmn.core.config;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
@@ -15,8 +16,10 @@ import java.util.concurrent.CopyOnWriteArrayList;
 @Slf4j
 public class RedisWebSocketHandler extends TextWebSocketHandler {
 
+    @Value("${spring.data.redis.host}")
+    private String REDIS_HOST;
+
     private static final String REDIS_CHANNEL = "ssh-command-output";
-    private static final String REDIS_HOST = "localhost";
     private static final int REDIS_TIMEOUT = 60000; // 1분
     private static final int REDIS_PORT = 6379;
 

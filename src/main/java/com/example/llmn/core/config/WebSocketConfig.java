@@ -1,6 +1,7 @@
 package com.example.llmn.core.config;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.socket.WebSocketHandler;
 import org.springframework.web.socket.config.annotation.EnableWebSocket;
@@ -12,11 +13,14 @@ import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry
 @RequiredArgsConstructor
 public class WebSocketConfig implements WebSocketConfigurer {
 
+    @Value("${websocket.endpoint}")
+    private String WEB_SOCKET_ENDPOINT;
+
     private final RedisWebSocketHandler redisWebSocketHandler;
 
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
         // WebSocket 핸들러 등록
-        registry.addHandler(redisWebSocketHandler, "/ws").setAllowedOrigins("*");
+        registry.addHandler(redisWebSocketHandler, WEB_SOCKET_ENDPOINT).setAllowedOrigins("*");
     }
 }

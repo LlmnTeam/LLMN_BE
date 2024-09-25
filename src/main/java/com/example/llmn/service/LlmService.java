@@ -7,6 +7,7 @@ import com.example.llmn.repository.ProjectRepository;
 import com.example.llmn.repository.SummaryRepository;
 import com.example.llmn.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,17 +32,36 @@ public class LlmService {
     private final SummaryRepository summaryRepository;
     private final ProjectRepository projectRepository;
     private final WebClient webClient;
-    private static final String LOG_SUMMERY_URI = "http://localhost:8000/process/logSummary";
-    private static final String PERFORMANCE_SUMMERY_URI = "http://localhost:8000/process/performanceSummary";
-    private static final String DAILY_SUMMERY_URI = "http://localhost:8000/process/dailySummary";
-    private static final String HOURLY_SUMMARY_URI = "http://localhost:8000/process/hourlySummary";
-    private static final String TREND_SUMMERY_URI = "http://localhost:8000/process/trendSummary";
-    private static final String RECOMMEND_URI = "http://localhost:8000/process/recommend";
+
+    @Value("${log.summary.uri}")
+    private String LOG_SUMMERY_URI;
+
+    @Value("${performance_summary.uri}")
+    private String PERFORMANCE_SUMMERY_URI;
+
+    @Value("${daily_summary.uri}")
+    private String DAILY_SUMMERY_URI;
+
+    @Value("${hourly.summary.uri}")
+    private String HOURLY_SUMMARY_URI;
+
+    @Value("${trend.summary.uri}")
+    private String TREND_SUMMERY_URI;
+
+    @Value("${recommend.uri}")
+    private String RECOMMEND_URI;
+
+    private static final String PERFORMANCE_SUMMARY_HEADER = "### Performance Summary ###\n";
+    private static final String APPLICATION_LOG_SUMMARY_HEADER = "### Application Log Summary ###\n";
+    private static final String WEEKLY_TREND_HEADER = "### Weekly Trend Summaries ###\n\n";
+    private static final String LOG_EMERGENCY_ALARM_SUFFIX = "의 로그를 점검 해보세요. 문제점이 발견되었습니다.";
+    private static final String LOG_UPDATE_ALARM_SUFFIX = "의 요약이 업데이트 되었습니다.";
     private static final int METRIC_HISTORY_PREVIOUS_HOUR = 1;
     private static final String PERFORMANCE_SUMMARY_ALARM = "새로운 성능 요약이 생성 되었습니다.";
     private static final String DAILY_SUMMARY_ALARM = "새로운 일일 요약이 생성 되었습니다.";
     private static final String TREND_SUMMARY_ALARM = "장기 트렌드 분석 요약이 생성 되었습니다.";
     private static final String RECOMMENDATION_ALARM = "새로운 추천 사항이 업데이트 되었습니다";
+    private static final String NO_SUMMARY_DATA = "- 요약 데이터가 존재하지 않습니다.\n";
 
     @Transactional
     @Scheduled(cron = "0 0 * * * *") // 매시 0분
@@ -66,7 +86,7 @@ public class LlmService {
                     project.updateIsUrgent(summaryDTO.isUrgent());
 
                     // 긴급 알람 업데이트
-                    String emergencyAlarmContent = project.getProjectName() + "의 로그를 점검 해보세요. 문제점이 발견되었습니다.";
+                    String emergencyAlarmContent = project.getProjectName() + LOG_EMERGENCY_ALARM_SUFFIX;
                     alarmService.generateAlarm(project.getUser().getId(), emergencyAlarmContent, AlarmType.EMERGENCY);
 
                     // 일반 요약 저장
@@ -90,7 +110,7 @@ public class LlmService {
                     summaryRepository.save(anomalySummary);
 
                     // 업데이트 알람 생성
-                    String updateAlarmContent = project.getProjectName() + "의 요약이 업데이트 되었습니다.";
+                    String updateAlarmContent = project.getProjectName() + LOG_UPDATE_ALARM_SUFFIX;
                     alarmService.generateAlarm(project.getUser().getId(), updateAlarmContent, AlarmType.UPDATE);
                 });
     }
@@ -271,9 +291,9 @@ public class LlmService {
         List<Summary> logSummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.GENERAL, SummaryType.ANOMALY), userId, startOfHour);
 
         // 성능 요약을 로그 메시지로 변환
-        logMessageBuilder.append("### Performance Summary ###\n");
+        logMessageBuilder.append(PERFORMANCE_SUMMARY_HEADER);
         if (performanceSummaries.isEmpty()) {
-            logMessageBuilder.append("- 최근에 성능 요약이 없습니다.\n");
+            logMessageBuilder.append(NO_SUMMARY_DATA);
         } else {
             for (Summary summary : performanceSummaries) {
                 logMessageBuilder.append("Time: ")
@@ -285,9 +305,9 @@ public class LlmService {
         }
 
         // 일반 및 이상 로그 요약을 로그 메시지로 변환
-        logMessageBuilder.append("\n### Application Log Summary ###\n");
+        logMessageBuilder.append(APPLICATION_LOG_SUMMARY_HEADER);
         if (logSummaries.isEmpty()) {
-            logMessageBuilder.append("- 최근에 로그 요약이 없습니다.\n");
+            logMessageBuilder.append(NO_SUMMARY_DATA);
         } else {
             for (Summary summary : logSummaries) {
                 logMessageBuilder.append("Time: ")
@@ -318,9 +338,9 @@ public class LlmService {
         List<Summary> logSummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.GENERAL, SummaryType.ANOMALY), userId, startOfDay);
 
         // 성능 요약을 로그 메시지로 변환
-        logMessageBuilder.append("### Performance Summary ###\n");
+        logMessageBuilder.append(PERFORMANCE_SUMMARY_HEADER);
         if (performanceSummaries.isEmpty()) {
-            logMessageBuilder.append("- 오늘의 성능 요약이 없습니다.\n");
+            logMessageBuilder.append(NO_SUMMARY_DATA);
         } else {
             for (Summary summary : performanceSummaries) {
                 logMessageBuilder.append("Time: ")
@@ -332,9 +352,9 @@ public class LlmService {
         }
 
         // 일반 및 이상 로그 요약을 로그 메시지로 변환
-        logMessageBuilder.append("\n### Application Log Summary ###\n");
+        logMessageBuilder.append(APPLICATION_LOG_SUMMARY_HEADER);
         if (logSummaries.isEmpty()) {
-            logMessageBuilder.append("- 오늘의 로그 요약이 없습니다.\n");
+            logMessageBuilder.append(NO_SUMMARY_DATA);
         } else {
             for (Summary summary : logSummaries) {
                 logMessageBuilder.append("Time: ")
@@ -364,7 +384,7 @@ public class LlmService {
         LocalDateTime startOfDay = LocalDateTime.now().minusWeeks(1).with(LocalTime.MIN);
         List<Summary> trendSummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.DAILY), userId, startOfDay);
 
-        logMessageBuilder.append("### Weekly Trend Summaries ###\n\n");
+        logMessageBuilder.append(WEEKLY_TREND_HEADER);
 
         for (Summary summary : trendSummaries) {
             logMessageBuilder.append("Date: ")
@@ -394,9 +414,9 @@ public class LlmService {
         List<Summary> logSummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.GENERAL, SummaryType.ANOMALY), userId, startOfTime);
 
         // 성능 요약을 로그 메시지로 변환
-        logMessageBuilder.append("### Performance Summary ###\n");
+        logMessageBuilder.append(PERFORMANCE_SUMMARY_HEADER);
         if (performanceSummaries.isEmpty()) {
-            logMessageBuilder.append("- 성능 요약 내역이 없습니다.\n");
+            logMessageBuilder.append(NO_SUMMARY_DATA);
         } else {
             for (Summary summary : performanceSummaries) {
                 logMessageBuilder.append("Date: ")
@@ -408,9 +428,9 @@ public class LlmService {
         }
 
         // 일반 및 이상 로그 요약을 로그 메시지로 변환
-        logMessageBuilder.append("\n### Application Log Summary ###\n");
+        logMessageBuilder.append(APPLICATION_LOG_SUMMARY_HEADER);
         if (logSummaries.isEmpty()) {
-            logMessageBuilder.append("- 로그 요약 내역이 없습니다.\n");
+            logMessageBuilder.append(NO_SUMMARY_DATA);
         } else {
             for (Summary summary : logSummaries) {
                 logMessageBuilder.append("Date: ")

@@ -27,6 +27,10 @@ import java.time.format.DateTimeFormatter;
 public class JwtAuthenticationFilter extends BasicAuthenticationFilter {
 
     private final RedisService redisService;
+    private static final String REDIS_KEY_REFRESH_TOKEN = "refreshToken";
+    private static final String REDIS_KEY_ACCESS_TOKEN = "accessToken";
+    public static final String REFRESH_TOKEN_COOKIE_KEY = "refreshToken";
+    public static final String ACCESS_TOKEN_COOKIE_KEY = "accessToken";
 
     public JwtAuthenticationFilter(AuthenticationManager authenticationManager, RedisService redisService) {
         super(authenticationManager);
@@ -41,7 +45,7 @@ public class JwtAuthenticationFilter extends BasicAuthenticationFilter {
                 authorizationHeader.replace(JWTProvider.TOKEN_PREFIX, "") : null;
 
         // 리프레쉬 토큰은 '쿠키'에서 추출
-        String refreshToken = CookieUtils.getCookieFromRequest(JWTProvider.REFRESH_TOKEN_COOKIE_KEY, request);
+        String refreshToken = CookieUtils.getCookieFromRequest(REFRESH_TOKEN_COOKIE_KEY, request);
 
         // 1st 토큰 값이 존재하는지 체크
         if (checkIsTokenEmpty(accessToken, refreshToken)){
@@ -62,8 +66,8 @@ public class JwtAuthenticationFilter extends BasicAuthenticationFilter {
                 refreshToken = JWTProvider.createRefreshToken(user);
 
                 updateToken(user, accessToken, refreshToken);
-                CookieUtils.setCookieToResponse(JWTProvider.ACCESS_TOKEN_COOKIE_KEY, accessToken, JWTProvider.ACCESS_EXP_SEC, false, false, response);
-                CookieUtils.setCookieToResponse(JWTProvider.REFRESH_TOKEN_COOKIE_KEY, refreshToken, JWTProvider.REFRESH_EXP_SEC, false, true, response);
+                CookieUtils.setCookieToResponse(ACCESS_TOKEN_COOKIE_KEY, accessToken, JWTProvider.ACCESS_EXP_SEC, false, false, response);
+                CookieUtils.setCookieToResponse(REFRESH_TOKEN_COOKIE_KEY, refreshToken, JWTProvider.REFRESH_EXP_SEC, false, true, response);
             }
         }
 
@@ -78,7 +82,7 @@ public class JwtAuthenticationFilter extends BasicAuthenticationFilter {
         redisService.addSetElement(createVisitKey(), user.getId());
 
         // Request 쿠키와 Response 쿠키 동기화
-        CookieUtils.syncHttpResponseCookiesFromHttpRequest(request, response, JWTProvider.ACCESS_TOKEN_COOKIE_KEY, JWTProvider.REFRESH_TOKEN_COOKIE_KEY);
+        CookieUtils.syncHttpResponseCookiesFromHttpRequest(request, response, ACCESS_TOKEN_COOKIE_KEY, REFRESH_TOKEN_COOKIE_KEY);
 
         // 엑세스 토큰은 HTTP Header로 리턴
         response.setHeader(HttpHeaders.AUTHORIZATION, JWTProvider.TOKEN_PREFIX + accessToken);
@@ -135,7 +139,7 @@ public class JwtAuthenticationFilter extends BasicAuthenticationFilter {
         if (refreshToken != null) {
             User user = getUserFromToken(refreshToken);
 
-            if (user != null && redisService.validateData("refreshToken", String.valueOf(user.getId()), refreshToken)) {
+            if (user != null && redisService.validateData(REDIS_KEY_REFRESH_TOKEN, String.valueOf(user.getId()), refreshToken)) {
                 return user;
             }
         }
@@ -144,9 +148,9 @@ public class JwtAuthenticationFilter extends BasicAuthenticationFilter {
 
     private void updateToken(User user, String accessToken, String refreshToken){
         // 리프레쉬 토큰 갱신
-        redisService.storeValue("refreshToken", String.valueOf(user.getId()), refreshToken, JWTProvider.REFRESH_EXP_MILLI);
+        redisService.storeValue(REDIS_KEY_REFRESH_TOKEN, String.valueOf(user.getId()), refreshToken, JWTProvider.REFRESH_EXP_MILLI);
 
         // 엑세스 토큰 갱신
-        redisService.storeValue("accessToken", String.valueOf(user.getId()), accessToken, JWTProvider.ACCESS_EXP_MILLI);
+        redisService.storeValue(REDIS_KEY_ACCESS_TOKEN, String.valueOf(user.getId()), accessToken, JWTProvider.ACCESS_EXP_MILLI);
     }
 }

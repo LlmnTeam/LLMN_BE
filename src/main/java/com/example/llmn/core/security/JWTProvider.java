@@ -23,8 +23,6 @@ public class JWTProvider {
     public static final String TOKEN_PREFIX = "Bearer ";
     public static final String AUTHORIZATION = "Authorization";
     public static final String SECRET = "MySecretKey";
-    public static final String REFRESH_TOKEN_COOKIE_KEY = "refreshToken";
-    public static final String ACCESS_TOKEN_COOKIE_KEY = "accessToken";
 
 
     // access token 생성
