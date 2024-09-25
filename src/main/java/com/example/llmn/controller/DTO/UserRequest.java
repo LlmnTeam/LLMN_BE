@@ -49,4 +49,10 @@ public class UserRequest {
             String remoteKeyPath,
             boolean receivingAlarm){}
 
+    public record VerifyCodeDTO(
+            @NotBlank
+            @Pattern(regexp = "^[\\w._%+-]+@[\\w.-]+\\.[a-zA-Z]{2,6}$", message = "올바른 이메일 형식을 입력해주세요.")
+            String email,
+            @NotBlank(message = "코드를 입력해주세요.")
+            String code){}
 }

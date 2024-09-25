@@ -174,7 +174,7 @@ public class SSHCommandExecutor {
                 String output = new String(buffer, 0, bytesRead, StandardCharsets.UTF_8);
                 resultBuilder.append(output);
 
-                // Redis에 출력 전송
+                // Redis에 읽고 있는 데이터 전송
                 jedis.publish(REDIS_CHANNEL, output);
             }
         }

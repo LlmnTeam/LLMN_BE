@@ -26,4 +26,6 @@ public class UserResponse {
             String remoteHost,
             String remoteKeyPath,
             boolean receivingAlarm){}
+
+    public record VerifyEmailCodeDTO(boolean isMatching) {}
 }

@@ -23,12 +23,6 @@ public class LogController {
 
     private final LogService logService;
 
-    @PatchMapping("/logs")
-    public ResponseEntity<?> fetchLogs() throws IOException {
-        // logService.fetchLogs();
-        return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, null));
-    }
-
     @GetMapping("/logs")
     public ResponseEntity<?> searchLogs(@RequestParam Instant startTime,
                                         @RequestParam Instant endTime,

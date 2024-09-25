@@ -138,6 +138,14 @@ public class UserService {
         }
     }
 
+    public UserResponse.VerifyEmailCodeDTO verifyCode(UserRequest.VerifyCodeDTO requestDTO, String codeType){
+        // 레디스를 통해 해당 코드가 유효한지 확인
+        if(!redisService.validateData(REDIS_KEY_EMAIL_CODE + codeType, requestDTO.email(), requestDTO.code()))
+            return new UserResponse.VerifyEmailCodeDTO(false);
+
+        return new UserResponse.VerifyEmailCodeDTO(true);
+    }
+
     public Path uploadSSHKey(MultipartFile file) throws IOException {
         if (file.isEmpty()) {
             throw new IllegalArgumentException("파일이 없습니다.");

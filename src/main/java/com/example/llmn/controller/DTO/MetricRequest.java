@@ -4,5 +4,5 @@ import jakarta.validation.constraints.NotBlank;
 
 public class MetricRequest {
 
-    public record ExecuteCommandDTO(@NotBlank(message="설명을 입력해주세요.") String command){}
+    public record ExecuteCommandDTO(@NotBlank(message="명령을 입력해주세요.") String command){}
 }
