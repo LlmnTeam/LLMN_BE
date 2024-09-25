@@ -20,11 +20,17 @@ public class DockerService {
     private final ObjectMapper objectMapper;
 
     private static final String RESOURCE_KEY = "resource";
+    public static final String DOCKER_RESOURCE_KEY_CPU = "CPU";
+    public static final String DOCKER_RESOURCE_KEY_MEMORY = "Memory";
+    public static final String COMMAND_DOCKER_STOP = "docker stop ";
+    public static final String COMMAND_DOCKER_RESTART = "docker restart ";
+    public static final String COMMAND_DOCKER_PS = "docker ps --format \"{{.Names}}\"";
+    public static final String COMMAND_DOCKER_STATS = "docker stats --no-stream --format \"{{.Name}}:{{.CPUPerc}}:{{.MemUsage}}\"";
     private static final Long RESOURCE_EXP = 10 * 60 * 1000L; // 10분
 
     // 도커 컨테이너 종료
     public boolean stopContainerByName(String containerName, Long userId) throws Exception {
-        String command = "docker stop " + containerName;
+        String command = COMMAND_DOCKER_STOP + containerName;
         String commandResponse = sshService.executeCommandOnce(command, userId);
 
         return commandResponse.trim().equals(containerName);  // 성공 여부 true/false로 리턴
@@ -32,7 +38,7 @@ public class DockerService {
 
     // 도커 컨테이너 재시작
     public boolean restartContainerByName(String containerName, Long userId) throws Exception {
-        String command = "docker restart " + containerName;
+        String command = COMMAND_DOCKER_RESTART + containerName;
         String commandResponse = sshService.executeCommandOnce(command, userId);
 
         return commandResponse.trim().equals(containerName);
@@ -40,8 +46,7 @@ public class DockerService {
 
     // 실행중인 도커 컨테이너 목록 조회
     public List<String> findRunningContainerList(Long userId) throws Exception {
-        String command = "docker ps --format \"{{.Names}}\"";
-        String commandResponse = sshService.executeCommandOnce(command, userId);
+        String commandResponse = sshService.executeCommandOnce(COMMAND_DOCKER_PS, userId);
 
         // 응답을 줄 단위로 나눠서 리스트로 변환
         List<String> containerNames = Arrays.asList(commandResponse.split("\n"));
@@ -72,8 +77,7 @@ public class DockerService {
         }
 
         // 캐시를 사용하지 않거나 캐시된 값이 없음 => 조회해서 사용
-        String command = "docker stats --no-stream --format \"{{.Name}}:{{.CPUPerc}}:{{.MemUsage}}\"";
-        String commandResponse = sshService.executeCommandOnce(command, userId);
+        String commandResponse = sshService.executeCommandOnce(COMMAND_DOCKER_STATS, userId);
 
         // 결과를 줄 단위로 나눔
         String[] lines = commandResponse.split("\n");
@@ -93,8 +97,8 @@ public class DockerService {
 
                 // 내부 맵 생성 후 CPU와 메모리 사용량 추가
                 Map<String, String> resourceUsage = new HashMap<>();
-                resourceUsage.put("CPU", cpuUsage);
-                resourceUsage.put("Memory", memUsage);
+                resourceUsage.put(DOCKER_RESOURCE_KEY_CPU, cpuUsage);
+                resourceUsage.put(DOCKER_RESOURCE_KEY_MEMORY, memUsage);
 
                 containerUsageMap.put(containerName, resourceUsage);
             }
