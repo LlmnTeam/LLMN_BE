@@ -12,7 +12,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -36,53 +35,55 @@ public class SearchService {
 
         // <containerName, projectId> 형태의 맵 생성
         List<Project> projects = projectRepository.findByUserId(userId);
-        Map<String, Long> projectMap = projects.stream()
+        Map<String, Long> containerNameToIdMap = projects.stream()
                 .collect(Collectors.toMap(Project::getContainerName, Project::getId));
 
         // 1. 로그 파일 검색
         List<String> logFiles = logService.findLogFileList();
+        List<SearchResponse.LogFileDTO> searchedLogDTOS = searchLogFiles(logFiles, lowerCaseKeyword, startDate, endDate, containerNameToIdMap);
 
-        List<SearchResponse.LogFileDTO> logFileDTOS = logFiles.stream()
-                .filter(logFileName -> logFileName.toLowerCase().contains(lowerCaseKeyword)) // 키워드 필터링
+        // 2. 인사이트 기록 검색
+        List<SearchResponse.InsightDTO> searchedInsightDTOS = searchInsights(projects, lowerCaseKeyword, startDate, endDate);
+
+        return new SearchResponse.SearchDTO(searchedLogDTOS, searchedInsightDTOS);
+    }
+
+    private List<SearchResponse.LogFileDTO> searchLogFiles(List<String> logFiles, String keyword, LocalDateTime startDate, LocalDateTime endDate, Map<String, Long> containerNameToIdMap) {
+        return logFiles.stream()
+                .filter(logFileName -> logFileName.toLowerCase().contains(keyword)) // 키워드 필터링
                 .filter(logFileName -> { // 시간 필터링 (시작일 ~ 종료일)
                     LocalDateTime logDateTime = extractDateTime(logFileName);
-                    return logDateTime != null && (logDateTime.isEqual(startDate) || logDateTime.isAfter(startDate)) // 시작일자 이후
-                            && (logDateTime.isEqual(endDate) || logDateTime.isBefore(endDate)); // 종료일자 이전
+                    return isWithinDateRange(logDateTime, startDate, endDate);
                 })
-                .map(logFileName -> {
+                .map(logFileName -> { // DTO로 매핑
                     String containerName = extractContainerName(logFileName);
-                    Long projectId = projectMap.get(containerName);
+                    Long projectId = containerNameToIdMap.get(containerName);
                     String redirectURL = buildLogfileRedirectURL(projectId,logFileName);
                     return new SearchResponse.LogFileDTO(logFileName, redirectURL);
                 })
                 .toList();
+    }
 
-        // 2. 인사이트 기록 검색
-        List<Summary> summaries = new ArrayList<>();
-
+    private List<SearchResponse.InsightDTO> searchInsights(List<Project> projects, String keyword, LocalDateTime startDate, LocalDateTime endDate){
         // 검색 키워드와 연관된 프로젝트 검색
-        List<Project> searchedProjects = projects.stream()
-                .filter(project -> project.getProjectName().toLowerCase().contains(lowerCaseKeyword)
-                        || project.getContainerName().toLowerCase().contains(lowerCaseKeyword)
-                        || lowerCaseKeyword.contains(project.getProjectName().toLowerCase())
-                        || lowerCaseKeyword.contains(project.getContainerName().toLowerCase()))
+        List<Project> relatedProjects = projects.stream()
+                .filter(project -> project.getProjectName().toLowerCase().contains(keyword)
+                        || project.getContainerName().toLowerCase().contains(keyword)
+                        || keyword.contains(project.getProjectName().toLowerCase())
+                        || keyword.contains(project.getContainerName().toLowerCase()))
+                .distinct()
                 .toList();
 
         // 검색된 프로젝트의 인사이트 목록 조회
-        for(Project project : searchedProjects) {
-            List<Summary> foundSummaries = summaryRepository.findByProjectAndDateRange(project, startDate, endDate);
-            summaries.addAll(foundSummaries);
-        }
+        List<Summary> summaries = summaryRepository.findByProjectsAndDateRange(relatedProjects, startDate, endDate);
 
-        List<SearchResponse.InsightDTO> insightDTOS = summaries.stream()
+        return summaries.stream()
                 .map(summary -> new SearchResponse.InsightDTO(
                         summary.getProject().getProjectName(),
                         formatLocalDateTime(summary.getCreatedDate()),
                         summary.getSummaryType(),
                         summary.getContent()))
                 .toList();
-
-        return new SearchResponse.SearchDTO(logFileDTOS, insightDTOS);
     }
 
     // 로그 파일명 형식인 '프로젝트명-log-날짜.txt'에서 프로젝트명 추출하기
@@ -110,9 +111,9 @@ public class SearchService {
         if (matcher.matches()) {
             String datePart = matcher.group(1); // yyyy-MM-dd
             String hourPart = matcher.group(2); // HH
-
-            // '2024-09-13 20' 형태로 날짜와 시간을 합침
             String dateTimeString = datePart + " " + hourPart;
+
+            // '2024-09-13 20' 형태
             DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH");
 
             return LocalDateTime.parse(dateTimeString, formatter);
@@ -133,5 +134,10 @@ public class SearchService {
 
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
         return localDateTime.format(formatter);
+    }
+
+    private boolean isWithinDateRange(LocalDateTime data, LocalDateTime startDate, LocalDateTime endDate) {
+        return data != null && (data.isEqual(startDate) || data.isAfter(startDate)) // 시작일자 이후
+                && (data.isEqual(endDate) || data.isBefore(endDate)); // 종료일자 이전
     }
 }
