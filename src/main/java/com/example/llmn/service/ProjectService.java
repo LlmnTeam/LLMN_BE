@@ -34,6 +34,13 @@ public class ProjectService {
     private final SummaryRepository summaryRepository;
     private final EntityManager entityManager;
 
+    private static final String DOCKER_RESOURCE_KEY_CPU = "CPU";
+    private static final String DOCKER_RESOURCE_KEY_MEMORY = "Memory";
+    private static final String NOT_ACCESSIBLE_VALUE = "N/A";
+    private static final String NOT_EXIST_SUMMARY = "로그 요약본이 존재하지 않습니다.";
+    private static final String NOT_EXIST_LOG = "로그값이 존재하지 않습니다";
+    private static final String SORT_BY_DATE = "createdDate";
+
     @Transactional
     public ProjectResponse.CreateProjectDTO createProject(ProjectRequest.CreateProjectDTO requestDTO, Long userId){
         // 컨테이너 이름이 들어오지 않으면 NOT_CONNECTED로 처리
@@ -97,10 +104,10 @@ public class ProjectService {
         List<Project> projects = projectRepository.findByUserId(userId);
 
         // 컨테이너 리소스 조회
-        Map<String, Map<String, String>> containersResourceUsageMap = dockerService.findContainersResourceUsage(userId, isUsingCache);
+        Map<String, Map<String, String>> containersResourceMap = dockerService.findContainersResourceUsage(userId, isUsingCache);
 
         // 실행중인 컨테이너 목록 (Map의 키가 컨테이너 이름이니 이를 리스트로 변환)
-        List<String> runningContainerNames = new ArrayList<>(containersResourceUsageMap.keySet());
+        List<String> runningContainerNames = new ArrayList<>(containersResourceMap.keySet());
 
         List<ProjectResponse.ProjectDTO> projectDTOS = projects.stream()
                 .map(project -> {
@@ -114,12 +121,12 @@ public class ProjectService {
                     }
 
                     // CPU 및 메모리 사용량 값이 없을 경우 "N/A"로 처리
-                    String cpuUsage = Optional.ofNullable(containersResourceUsageMap.get(project.getContainerName()))
-                            .map(resourceMap -> resourceMap.get("CPU"))
-                            .orElse("N/A");
-                    String memoryUsage = Optional.ofNullable(containersResourceUsageMap.get(project.getContainerName()))
-                            .map(resourceMap -> resourceMap.get("Memory"))
-                            .orElse("N/A");
+                    String cpuUsage = Optional.ofNullable(containersResourceMap.get(project.getContainerName()))
+                            .map(resourceMap -> resourceMap.get(DOCKER_RESOURCE_KEY_CPU))
+                            .orElse(NOT_ACCESSIBLE_VALUE);
+                    String memoryUsage = Optional.ofNullable(containersResourceMap.get(project.getContainerName()))
+                            .map(resourceMap -> resourceMap.get(DOCKER_RESOURCE_KEY_MEMORY))
+                            .orElse(NOT_ACCESSIBLE_VALUE);
 
                     return new ProjectResponse.ProjectDTO(
                         project.getId(),
@@ -143,14 +150,14 @@ public class ProjectService {
         );
 
         // 최신 요약본 가져오기
-        Pageable pageable = PageRequest.of(0, 1, Sort.by(Sort.Direction.DESC, "createdDate"));
+        Pageable pageable = PageRequest.of(0, 1, Sort.by(Sort.Direction.DESC, SORT_BY_DATE));
         Optional<Summary> latestSummary = summaryRepository.findLatestSummaryByProject(project, pageable)
                 .getContent()
                 .stream()
                 .findFirst();
 
         String summaryContent = latestSummary.map(Summary::getContent)
-                .orElse("로그 요약본이 존재하지 않습니다.");
+                .orElse(NOT_EXIST_SUMMARY);
         LocalDateTime updateTime = latestSummary.map(Summary::getCreatedDate)
                 .orElse(null);
 
@@ -158,7 +165,7 @@ public class ProjectService {
         String recentLog = logService.searchRecentLogInStr(project.getContainerName(), 2L);
 
         if (recentLog.isEmpty()) {
-            recentLog = "로그값이 존재하지 않습니다";
+            recentLog = NOT_EXIST_LOG;
         }
 
         return new ProjectResponse.FindProjectByIdDTO(
