@@ -27,12 +27,24 @@ public class MetricService {
     private final SSHService sshService;
     private final ObjectMapper objectMapper;
 
-    private static final String NETWORK_RECEIVED_KEY = "network:received";
-    private static final String NETWORK_TRANSMITTED_KEY = "network:transmitted";
+    private static final String REDIS_KEY_NETWORK_REC = "network:received";
+    private static final String REDIS_KEY_NETWORK_TRANS = "network:transmitted";
     private static final String METRIC_KEY = "metric";
     private static final Long METRIC_EXP = 10 * 60 * 1000L; // 10분
     private static final boolean UPDATE_CACHE = true;
     private static final boolean NOT_UPDATE_CACHE = false;
+    private static final String METRIC_MAP_CPU_USAGE = "cpuUsage";
+    private static final String METRIC_MAP_TOTAL_MEMORY = "totalMemory";
+    private static final String METRIC_MAP_USED_MEMORY = "usedMemory";
+    private static final String METRIC_MAP_NETWORK_REC = "networkReceived";
+    private static final String METRIC_MAP_NETWORK_SENT ="networkSent";
+    private static final String METRIC_MAP_DAILY_NET_REC = "dailyReceived";
+    private static final String METRIC_MAP_DAILY_NET_SENT ="dailySent";
+    private static final String COMMAND_TOP = "top -b -n1 | grep \"Cpu(s)\\|Mem\"";
+    private static final String COMMAND_NETWORK_USAGE = "cat /proc/net/dev | grep eth0";
+    private static final String CPU_USAGE_PREFIX = "%Cpu(s):";
+    private static final String MEM_USAGE_PREFIX = "MiB Mem";
+    public static final String NUMERIC_REGEX = "[^0-9.]";
 
     @Scheduled(cron = "0 0/10 * * * *")
     public void collectMetrics() throws Exception {
@@ -46,11 +58,11 @@ public class MetricService {
 
             Metric metric = Metric.builder()
                     .user(userRef)
-                    .cpuUsage(topMetrics.get("cpuUsage"))
-                    .totalMemory(topMetrics.get("totalMemory"))
-                    .usedMemory(topMetrics.get("usedMemory"))
-                    .totalBytesReceived(networkMetrics.get("networkReceived")) // 10분 간격의 네트워크 트래픽
-                    .totalBytesSent(networkMetrics.get("networkSent"))
+                    .cpuUsage(topMetrics.get(METRIC_MAP_CPU_USAGE))
+                    .totalMemory(topMetrics.get(METRIC_MAP_TOTAL_MEMORY))
+                    .usedMemory(topMetrics.get(METRIC_MAP_USED_MEMORY))
+                    .totalBytesReceived(networkMetrics.get(METRIC_MAP_NETWORK_REC)) // 10분 간격의 네트워크 트래픽
+                    .totalBytesSent(networkMetrics.get(METRIC_MAP_NETWORK_SENT))
                     .build();
 
             metricRepository.save(metric);
@@ -60,9 +72,8 @@ public class MetricService {
     public Map<String, Double> collectTopMetrics(Long userId) throws Exception {
         Map<String, Double> metricsMap = new HashMap<>();
 
-        // CPU와 메모리 사용량을 동시에 얻기 위한 top 명령어 실행
-        String command = "top -b -n1 | grep \"Cpu(s)\\|Mem\"";
-        String commandResponse = sshService.executeCommandOnce(command, userId);
+        // CPU와 메모리 사용량을 동시에 얻기 위해 top 명령어 실행
+        String commandResponse = sshService.executeCommandOnce(COMMAND_TOP, userId);
 
         // 명령어 응답 파싱
         String[] lines = commandResponse.split("\n");
@@ -70,30 +81,36 @@ public class MetricService {
         for (String line : lines) {
             line = line.trim();
 
-            // CPU 사용량 라인 처리
-            if (line.startsWith("%Cpu(s):")) {
+            // CPU 사용량 라인 처리 (%Cpu(s): 0.0 us, 6.2 sy, 0.0 ni, 93.8 id, 0.0 wa, 0.0 hi, 0.0 si, 0.0 st)
+            if (line.startsWith(CPU_USAGE_PREFIX)) {
                 // 쉼표를 기준으로 분리
                 String[] cpuParts = line.split(",");
 
-                // "Cpu(s):" 제거 후 공백과 문자를 제거하여 숫자만 추출
-                String usUsage = cpuParts[0].split(":")[1].trim().replaceAll("[^0-9.]", "").trim();
-                String syUsage = cpuParts[1].trim().replaceAll("[^0-9.]", "").trim();
+                // us 값과 sy 값 추출
+                String usUsage = cpuParts[0].split(":")[1]
+                        .trim()
+                        .replaceAll(NUMERIC_REGEX, "")
+                        .trim();
+                String syUsage = cpuParts[1]
+                        .trim()
+                        .replaceAll(NUMERIC_REGEX, "")
+                        .trim();
 
                 // us와 sy를 합쳐서 CPU 부하량 계산
                 double cpuUsage = Double.parseDouble(usUsage) + Double.parseDouble(syUsage);
-                metricsMap.put("cpuUsage", cpuUsage);
+                metricsMap.put(METRIC_MAP_CPU_USAGE, cpuUsage);
             }
 
-            // 메모리 사용량 라인 처리
-            if (line.startsWith("MiB Mem")) {
+            // 메모리 사용량 라인 처리 (MiB Mem : 949.2 total, 141.4 free, 325.1 used, 482.8 buff/cache)
+            if (line.startsWith(MEM_USAGE_PREFIX)) {
                 String[] memParts = line.split(",");
 
                 // 전체 메모리와 사용 메모리 추출
-                String memTotal = memParts[0].replaceAll("[^0-9.]", "").trim();
-                String memUsed = memParts[2].replaceAll("[^0-9.]", "").trim();
+                String memTotal = memParts[0].replaceAll(NUMERIC_REGEX, "").trim();
+                String memUsed = memParts[2].replaceAll(NUMERIC_REGEX, "").trim();
 
-                metricsMap.put("totalMemory", Double.parseDouble(memTotal));
-                metricsMap.put("usedMemory", Double.parseDouble(memUsed));
+                metricsMap.put(METRIC_MAP_TOTAL_MEMORY, Double.parseDouble(memTotal));
+                metricsMap.put(METRIC_MAP_USED_MEMORY, Double.parseDouble(memUsed));
             }
         }
 
@@ -105,23 +122,23 @@ public class MetricService {
         Map<String, Double> metricsMap = new HashMap<>();
 
         // 현재 네트워크 사용량 조회
-        Map<String, Double> currentUsage = collectNetworkUsage(userId);
+        Map<String, Double> currentNetworkMetric = collectNetworkUsage(userId);
 
         // 레디스에서 이전 네트워크 사용량 조회 (없으면 0.0)
-        Double previousReceived = redisService.getDataInDouble(NETWORK_RECEIVED_KEY);
-        Double previousTransmitted = redisService.getDataInDouble(NETWORK_TRANSMITTED_KEY);
+        Double previousReceived = redisService.getDataInDouble(REDIS_KEY_NETWORK_REC);
+        Double previousTransmitted = redisService.getDataInDouble(REDIS_KEY_NETWORK_TRANS);
 
         // 특정 기간 동안의 네트워크 사용량 계산 (설정한 기간에 따라 달라짐)
-        double receivedDiff = currentUsage.get("networkReceived") - previousReceived;
-        double transmittedDiff = currentUsage.get("networkSent") - previousTransmitted;
+        double receivedDiff = currentNetworkMetric.get(METRIC_MAP_NETWORK_REC) - previousReceived;
+        double transmittedDiff = currentNetworkMetric.get(METRIC_MAP_NETWORK_SENT) - previousTransmitted;
 
-        metricsMap.put("networkReceived", receivedDiff);
-        metricsMap.put("networkSent", transmittedDiff);
+        metricsMap.put(METRIC_MAP_NETWORK_REC, receivedDiff);
+        metricsMap.put(METRIC_MAP_NETWORK_SENT, transmittedDiff);
 
         // 업데이트 플래그가 존재 => 현재 네트워크 사용량으로 업데이트
         if(updateCache) {
-            redisService.storeValue(NETWORK_RECEIVED_KEY, String.valueOf(currentUsage.get("networkReceived")));
-            redisService.storeValue(NETWORK_TRANSMITTED_KEY, String.valueOf(currentUsage.get("networkSent")));
+            redisService.storeValue(REDIS_KEY_NETWORK_REC, String.valueOf(currentNetworkMetric.get(METRIC_MAP_NETWORK_REC)));
+            redisService.storeValue(REDIS_KEY_NETWORK_TRANS, String.valueOf(currentNetworkMetric.get(METRIC_MAP_NETWORK_SENT)));
         }
 
         return metricsMap;
@@ -139,11 +156,11 @@ public class MetricService {
         Map<String, Double> networkMetrics = collectNetworkMetrics(userId, NOT_UPDATE_CACHE);
 
         MetricResponse.FindCurrentMetricDTO metricDTO = new MetricResponse.FindCurrentMetricDTO(
-                topMetrics.get("cpuUsage"),
-                topMetrics.get("totalMemory"),
-                topMetrics.get("usedMemory"),
-                networkMetrics.get("networkReceived"),
-                networkMetrics.get("networkSent")
+                topMetrics.get(METRIC_MAP_CPU_USAGE),
+                topMetrics.get(METRIC_MAP_TOTAL_MEMORY),
+                topMetrics.get(METRIC_MAP_USED_MEMORY),
+                networkMetrics.get(METRIC_MAP_NETWORK_REC),
+                networkMetrics.get(METRIC_MAP_NETWORK_SENT)
         );
 
         // 유효 시간은 10분
@@ -214,17 +231,18 @@ public class MetricService {
                 .sum();
 
         Map<String, Long> dailyTraffic = new HashMap<>();
-        dailyTraffic.put("dailyReceived", (long) dailyReceived);
-        dailyTraffic.put("dailySent", (long) dailySent);
+        dailyTraffic.put(METRIC_MAP_DAILY_NET_REC, (long) dailyReceived);
+        dailyTraffic.put(METRIC_MAP_DAILY_NET_SENT, (long) dailySent);
 
         return dailyTraffic;
     }
 
     // 네트워크 송수신량 수집
     private Map<String, Double> collectNetworkUsage(Long userId) throws Exception {
-        String command = "cat /proc/net/dev | grep eth0";
-        String commandResponse = sshService.executeCommandOnce(command, userId);
+        // 네트워크 송/수신 기록 조회 명령어 실행
+        String commandResponse = sshService.executeCommandOnce(COMMAND_NETWORK_USAGE, userId);
 
+        // eth0: 905961216 722194  0  0  0  0  0  0  21378581  162883  0  0  0  0  0  0
         String[] parts = commandResponse.trim().split("\\s+");
 
         Map<String, Double> networkUsageMap = new HashMap<>();
@@ -236,8 +254,8 @@ public class MetricService {
             double receivedMB = receivedBytes / (1024.0 * 1024.0);
             double transmittedMB = transmittedBytes / (1024.0 * 1024.0);
 
-            networkUsageMap.put("networkReceived", receivedMB);
-            networkUsageMap.put("networkSent", transmittedMB);
+            networkUsageMap.put(METRIC_MAP_NETWORK_REC, receivedMB);
+            networkUsageMap.put(METRIC_MAP_NETWORK_SENT, transmittedMB);
         }
 
         return networkUsageMap;
