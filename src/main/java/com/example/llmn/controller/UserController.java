@@ -64,6 +64,12 @@ public class UserController {
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 
+    @PostMapping("/accounts/verify/code")
+    public ResponseEntity<?> verifyCode(@RequestBody @Valid UserRequest.VerifyCodeDTO requestDTO){
+        UserResponse.VerifyEmailCodeDTO responseDTO = userService.verifyCode(requestDTO);
+        return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
+    }
+
     @GetMapping("/home")
     public ResponseEntity<?> findDashboard(@AuthenticationPrincipal CustomUserDetails userDetails) throws Exception {
         UserResponse.FindDashboardDTO responseDTO = userService.findDashboard(userDetails.getUser().getId());
