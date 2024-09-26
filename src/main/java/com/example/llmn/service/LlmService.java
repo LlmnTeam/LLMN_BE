@@ -18,6 +18,7 @@ import java.net.URI;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 
@@ -51,9 +52,10 @@ public class LlmService {
     @Value("${recommend.uri}")
     private String RECOMMEND_URI;
 
-    private static final String PERFORMANCE_SUMMARY_HEADER = "### Performance Summary ###\n";
-    private static final String APPLICATION_LOG_SUMMARY_HEADER = "### Application Log Summary ###\n";
-    private static final String WEEKLY_TREND_HEADER = "### Weekly Trend Summaries ###\n\n";
+    private static final String LOG_DATA_HEADER = "<Log Data>\n";
+    private static final String PERFORMANCE_SUMMARY_HEADER = "<Performance Summary>\n";
+    private static final String APPLICATION_LOG_SUMMARY_HEADER = "<Application Log Summary>\n";
+    private static final String WEEKLY_TREND_HEADER = "-<Weekly Trend Summaries>\n";
     private static final String LOG_EMERGENCY_ALARM_SUFFIX = "의 로그를 점검 해보세요. 문제점이 발견되었습니다.";
     private static final String LOG_UPDATE_ALARM_SUFFIX = "의 요약이 업데이트 되었습니다.";
     private static final int METRIC_HISTORY_PREVIOUS_HOUR = 1;
@@ -226,14 +228,20 @@ public class LlmService {
         // 로그 메시지는 ElasticSearch에서 가져온다
         String logMessage = logService.searchLogInStr(startTime, endTime, containerName);
 
+        StringBuilder logMessageBuilder = new StringBuilder();
+        logMessageBuilder.append(LOG_DATA_HEADER);
+
         // 검색 결과가 빈 값이면 null을 반환
         if (logMessage == null || logMessage.isEmpty()) {
             return null;
         }
 
+        logMessageBuilder.append(logMessage);
+        logMessageBuilder.append("\n");
+
         return webClient.post()
                 .uri(buildURI(LOG_SUMMERY_URI))
-                .bodyValue(new LogDTO.SummaryRequestDTO(logMessage))
+                .bodyValue(new LogDTO.SummaryRequestDTO(logMessageBuilder.toString()))
                 .retrieve()
                 .bodyToMono(LogDTO.SummaryResponseDTO.class)
                 .block();
@@ -243,52 +251,48 @@ public class LlmService {
         // 1시간 전까지의 성능 지표
         MetricResponse.FindMetricHistoryDTO metricHistory = metricService.findMetricHistory(METRIC_HISTORY_PREVIOUS_HOUR, userId);
 
-        // StringBuilder를 사용하여 메트릭 정보를 문자열로 변환
         StringBuilder logMessageBuilder = new StringBuilder();
+        logMessageBuilder.append(PERFORMANCE_SUMMARY_HEADER);
 
         // CPU 메트릭 정보를 추가
-        logMessageBuilder.append("CPU Metrics:\n");
+        logMessageBuilder.append("1. CPU Metrics:\n");
         for (MetricResponse.CpuMetricDTO cpuMetric : metricHistory.cpuMetrics()) {
             logMessageBuilder.append(String.format("- Time: %s, CPU Usage: %.2f%%\n", cpuMetric.time(), cpuMetric.cpuUsage()));
         }
 
         // 메모리 메트릭 정보를 추가
-        logMessageBuilder.append("\nMemory Metrics:\n");
+        logMessageBuilder.append("\n2. Memory Metrics:\n");
         for (MetricResponse.MemoryMetricDTO memoryMetric : metricHistory.memoryMetrics()) {
             logMessageBuilder.append(String.format("- Time: %s, Memory Usage: %.2f MB\n", memoryMetric.time(), memoryMetric.memoryUsage()));
         }
 
         // 네트워크 In 메트릭 정보를 추가
-        logMessageBuilder.append("\nNetwork In Metrics:\n");
+        logMessageBuilder.append("\n3. Network In Metrics:\n");
         for (MetricResponse.NetworkInMetricDTO networkInMetric : metricHistory.networkInMetrics()) {
             logMessageBuilder.append(String.format("- Time: %s, Network Received: %.2f MB\n", networkInMetric.time(), networkInMetric.networkReceived()));
         }
 
         // 네트워크 Out 메트릭 정보를 추가
-        logMessageBuilder.append("\nNetwork Out Metrics:\n");
+        logMessageBuilder.append("\n4. Network Out Metrics:\n");
         for (MetricResponse.NetworkOutMetricDTO networkOutMetric : metricHistory.networkOutMetrics()) {
             logMessageBuilder.append(String.format("- Time: %s, Network Sent: %.2f MB\n", networkOutMetric.time(), networkOutMetric.networkSent()));
         }
 
-        // logMessage 문자열로 변환
-        String logMessage = logMessageBuilder.toString();
-
         return webClient.post()
                 .uri(buildURI(PERFORMANCE_SUMMERY_URI))
-                .bodyValue(new LogDTO.SummaryRequestDTO(logMessage))
+                .bodyValue(new LogDTO.SummaryRequestDTO(logMessageBuilder.toString()))
                 .retrieve()
                 .bodyToMono(LogDTO.PerformanceSummaryResponseDTO.class)
                 .block();
     }
 
     private LogDTO.HourlySummaryResponseDTO fetchHourlySummary(Long userId) {
-        StringBuilder logMessageBuilder = new StringBuilder();
-
-        LocalDateTime startOfHour = LocalDateTime.now().withMinute(0).minusSeconds(0);
-
         // 성능 요약 리스트와 어플리케이션 요약 리스트
+        LocalDateTime startOfHour = LocalDateTime.now().withMinute(0).minusSeconds(0);
         List<Summary> performanceSummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.PERFORMANCE), userId, startOfHour);
         List<Summary> logSummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.GENERAL, SummaryType.ANOMALY), userId, startOfHour);
+
+        StringBuilder logMessageBuilder = new StringBuilder();
 
         // 성능 요약을 로그 메시지로 변환
         logMessageBuilder.append(PERFORMANCE_SUMMARY_HEADER);
@@ -296,11 +300,12 @@ public class LlmService {
             logMessageBuilder.append(NO_SUMMARY_DATA);
         } else {
             for (Summary summary : performanceSummaries) {
-                logMessageBuilder.append("Time: ")
-                        .append(summary.getCreatedDate())
+                logMessageBuilder.append("Summary Date: ")
+                        .append(formatLocalDateTime(summary.getCreatedDate()))
                         .append("\n")
+                        .append("Summary Content: ")
                         .append(summary.getContent())
-                        .append("\n\n");
+                        .append("\n");
             }
         }
 
@@ -310,32 +315,30 @@ public class LlmService {
             logMessageBuilder.append(NO_SUMMARY_DATA);
         } else {
             for (Summary summary : logSummaries) {
-                logMessageBuilder.append("Time: ")
-                        .append(summary.getCreatedDate())
+                logMessageBuilder.append("Summary Date: ")
+                        .append(formatLocalDateTime(summary.getCreatedDate()))
                         .append("\n")
+                        .append("Summary Content: ")
                         .append(summary.getContent())
-                        .append("\n\n");
+                        .append("\n");
             }
         }
 
-        String logMessage = logMessageBuilder.toString();
-
         return webClient.post()
                 .uri(buildURI(HOURLY_SUMMARY_URI))
-                .bodyValue(new LogDTO.SummaryRequestDTO(logMessage))
+                .bodyValue(new LogDTO.SummaryRequestDTO(logMessageBuilder.toString()))
                 .retrieve()
                 .bodyToMono(LogDTO.HourlySummaryResponseDTO.class)
                 .block();
     }
 
     private LogDTO.DailySummaryResponseDTO fetchDailySummary(Long userId) {
-        StringBuilder logMessageBuilder = new StringBuilder();
-
-        LocalDateTime startOfDay = LocalDateTime.now().with(LocalTime.MIN);
-
         // 성능 요약 리스트와 어플리케이션 요약 리스트
+        LocalDateTime startOfDay = LocalDateTime.now().with(LocalTime.MIN);
         List<Summary> performanceSummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.PERFORMANCE), userId, startOfDay);
         List<Summary> logSummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.GENERAL, SummaryType.ANOMALY), userId, startOfDay);
+
+        StringBuilder logMessageBuilder = new StringBuilder();
 
         // 성능 요약을 로그 메시지로 변환
         logMessageBuilder.append(PERFORMANCE_SUMMARY_HEADER);
@@ -343,11 +346,12 @@ public class LlmService {
             logMessageBuilder.append(NO_SUMMARY_DATA);
         } else {
             for (Summary summary : performanceSummaries) {
-                logMessageBuilder.append("Time: ")
-                        .append(summary.getCreatedDate())
+                logMessageBuilder.append("Summary Date: ")
+                        .append(formatLocalDateTime(summary.getCreatedDate()))
                         .append("\n")
+                        .append("Summary Content: ")
                         .append(summary.getContent())
-                        .append("\n\n");
+                        .append("\n");
             }
         }
 
@@ -357,49 +361,44 @@ public class LlmService {
             logMessageBuilder.append(NO_SUMMARY_DATA);
         } else {
             for (Summary summary : logSummaries) {
-                logMessageBuilder.append("Time: ")
-                        .append(summary.getCreatedDate())
+                logMessageBuilder.append("Summary Date: ")
+                        .append(formatLocalDateTime(summary.getCreatedDate()))
                         .append("\n")
+                        .append("Summary Content: ")
                         .append(summary.getContent())
-                        .append("\n\n");
+                        .append("\n");
             }
         }
-
-        // logMessage 문자열로 변환
-        String logMessage = logMessageBuilder.toString();
 
         // LLM에 전달하기 위해 FastAPI에 요청
         return webClient.post()
                 .uri(buildURI(DAILY_SUMMERY_URI))
-                .bodyValue(new LogDTO.SummaryRequestDTO(logMessage))
+                .bodyValue(new LogDTO.SummaryRequestDTO(logMessageBuilder.toString()))
                 .retrieve()
                 .bodyToMono(LogDTO.DailySummaryResponseDTO.class)
                 .block();
     }
 
     private LogDTO.TrendSummaryResponseDTO fetchTrendSummary(Long userId){
-        StringBuilder logMessageBuilder = new StringBuilder();
-
         // 1주일 전까지의 일일 리포트를 인풋으로 사용
         LocalDateTime startOfDay = LocalDateTime.now().minusWeeks(1).with(LocalTime.MIN);
-        List<Summary> trendSummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.DAILY), userId, startOfDay);
+        List<Summary> dailySummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.DAILY), userId, startOfDay);
 
+        StringBuilder logMessageBuilder = new StringBuilder();
         logMessageBuilder.append(WEEKLY_TREND_HEADER);
 
-        for (Summary summary : trendSummaries) {
-            logMessageBuilder.append("Date: ")
-                    .append(summary.getCreatedDate())
+        for (Summary summary : dailySummaries) {
+            logMessageBuilder.append("Summary Date: ")
+                    .append(formatLocalDateTime(summary.getCreatedDate()))
                     .append("\n")
+                    .append("Summary Content: ")
                     .append(summary.getContent())
-                    .append("\n\n");
+                    .append("\n");
         }
-
-        // logMessage 문자열로 변환
-        String logMessage = logMessageBuilder.toString();
 
         return webClient.post()
                 .uri(buildURI(TREND_SUMMERY_URI))
-                .bodyValue(new LogDTO.SummaryRequestDTO(logMessage))
+                .bodyValue(new LogDTO.SummaryRequestDTO(logMessageBuilder.toString()))
                 .retrieve()
                 .bodyToMono(LogDTO.TrendSummaryResponseDTO.class)
                 .block();
@@ -419,11 +418,12 @@ public class LlmService {
             logMessageBuilder.append(NO_SUMMARY_DATA);
         } else {
             for (Summary summary : performanceSummaries) {
-                logMessageBuilder.append("Date: ")
+                logMessageBuilder.append("Summary Date: ")
                         .append(summary.getCreatedDate())
                         .append("\n")
+                        .append("Summary Content: ")
                         .append(summary.getContent())
-                        .append("\n\n");
+                        .append("\n");
             }
         }
 
@@ -433,21 +433,19 @@ public class LlmService {
             logMessageBuilder.append(NO_SUMMARY_DATA);
         } else {
             for (Summary summary : logSummaries) {
-                logMessageBuilder.append("Date: ")
+                logMessageBuilder.append("Summary Date: ")
                         .append(summary.getCreatedDate())
                         .append("\n")
+                        .append("Summary Content: ")
                         .append(summary.getContent())
-                        .append("\n\n");
+                        .append("\n");
             }
         }
-
-        // logMessage 문자열로 변환
-        String logMessage = logMessageBuilder.toString();
 
         // LLM에 전달하기 위해 FastAPI에 요청
         return webClient.post()
                 .uri(buildURI(RECOMMEND_URI))
-                .bodyValue(new LogDTO.SummaryRequestDTO(logMessage))
+                .bodyValue(new LogDTO.SummaryRequestDTO(logMessageBuilder.toString()))
                 .retrieve()
                 .bodyToMono(LogDTO.RecommendationDTO.class)
                 .block();
@@ -456,5 +454,10 @@ public class LlmService {
     private URI buildURI(String uri) {
         UriComponentsBuilder uriBuilder = UriComponentsBuilder.fromHttpUrl(uri);
         return uriBuilder.build().encode().toUri();
+    }
+
+    public static String formatLocalDateTime(LocalDateTime localDateTime) {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+        return localDateTime.format(formatter);
     }
 }
