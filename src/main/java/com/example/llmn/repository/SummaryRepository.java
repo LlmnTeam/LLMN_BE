@@ -46,6 +46,14 @@ public interface SummaryRepository extends JpaRepository<Summary, Long> {
                                        @Param("startOfDay") LocalDateTime startOfDay);
 
     @EntityGraph(attributePaths = {"project"})
+    @Query("SELECT s FROM Summary s " +
+            "JOIN s.user u " +
+            "WHERE s.summaryType IN :types AND u.id = :userId AND s.createdDate >= :startOfDay")
+    List<Summary> findByTypeWithinDateWithProject(@Param("types") List<SummaryType> types,
+                                                  @Param("userId") Long userId,
+                                                  @Param("startOfDay") LocalDateTime startOfDay);
+
+    @EntityGraph(attributePaths = {"project"})
     @Query("SELECT s FROM Summary s WHERE s.project IN :projects AND s.createdDate BETWEEN :startDate AND :endDate")
     List<Summary> findByProjectsAndDateRange(@Param("projects") List<Project> projects,
                                              @Param("startDate") LocalDateTime startDate,

@@ -245,9 +245,13 @@ public class LlmService {
             return null;
         }
 
-        requestContentBuilder.append(LOG_DATA_HEADER);
-        requestContentBuilder.append(logMessage);
-        requestContentBuilder.append("\n");
+        requestContentBuilder.append(LOG_DATA_HEADER)
+                .append("Application Name: ")
+                .append(containerName)
+                .append("\n")
+                .append("Log Content: ")
+                .append(logMessage)
+                .append("\n");
 
         return webClient.post()
                 .uri(buildURI(LOG_SUMMERY_URI))
@@ -303,13 +307,13 @@ public class LlmService {
         // 성능 요약 리스트와 어플리케이션 요약 리스트
         LocalDateTime startOfHour = LocalDateTime.now().withMinute(0).minusSeconds(0);
         List<Summary> performanceSummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.PERFORMANCE), userId, startOfHour);
-        List<Summary> logSummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.GENERAL, SummaryType.ANOMALY), userId, startOfHour);
+        List<Summary> logSummaries = summaryRepository.findByTypeWithinDateWithProject(List.of(SummaryType.GENERAL, SummaryType.ANOMALY), userId, startOfHour);
 
         // 성능 요약 추가
         appendSummary(requestContentBuilder, PERFORMANCE_SUMMARY_HEADER, performanceSummaries);
 
         // 일반 및 이상 로그 요약 추가
-        appendSummary(requestContentBuilder, APPLICATION_LOG_SUMMARY_HEADER, logSummaries);
+        appendSummaryWithApplicationName(requestContentBuilder, APPLICATION_LOG_SUMMARY_HEADER, logSummaries);
 
         return webClient.post()
                 .uri(buildURI(HOURLY_SUMMARY_URI))
@@ -325,13 +329,13 @@ public class LlmService {
         // 성능 요약 리스트와 어플리케이션 요약 리스트
         LocalDateTime startOfDay = LocalDateTime.now().with(LocalTime.MIN);
         List<Summary> performanceSummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.PERFORMANCE), userId, startOfDay);
-        List<Summary> logSummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.GENERAL, SummaryType.ANOMALY), userId, startOfDay);
+        List<Summary> logSummaries = summaryRepository.findByTypeWithinDateWithProject(List.of(SummaryType.GENERAL, SummaryType.ANOMALY), userId, startOfDay);
 
         // 성능 요약 추가
         appendSummary(requestContentBuilder, PERFORMANCE_SUMMARY_HEADER, performanceSummaries);
 
         // 일반 및 이상 로그 요약 추가
-        appendSummary(requestContentBuilder, APPLICATION_LOG_SUMMARY_HEADER, logSummaries);
+        appendSummaryWithApplicationName(requestContentBuilder, APPLICATION_LOG_SUMMARY_HEADER, logSummaries);
 
         // LLM에 전달하기 위해 FastAPI에 요청
         return webClient.post()
@@ -365,13 +369,13 @@ public class LlmService {
         // 6시간 전의 요약들을 인풋으로
         LocalDateTime startOfTime = LocalDateTime.now().minusHours(6);
         List<Summary> performanceSummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.PERFORMANCE), userId, startOfTime);
-        List<Summary> logSummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.GENERAL, SummaryType.ANOMALY), userId, startOfTime);
+        List<Summary> logSummaries = summaryRepository.findByTypeWithinDateWithProject(List.of(SummaryType.GENERAL, SummaryType.ANOMALY), userId, startOfTime);
 
         // 성능 요약 추가
         appendSummary(requestContentBuilder, PERFORMANCE_SUMMARY_HEADER, performanceSummaries);
 
         // 일반 및 이상 로그 요약 추가
-        appendSummary(requestContentBuilder, APPLICATION_LOG_SUMMARY_HEADER, logSummaries);
+        appendSummaryWithApplicationName(requestContentBuilder, APPLICATION_LOG_SUMMARY_HEADER, logSummaries);
 
         // LLM에 전달하기 위해 FastAPI에 요청
         return webClient.post()
@@ -399,6 +403,25 @@ public class LlmService {
         }
     }
 
+    private void appendSummaryWithApplicationName(StringBuilder requestContentBuilder, String header, List<Summary> summaries) {
+        requestContentBuilder.append(header);
+
+        if (summaries.isEmpty()) {
+            requestContentBuilder.append(NO_SUMMARY_DATA);
+        } else {
+            for (Summary summary : summaries) {
+                requestContentBuilder.append("Application Name: ")
+                        .append(summary.getProject().getContainerName())
+                        .append("\n")
+                        .append("Summary Date: ")
+                        .append(formatLocalDateTime(summary.getCreatedDate())) // 날짜 형식 변환
+                        .append("\n")
+                        .append("Summary Content: ")
+                        .append(summary.getContent()) // 요약 내용 추가
+                        .append("\n");
+            }
+        }
+    }
 
     private URI buildURI(String uri) {
         UriComponentsBuilder uriBuilder = UriComponentsBuilder.fromHttpUrl(uri);
