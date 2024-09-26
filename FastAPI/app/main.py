@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from pydantic_settings import BaseSettings
 import logging
 import os
+import redis
 from langchain_openai import ChatOpenAI
 from langchain.prompts import PromptTemplate 
 from langchain.callbacks.base import BaseCallbackHandler
@@ -39,6 +40,9 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
+# 레디스 설정
+r = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
+
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -53,9 +57,11 @@ class Question(BaseModel):
 class LogFile(BaseModel):
     name: str
 
-class LogFilesRequest(BaseModel):
+class  LogFilesRequest(BaseModel):
+    userId: int
     logFiles: list[LogFile]
     question: str
+    isFirstQuestion: bool  # 첫 번째 질문 여부를 나타내는 변수
 
 # OpenAI API 스트리밍
 class StreamingHandler(BaseCallbackHandler):
@@ -115,6 +121,25 @@ class Rag_Service:
             # 큐에서 처리된 항목을 완료 처리 => 0.1초 동안 비동기적으로 대기하여 스트리밍 속도를 조정
             self.streamer_queue.task_done() 
             await asyncio.sleep(0.1) 
+
+class ConversationManager:
+    def __init__(self, user_id: str):
+        self.user_id = user_id
+        self.key = f"conversation:{self.user_id}"
+
+    # 대화 히스토리에 사용자 입력과 시스템 응답을 추가
+    def add_to_history(self, user_input: str, system_response: str):
+        r.rpush(self.key, f"User: {user_input}", f"System: {system_response}")
+        r.expire(self.key, 1800)  # TTL은 30분
+
+    # 최근 n개의 대화 히스토리(질문/응답) 가져오기
+    def get_recent_conversation(self, n=5):
+        return r.lrange(self.key, -n*2, -1)  
+
+    # 대화 히스토리 포맷팅 
+    def format_conversation(self, n=5):
+        conversation = self.get_recent_conversation(n)
+        return "\n".join(conversation)  
 
 ######################################################################################################
 
@@ -502,23 +527,34 @@ def read_log_file(file_path: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-def combine_logs_and_question(log_files_request: LogFilesRequest) -> str:
+def combine_logs_and_question(log_files_request: LogFilesRequest, conversation_manager: ConversationManager) -> str:
     log_message_builder = []
 
-    # 로그 파일의 내용을 모두 읽어서 하나의 문자열로 결합
-    for logFile in log_files_request.logFiles:
-        file_path = os.path.join(logs_dir, logFile.name)
-        log_content = read_log_file(file_path)
-        log_message_builder.append(f"### Log file: {logFile.name} ###\n{log_content}\n")
+    # 첫 번째 질문일 경우에만 로그 파일의 내용을 추가
+    if log_files_request.isFirstQuestion:
+        for logFile in log_files_request.logFiles:
+            file_path = os.path.join(logs_dir, logFile.name)
+            log_content = read_log_file(file_path)
+            log_message_builder.append(f"### Log file: {logFile.name} ###\n{log_content}\n")
 
-    prompt = (
-        "### Persona ###\n"
-        "You are an expert system log analyst. Your task is to analyze the following log files and provide insightful, detailed responses based on system performance, errors, and abnormal patterns.\n"
-        "Focus on the key issues found in the logs and the user's question.\n"
-        "Your responses should be in Korean.\n"
-        "\n"
-        "### Log Files ###\n"
-        f"{''.join(log_message_builder)}\n"
+    prompt = ""
+
+    # 첫 번째 질문일 경우에만 Persona 프롬프트 추가
+    if log_files_request.isFirstQuestion:
+        prompt = (
+            "### Persona ###\n"
+            "You are an expert system log analyst. Your task is to analyze the following log files and provide insightful, detailed responses based on system performance, errors, and abnormal patterns.\n"
+            "Focus on the key issues found in the logs and the user's question.\n"
+            "Your responses should be in Korean.\n"
+        )
+
+        # 로그 파일 내용도 첫 번째 질문에만 포함
+        prompt += f"\n### Log Files ###\n{''.join(log_message_builder)}\n"
+
+    # 대화 히스토리 및 질문 추가
+    prompt += (
+        "\n### Conversation History ###\n"
+        f"{conversation_manager.format_conversation()}\n"  # 이전 대화 히스토리 추가
         "\n"
         "### User Question ###\n"
         f"{log_files_request.question}\n"
@@ -579,15 +615,27 @@ async def process_hourly_summary(request: LogRequest):
         "hourlySummary": hourly_summary
     }
 
-#@app.post("/question")
-#async def generate_text_streaming(query: Question):
-#    rag_service = Rag_Service()
-#
-#    return StreamingResponse(rag_service.generate_text_streaming(query), media_type='text/event-stream')
-
 @app.post("/logs/question")
 async def process_logs_and_question(log_files_request: LogFilesRequest):
-    final_question = combine_logs_and_question(log_files_request)
+    conversation_manager = ConversationManager(log_files_request.userId)
 
+    # 로그와 질문을 포함한 최종 질문 생성
+    final_question = combine_logs_and_question(log_files_request, conversation_manager)
+
+    # OpnAI API 호출
     rag_service = Rag_Service()
-    return StreamingResponse(rag_service.generate_text_streaming(final_question), media_type='text/event-stream')
+
+    # 스트리밍된 응답을 수집하기 위한 리스트
+    response_collector = []
+
+    async def stream_response():
+        # OpenAI API가 토큰을 생성할 때마다, 응답을 수집하고 바로바로 chunk를 반환
+        async for chunk in rag_service.generate_text_streaming(final_question):
+            response_collector.append(chunk)  
+            yield chunk
+
+        # async 루프 완료(스트리밍이 종료) => 대화 히스토리에 저장
+        complete_response = ''.join(response_collector)
+        conversation_manager.add_to_history(log_files_request.question, complete_response)
+
+    return StreamingResponse(stream_response(), media_type='text/event-stream')
