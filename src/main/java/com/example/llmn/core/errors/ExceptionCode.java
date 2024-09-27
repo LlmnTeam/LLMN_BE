@@ -19,6 +19,9 @@ public enum ExceptionCode {
     USER_UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "로그인이 되지 않았습니다."),
     USER_ALREADY_EXIT(HttpStatus.NOT_FOUND, "이미 탈퇴한 계정입니다."),
     ALREADY_SEND_EMAIL(HttpStatus.NOT_FOUND, "이미 이메일을 전송하였습니다. 5분 후에 다시 시도해주세요"),
+    SSH_INFO_EMPTY(HttpStatus.BAD_REQUEST, "SSH 정보는 적어도 하나 이상 입력해야 합니다."),
+    MONITORING_SSH_NOT_SELECT(HttpStatus.BAD_REQUEST, "모니터링 할 클라우드 인스턴스 호스트명이 잘못됐습니다."),
+    DUPLICATE_SSH_HOST(HttpStatus.BAD_REQUEST, "SSH 호스트 이름이 중복됩니다."),
 
     // ElasticSearch 오류
     ELASTIC_SEARCH_ERROR(HttpStatus.NOT_FOUND, "ElasticSearch에 문제가 발생했습니다."),
@@ -38,6 +41,7 @@ public enum ExceptionCode {
 
     // 프로젝트 관련 에러
     PROJECT_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 프로젝트를 찾을 수 없습니다."),
+    SSH_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 SSH 정보를 찾을 수 없습니다"),
 
     // 셀 관련 에러
     SHELL_CONNECT_FAIL(HttpStatus.INTERNAL_SERVER_ERROR, "Shell 채널 초기화 실패");

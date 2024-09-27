@@ -4,6 +4,8 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
+import java.util.List;
+
 public class UserRequest {
 
     public record LoginDTO(
@@ -30,10 +32,16 @@ public class UserRequest {
             String password,
             @NotBlank(message = "비밀번호를 입력해주세요.")
             String passwordConfirm,
+            List<SshInfoDTO> sshInfo,
+            boolean receivingAlarm,
+            @NotBlank(message = "모니터링할 클라우드 인스턴스를 선택해야 합니다.")
+            String monitoringSshHost) {}
+
+    public record SshInfoDTO(
             String remoteName,
             String remoteHost,
-            String remoteKeyPath,
-            boolean receivingAlarm) {}
+            String remoteKeyPath
+    ){}
 
     public record EmailDTO(
             @NotBlank(message = "이메일을 입력해주세요.")
@@ -44,10 +52,11 @@ public class UserRequest {
             @NotBlank(message="닉네임을 입력해주세요.")
             @Size(min=2, max=20, message = "닉네임은 2자에서 20자 이내여야 합니다.")
             String nickName,
-            String remoteName,
-            String remoteHost,
-            String remoteKeyPath,
-            boolean receivingAlarm){}
+            List<SshInfoDTO> sshInfos,
+            boolean receivingAlarm,
+            @NotBlank(message = "모니터링할 클라우드 인스턴스를 선택해야 합니다.")
+            String monitoringSshHost
+    ){}
 
     public record VerifyCodeDTO(
             @NotBlank

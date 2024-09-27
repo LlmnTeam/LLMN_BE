@@ -5,7 +5,6 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.springframework.transaction.annotation.Transactional;
 
 @Entity
 @Table(name = "user_tb")
@@ -26,29 +25,33 @@ public class User extends TimeStamp {
     @Column
     private String password;
 
-    @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "ssh_id")
-    private SshInfo sshInfo;
-
     @Column
     private boolean receivingAlarm;
 
+    @Column
+    private Long monitoringSshId;
+
     @Builder
-    public User(Long id, String nickName, String email, String password, SshInfo sshInfo, boolean receivingAlarm) {
+    public User(Long id, String nickName, String email, String password, boolean receivingAlarm, Long monitoringSshId) {
         this.id = id;
         this.nickName = nickName;
         this.email = email;
         this.password = password;
-        this.sshInfo = sshInfo;
         this.receivingAlarm = receivingAlarm;
+        this.monitoringSshId = monitoringSshId;
     }
 
     public void updatePassword (String password) {
         this.password  = password;
     }
 
-    public void updateConfiguration(String nickName, boolean receivingAlarm){
+    public void updateMonitoringSshInfoId(Long monitoringSshInfoId) {
+        this.monitoringSshId = monitoringSshInfoId;
+    }
+
+    public void updateConfiguration(String nickName, boolean receivingAlarm, Long monitoringSshId){
         this.nickName = nickName;
         this.receivingAlarm = receivingAlarm;
+        this.monitoringSshId = monitoringSshId;
     }
 }

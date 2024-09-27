@@ -22,10 +22,16 @@ public class UserResponse {
 
     public record FindConfigurationInfoDTO(
             String nickName,
+            List<SshInfoDTO> sshInfos,
+            Long monitoringSshId,
+            boolean receivingAlarm){}
+
+    public record SshInfoDTO(
+            Long id,
             String remoteName,
             String remoteHost,
-            String remoteKeyPath,
-            boolean receivingAlarm){}
+            String remoteKeyPath
+    ){}
 
     public record VerifyEmailCodeDTO(boolean isMatching) {}
 }

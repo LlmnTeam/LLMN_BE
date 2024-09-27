@@ -4,6 +4,8 @@ import com.example.llmn.core.errors.CustomException;
 import com.example.llmn.core.errors.ExceptionCode;
 import com.example.llmn.core.utils.SSHCommandExecutor;
 import com.example.llmn.domain.SshInfo;
+import com.example.llmn.domain.User;
+import com.example.llmn.repository.SshInfoRepository;
 import com.example.llmn.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -14,6 +16,7 @@ public class SSHService {
     private SSHCommandExecutor executor;
     private final RedisService redisService;
     private final UserRepository userRepository;
+    private final SshInfoRepository sshInfoRepository;
 
     private static final String REDIS_SSH_KEY = "SSH";
     public static final Long REDIS_SSH_KEY_EXP = 60L * 60 * 24 * 180; // 180일
@@ -52,8 +55,12 @@ public class SSHService {
 
         // 레디스에 캐시된 값이 없으면 DB에서 가져옴
         if (sshInfoStr == null) {
-            SshInfo sshInfoInDB = userRepository.findSshInfoById(userId).orElseThrow(
+            Long sshInfoId = userRepository.findMonitoringSshId(userId).orElseThrow(
                     () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
+            );
+
+            SshInfo sshInfoInDB = sshInfoRepository.findById(sshInfoId).orElseThrow(
+                    () -> new CustomException(ExceptionCode.SSH_NOT_FOUND)
             );
 
             // remoteHost, remoteName, keyPath를 하나의 문자로 합쳐서 저장
@@ -62,19 +69,21 @@ public class SSHService {
 
             return sshInfoInDB;
         } else {
-            return parseSshInfo(sshInfoStr);
+            return parseSshInfo(sshInfoStr, userId);
         }
     }
 
     // 문자인 sshInfoStr을 SsshInfo 객체로 변환
-    private SshInfo parseSshInfo(String sshInfoStr) {
+    private SshInfo parseSshInfo(String sshInfoStr, Long userId) {
         String[] parts = sshInfoStr.split(DELIMITER);
 
         if (parts.length != 3) {
             throw new IllegalArgumentException("잘못된 SSH 정보 형식입니다.");
         }
 
-        return new SshInfo(parts[0], parts[1], parts[2]);
+        User userRef = userRepository.getReferenceById(userId);
+
+        return new SshInfo(userRef ,parts[0], parts[1], parts[2]);
     }
 }
 

@@ -1,8 +1,6 @@
 package com.example.llmn.repository;
 
-import com.example.llmn.domain.SshInfo;
 import com.example.llmn.domain.User;
-import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -17,16 +15,11 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Query("SELECT u FROM User u WHERE u.email = :email")
     Optional<User> findByEmail(@Param("email") String email);
 
-    @Query("SELECT u FROM User u " +
-            "LEFT JOIN FETCH u.sshInfo " +
-            "WHERE u.id = :id")
-    Optional<User> findByIdWithSshInfo(@Param("id") Long id);
+    @Query("SELECT u.monitoringSshId FROM User u WHERE u.id = :userId")
+    Optional<Long> findMonitoringSshId(@Param("userId") Long userId);
 
     @Query("SELECT u.id FROM User u")
     List<Long> findIds();
-
-    @Query("SELECT u.sshInfo FROM User u WHERE u.id = :id")
-    Optional<SshInfo> findSshInfoById(@Param("id") Long id);
 
     @Query("SELECT COUNT(u) > 0 FROM User u WHERE u.email = :email")
     boolean existsByEmail(@Param("email") String email);

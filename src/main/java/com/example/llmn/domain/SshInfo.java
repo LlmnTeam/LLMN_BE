@@ -16,6 +16,10 @@ public class SshInfo extends TimeStamp{
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
+    private User user;
+
     @Column
     private String remoteName;
 
@@ -26,7 +30,8 @@ public class SshInfo extends TimeStamp{
     private String remoteKeyPath;
 
     @Builder
-    public SshInfo(String remoteHost, String remoteName, String remoteKeyPath) {
+    public SshInfo(User user, String remoteHost, String remoteName, String remoteKeyPath) {
+        this.user = user;
         this.remoteName = remoteName;
         this.remoteHost = remoteHost;
         this.remoteKeyPath = remoteKeyPath;
