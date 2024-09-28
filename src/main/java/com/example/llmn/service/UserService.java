@@ -212,7 +212,7 @@ public class UserService {
         );
 
         // 현재 지표
-        MetricResponse.FindCurrentMetricDTO currentMetric = metricService.findCurrentMetric(userId);
+        MetricResponse.FindCurrentMetricDTO currentMetric = metricService.findCurrentMetric(sshInfoId);
         String cpuUsage = String.format("%.2f%%", currentMetric.cpuUsage());
         String memoryUsage = currentMetric.totalMemory() > 0
                 ? String.format("%.2f%%", (currentMetric.usedMemory() / currentMetric.totalMemory()) * 100)
@@ -221,7 +221,7 @@ public class UserService {
         String networkSent = String.format("%.2f MB", currentMetric.networkSent());
 
         // 과거 지표
-        MetricResponse.FindMetricHistoryDTO metricHistory = metricService.findMetricHistory(24, userId);
+        MetricResponse.FindMetricHistoryDTO metricHistory = metricService.findMetricHistory(24, sshInfoId);
 
         // 시간별 요약
         String summary = getLatestHourlySummary()

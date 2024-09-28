@@ -155,16 +155,16 @@ public class MetricService {
         return metricsMap;
     }
 
-    public MetricResponse.FindCurrentMetricDTO findCurrentMetric(Long userId) throws Exception {
+    public MetricResponse.FindCurrentMetricDTO findCurrentMetric(Long sshInfoId) throws Exception {
         // 1. 레디스에서 캐시된 값을 먼저 조회
-        MetricResponse.FindCurrentMetricDTO cachedMetric = getCachedMetric(userId);
+        MetricResponse.FindCurrentMetricDTO cachedMetric = getCachedMetric(sshInfoId);
         if (cachedMetric != null) {
             return cachedMetric;
         }
 
         // 2. 캐시된 값이 없으면 새로운 Metric 수집 후 저장
-        Map<String, Double> topMetrics = collectTopMetrics(userId);
-        Map<String, Double> networkMetrics = collectNetworkMetrics(userId, NOT_UPDATE_CACHE);
+        Map<String, Double> topMetrics = collectTopMetrics(sshInfoId);
+        Map<String, Double> networkMetrics = collectNetworkMetrics(sshInfoId, NOT_UPDATE_CACHE);
 
         MetricResponse.FindCurrentMetricDTO metricDTO = new MetricResponse.FindCurrentMetricDTO(
                 topMetrics.get(METRIC_MAP_CPU_USAGE),
@@ -175,16 +175,16 @@ public class MetricService {
         );
 
         // 유효 시간은 10분
-        redisService.storeValue(METRIC_KEY, userId.toString(), objectMapper.writeValueAsString(metricDTO), METRIC_EXP);
+        redisService.storeValue(METRIC_KEY, sshInfoId.toString(), objectMapper.writeValueAsString(metricDTO), METRIC_EXP);
 
         return metricDTO;
     }
 
     @Transactional(readOnly = true)
-    public MetricResponse.FindMetricHistoryDTO findMetricHistory(int minusHour, Long userId){
+    public MetricResponse.FindMetricHistoryDTO findMetricHistory(int minusHour, Long sshInfoId){
         // minusHour 내 지표들을 모두 가져옴
         LocalDateTime now = LocalDateTime.now().withMinute(0).withSecond(0).withNano(0);
-        List<Metric> metrics = metricRepository.findALlWithinDate(now.minusHours(minusHour), userId);
+        List<Metric> metrics = metricRepository.findALlWithinDate(now.minusHours(minusHour), sshInfoId);
 
         // 시간 형식 "HH:mm"
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm");
@@ -228,10 +228,10 @@ public class MetricService {
     }
 
     // 하루 동안의 누적 네트워크 트래픽 계산
-    public Map<String, Long> getTodayNetworkTraffic(Long userId) {
+    public Map<String, Long> getTodayNetworkTraffic(Long sshInfoId) {
         // minusHour 내 지표들을 모두 가져옴
         LocalDateTime todayStart = LocalDateTime.now().withHour(0).withMinute(0).withSecond(0).withNano(0);
-        List<Metric> metrics = metricRepository.findALlWithinDate(todayStart, userId);
+        List<Metric> metrics = metricRepository.findALlWithinDate(todayStart, sshInfoId);
 
         double dailyReceived = metrics.stream()
                 .mapToDouble(Metric::getTotalBytesReceived)
@@ -273,8 +273,8 @@ public class MetricService {
     }
 
     // 레디스에서 Metric을 가져오는 메서드
-    private MetricResponse.FindCurrentMetricDTO getCachedMetric(Long userId) {
-        String cachedValue = redisService.getDataInStr(METRIC_KEY, userId.toString());
+    private MetricResponse.FindCurrentMetricDTO getCachedMetric(Long sshInfoId) {
+        String cachedValue = redisService.getDataInStr(METRIC_KEY, sshInfoId.toString());
 
         // 캐시된 값이 없으면 null 반환
         if (cachedValue == null) {
