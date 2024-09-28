@@ -88,22 +88,22 @@ public class ProjectController {
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 
-    @GetMapping("/container")
-    public ResponseEntity<?> findContainerList(@AuthenticationPrincipal CustomUserDetails userDetails) throws Exception {
-        List<String> runningContainerNameList = dockerService.findRunningContainerList(userDetails.getUser().getId());
+    @GetMapping("/project/{projectId}/container")
+    public ResponseEntity<?> findContainerList(@PathVariable Long projectId) throws Exception {
+        List<String> runningContainerNameList = dockerService.findRunningContainerList(projectId);
         ProjectResponse.FindContainerListDTO responseDTO = new ProjectResponse.FindContainerListDTO(runningContainerNameList);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 
-    @PostMapping("/container/stop")
-    public ResponseEntity<?> stopContainer(@RequestBody ProjectRequest.ContainerDTO requestDTO, @AuthenticationPrincipal CustomUserDetails userDetails) throws Exception {
-        boolean response = dockerService.stopContainerByName(requestDTO.name(), userDetails.getUser().getId());
+    @PostMapping("/project/{projectId}/container/stop")
+    public ResponseEntity<?> stopContainer(@RequestBody ProjectRequest.ContainerDTO requestDTO, @PathVariable Long projectId) throws Exception {
+        boolean response = dockerService.stopContainerByName(requestDTO.name(), projectId);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, response));
     }
 
-    @PostMapping("/container/restart")
-    public ResponseEntity<?> restartContainer(@RequestBody ProjectRequest.ContainerDTO requestDTO, @AuthenticationPrincipal CustomUserDetails userDetails) throws Exception {
-        boolean response = dockerService.restartContainerByName(requestDTO.name(), userDetails.getUser().getId());
+    @PostMapping("/project/{projectId}/container/restart")
+    public ResponseEntity<?> restartContainer(@RequestBody ProjectRequest.ContainerDTO requestDTO, @PathVariable Long projectId) throws Exception {
+        boolean response = dockerService.restartContainerByName(requestDTO.name(), projectId);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, response));
     }
 

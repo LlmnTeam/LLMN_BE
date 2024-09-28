@@ -6,6 +6,7 @@ import com.example.llmn.core.errors.CustomException;
 import com.example.llmn.core.errors.ExceptionCode;
 import com.example.llmn.domain.*;
 import com.example.llmn.repository.ProjectRepository;
+import com.example.llmn.repository.SshInfoRepository;
 import com.example.llmn.repository.SummaryRepository;
 import com.example.llmn.repository.UserRepository;
 import jakarta.persistence.EntityManager;
@@ -33,6 +34,7 @@ public class ProjectService {
     private final LogService logService;
     private final ProjectRepository projectRepository;
     private final SummaryRepository summaryRepository;
+    private final SshInfoRepository sshInfoRepository;
     private final UserRepository userRepository;
     private final EntityManager entityManager;
     private final SSHService sshService;

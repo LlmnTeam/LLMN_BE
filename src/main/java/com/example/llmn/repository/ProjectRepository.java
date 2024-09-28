@@ -22,4 +22,9 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
 
     @Query("SELECT p.containerName FROM Project p WHERE p.id = :projectId")
     Optional<String> findContainerNameById(@Param("projectId") Long projectId);
+
+    @Query("SELECT s.id FROM Project p " +
+            "JOIN p.sshInfo s " +
+            "WHERE p.id = :projectId")
+    Optional<Long> findSshInfoId(@Param("projectId") Long projectId);
 }

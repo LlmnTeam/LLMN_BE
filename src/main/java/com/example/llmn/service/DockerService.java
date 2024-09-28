@@ -1,5 +1,10 @@
 package com.example.llmn.service;
 
+import com.example.llmn.core.errors.CustomException;
+import com.example.llmn.core.errors.ExceptionCode;
+import com.example.llmn.domain.SshInfo;
+import com.example.llmn.repository.ProjectRepository;
+import com.example.llmn.repository.SshInfoRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -17,6 +22,8 @@ public class DockerService {
 
     private final SSHService sshService;
     private final RedisService redisService;
+    private final ProjectRepository projectRepository;
+    private final SshInfoRepository sshInfoRepository;
     private final ObjectMapper objectMapper;
 
     private static final String RESOURCE_KEY = "resource";
@@ -29,24 +36,36 @@ public class DockerService {
     private static final Long RESOURCE_EXP = 10 * 60 * 1000L; // 10분
 
     // 도커 컨테이너 종료
-    public boolean stopContainerByName(String containerName, Long userId) throws Exception {
+    public boolean stopContainerByName(String containerName, Long projectId) throws Exception {
+        Long sshInfoId = projectRepository.findSshInfoId(projectId).orElseThrow(
+                () -> new CustomException(ExceptionCode.PROJECT_NOT_FOUND)
+        );
+
         String command = COMMAND_DOCKER_STOP + containerName;
-        String commandResponse = sshService.executeCommandOnce(command, userId);
+        String commandResponse = sshService.executeCommandOnce(command, sshInfoId);
 
         return commandResponse.trim().equals(containerName);  // 성공 여부 true/false로 리턴
     }
 
     // 도커 컨테이너 재시작
-    public boolean restartContainerByName(String containerName, Long userId) throws Exception {
+    public boolean restartContainerByName(String containerName, Long projectId) throws Exception {
+        Long sshInfoId = projectRepository.findSshInfoId(projectId).orElseThrow(
+                () -> new CustomException(ExceptionCode.PROJECT_NOT_FOUND)
+        );
+
         String command = COMMAND_DOCKER_RESTART + containerName;
-        String commandResponse = sshService.executeCommandOnce(command, userId);
+        String commandResponse = sshService.executeCommandOnce(command, sshInfoId);
 
         return commandResponse.trim().equals(containerName); // 성공 여부 true/false로 리턴
     }
 
     // 실행중인 도커 컨테이너 목록 조회
-    public List<String> findRunningContainerList(Long userId) throws Exception {
-        String commandResponse = sshService.executeCommandOnce(COMMAND_DOCKER_PS, userId);
+    public List<String> findRunningContainerList(Long projectId) throws Exception {
+        Long sshInfoId = projectRepository.findSshInfoId(projectId).orElseThrow(
+                () -> new CustomException(ExceptionCode.PROJECT_NOT_FOUND)
+        );
+
+        String commandResponse = sshService.executeCommandOnce(COMMAND_DOCKER_PS, sshInfoId);
 
         // 줄 단위로 나눠서 리스트로 변환
         List<String> containerNames = Arrays.asList(commandResponse.split("\n"));
@@ -61,8 +80,8 @@ public class DockerService {
     }
 
     // 특정 컨테이너의 실행 여부 확인
-    public boolean isContainerRunning(String containerName, Long userId) throws Exception {
-        List<String> containerList = findRunningContainerList(userId);
+    public boolean isContainerRunning(String containerName, Long projectId) throws Exception {
+        List<String> containerList = findRunningContainerList(projectId);
 
         return containerList.stream()
                 .anyMatch(name -> name.equals(containerName));
@@ -77,8 +96,15 @@ public class DockerService {
         }
 
         // 2. 캐시를 사용하지 않거나 캐시된 값이 없음 => 명령어를 통해 조회
-        String commandResponse = sshService.executeCommandOnce(COMMAND_DOCKER_STATS, userId);
-        Map<String, Map<String, String>> containerUsageMap = parseCommandResponse(commandResponse);
+        Map<String, Map<String, String>> containerUsageMap = new HashMap<>();
+
+        List<SshInfo> sshInfos = sshInfoRepository.findByUserId(userId);
+        for(SshInfo sshInfo : sshInfos){
+            String commandResponse = sshService.executeCommandOnce(COMMAND_DOCKER_STATS, sshInfo.getId());
+            Map<String, Map<String, String>> parsedMap = parseCommandResponse(commandResponse);
+
+            containerUsageMap.putAll(parsedMap);
+        }
 
         // 유효 시간은 10분
         redisService.storeValue(RESOURCE_KEY, userId.toString(), objectMapper.writeValueAsString(containerUsageMap), RESOURCE_EXP);
