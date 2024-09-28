@@ -55,8 +55,11 @@ public class ProjectService {
         boolean isUrgent = (containerStatus == ContainerStatus.NOT_CONNECTED);
 
         User user = entityManager.getReference(User.class, userId);
+        SshInfo sshInfo = entityManager.getReference(SshInfo.class, requestDTO.sshInfoId());
+
         Project project = Project.builder()
                 .user(user)
+                .sshInfo(sshInfo)
                 .projectName(requestDTO.projectName())
                 .containerName(requestDTO.containerName())
                 .description(requestDTO.description())

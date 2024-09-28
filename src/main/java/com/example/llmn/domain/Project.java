@@ -20,6 +20,10 @@ public class Project extends TimeStamp{
     @JoinColumn(name = "user_id")
     private User user;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "ssh_info_id")
+    private SshInfo sshInfo;
+
     @Column
     private String projectName;
 
@@ -37,8 +41,9 @@ public class Project extends TimeStamp{
     private boolean isUrgent;
 
     @Builder
-    public Project(User user, String projectName, String containerName, String description, ContainerStatus containerStatus, boolean isUrgent) {
+    public Project(User user, SshInfo sshInfo, String projectName, String containerName, String description, ContainerStatus containerStatus, boolean isUrgent) {
         this.user = user;
+        this.sshInfo = sshInfo;
         this.projectName = projectName;
         this.containerName = containerName;
         this.containerStatus = containerStatus;
