@@ -32,7 +32,7 @@ public class UserRequest {
             String password,
             @NotBlank(message = "비밀번호를 입력해주세요.")
             String passwordConfirm,
-            List<SshInfoDTO> sshInfo,
+            List<SshInfoDTO> sshInfos,
             boolean receivingAlarm,
             @NotBlank(message = "모니터링할 클라우드 인스턴스를 선택해야 합니다.")
             String monitoringSshHost) {}

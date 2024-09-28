@@ -100,6 +100,16 @@ public class UserService {
         // 중복된 닉네임 다시 체크 (프론트에서 체크하고 이중 체크)
         checkDuplicateNickname(requestDTO.nickName());
 
+        // SshInfo가 비어 있음
+        if(requestDTO.sshInfos().isEmpty()){
+            throw new CustomException(ExceptionCode.SSH_INFO_EMPTY);
+        }
+
+        // Ssh Host가 중복된 게 있는지 체크
+        if(hasDuplicateRemoteHost(requestDTO.sshInfos())){
+            throw new CustomException(ExceptionCode.DUPLICATE_SSH_HOST);
+        }
+
         // 유저 엔티티 저장
         User user = User.builder()
                 .nickName(requestDTO.nickName())
@@ -113,7 +123,7 @@ public class UserService {
         // SSH 엔티티 저장
         List<SshInfo> sshInfos = new ArrayList<>();
 
-        requestDTO.sshInfo().forEach(sshInfoDTO -> {
+        requestDTO.sshInfos().forEach(sshInfoDTO -> {
             SshInfo sshInfo = SshInfo.builder()
                     .user(user)
                     .remoteName(sshInfoDTO.remoteName())
@@ -125,11 +135,12 @@ public class UserService {
             sshInfos.add(sshInfo);
         });
 
-        // 모니터링할 클라우드 인스턴스 id 업데이트
+        // 모니터링 하기로 한 SshInfo Host를 바탕으로 SshInfo 객체 찾기
         Optional<SshInfo> monitoringSshInfo = sshInfos.stream()
                 .filter(sshInfo -> sshInfo.getRemoteHost().equals(requestDTO.monitoringSshHost()))
                 .findFirst();
 
+        // 찾아서 없다면 요청이 잘못 들어옴
         if(monitoringSshInfo.isEmpty()){
             throw new CustomException(ExceptionCode.MONITORING_SSH_NOT_SELECT);
         }

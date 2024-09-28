@@ -55,11 +55,11 @@ public class SSHService {
 
         // 레디스에 캐시된 값이 없으면 DB에서 가져옴
         if (sshInfoStr == null) {
-            Long sshInfoId = userRepository.findMonitoringSshId(userId).orElseThrow(
+            Long monitoringSshInfoId = userRepository.findMonitoringSshId(userId).orElseThrow(
                     () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
             );
 
-            SshInfo sshInfoInDB = sshInfoRepository.findById(sshInfoId).orElseThrow(
+            SshInfo sshInfoInDB = sshInfoRepository.findById(monitoringSshInfoId).orElseThrow(
                     () -> new CustomException(ExceptionCode.SSH_NOT_FOUND)
             );
 

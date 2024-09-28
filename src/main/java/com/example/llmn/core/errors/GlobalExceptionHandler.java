@@ -25,6 +25,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<?> unknownServerError(Exception e){
         String message = e.getMessage();
         ApiUtils.ApiResult<?> apiResult = ApiUtils.error(message, HttpStatus.INTERNAL_SERVER_ERROR);
+        e.printStackTrace(); // 콘솔에 찍기
         return new ResponseEntity<>(apiResult, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 

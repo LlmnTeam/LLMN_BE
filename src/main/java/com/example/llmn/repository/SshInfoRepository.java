@@ -12,9 +12,9 @@ import java.util.Optional;
 @Repository
 public interface SshInfoRepository extends JpaRepository<SshInfo, Long> {
 
-    @Query("SELECT s FROM SshInfo s WHERE s.user = :userId")
+    @Query("SELECT s FROM SshInfo s WHERE s.user.id = :userId")
     List<SshInfo> findByUserId(@Param("userId") Long userId);
 
-    @Query("SELECT s.remoteHost FROM SshInfo s WHERE s = :id")
+    @Query("SELECT s.remoteHost FROM SshInfo s WHERE s.id = :id")
     Optional<String> findHostById(@Param("id") Long id);
 }
