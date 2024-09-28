@@ -57,7 +57,7 @@ public class ProjectResponse {
 
     public record FindCloudAndContainerInfoDTO(List<CloudInstanceDTO> cloudInstances){}
 
-    public record CloudInstanceDTO(String cloudName, List<ContainerDTO> containers){}
+    public record CloudInstanceDTO(String cloudName, Long sshInfoId, List<ContainerDTO> containers){}
 
     public record ContainerDTO(String containerName){}
 }

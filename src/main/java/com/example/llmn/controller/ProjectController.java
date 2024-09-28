@@ -37,6 +37,12 @@ public class ProjectController {
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 
+    @GetMapping("/cloud")
+    public ResponseEntity<?> findCloudAndContainerInfo(@AuthenticationPrincipal CustomUserDetails userDetails) throws Exception {
+        ProjectResponse.FindCloudAndContainerInfoDTO responseDTO = projectService.findCloudAndContainerInfo(userDetails.getUser().getId());
+        return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
+    }
+
     // 수정 시 사용할 API
     @GetMapping("/project/{projectId}/info")
     public ResponseEntity<?> findProjectInfoById(@PathVariable Long projectId) {

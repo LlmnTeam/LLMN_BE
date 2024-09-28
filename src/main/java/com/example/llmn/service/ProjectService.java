@@ -82,9 +82,9 @@ public class ProjectService {
                     .map(ProjectResponse.ContainerDTO::new)
                     .toList();
 
-            String cloudName =getSshInfoName(project.getSshInfo());
+            String cloudName = getSshInfoName(project.getSshInfo());
 
-            ProjectResponse.CloudInstanceDTO cloudInstanceDTO = new ProjectResponse.CloudInstanceDTO(cloudName, containerDTOS);
+            ProjectResponse.CloudInstanceDTO cloudInstanceDTO = new ProjectResponse.CloudInstanceDTO(cloudName, project.getSshInfo().getId(), containerDTOS);
             cloudInstanceDTOS.add(cloudInstanceDTO);
         }
 
