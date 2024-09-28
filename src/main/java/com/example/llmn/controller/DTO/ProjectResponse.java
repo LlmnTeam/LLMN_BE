@@ -54,4 +54,10 @@ public class ProjectResponse {
             String time,
             String content,
             boolean isChecked){}
+
+    public record FindCloudAndContainerInfoDTO(List<CloudInstanceDTO> cloudInstances){}
+
+    public record CloudInstanceDTO(String cloudName, List<ContainerDTO> containers){}
+
+    public record ContainerDTO(String containerName){}
 }

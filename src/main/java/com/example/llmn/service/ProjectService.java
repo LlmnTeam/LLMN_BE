@@ -20,10 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -34,7 +31,6 @@ public class ProjectService {
     private final LogService logService;
     private final ProjectRepository projectRepository;
     private final SummaryRepository summaryRepository;
-    private final SshInfoRepository sshInfoRepository;
     private final UserRepository userRepository;
     private final EntityManager entityManager;
     private final SSHService sshService;
@@ -72,6 +68,27 @@ public class ProjectService {
         projectRepository.save(project);
 
         return new ProjectResponse.CreateProjectDTO(project.getId());
+    }
+
+    @Transactional(readOnly = true)
+    public ProjectResponse.FindCloudAndContainerInfoDTO findCloudAndContainerInfo(Long userId) throws Exception {
+        List<Project> projects = projectRepository.findByUserIdWithSshInfo(userId);
+
+        List<ProjectResponse.CloudInstanceDTO> cloudInstanceDTOS = new ArrayList<>();
+
+        for(Project project : projects){
+            List<String> runningContainers = dockerService.findRunningContainerList(project.getId());
+            List<ProjectResponse.ContainerDTO> containerDTOS = runningContainers.stream()
+                    .map(ProjectResponse.ContainerDTO::new)
+                    .toList();
+
+            String cloudName =getSshInfoName(project.getSshInfo());
+
+            ProjectResponse.CloudInstanceDTO cloudInstanceDTO = new ProjectResponse.CloudInstanceDTO(cloudName, containerDTOS);
+            cloudInstanceDTOS.add(cloudInstanceDTO);
+        }
+
+        return new ProjectResponse.FindCloudAndContainerInfoDTO(cloudInstanceDTOS);
     }
 
     // 수정 시 사용할 API
@@ -286,5 +303,12 @@ public class ProjectService {
 
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
         return localDateTime.format(formatter);
+    }
+
+    private String getSshInfoName(SshInfo sshInfo) {
+        String remoteName = sshInfo.getRemoteName() != null ? sshInfo.getRemoteName() : "Unknown Name";
+        String remoteHost = sshInfo.getRemoteHost() != null ? sshInfo.getRemoteHost() : "Unknown Host";
+
+        return String.format("%s (%s)", remoteName, remoteHost);
     }
 }
