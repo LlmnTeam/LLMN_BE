@@ -2,6 +2,8 @@ package com.example.llmn.service;
 
 import com.example.llmn.controller.DTO.LogDTO;
 import com.example.llmn.controller.DTO.MetricResponse;
+import com.example.llmn.core.errors.CustomException;
+import com.example.llmn.core.errors.ExceptionCode;
 import com.example.llmn.domain.*;
 import com.example.llmn.repository.ProjectRepository;
 import com.example.llmn.repository.SummaryRepository;
@@ -120,14 +122,14 @@ public class LlmService {
     @Transactional
     @Scheduled(cron = "0 5 * * * *") // 매시 5분에
     public void summaryPerformance(){
-        List<Long> userIds = userRepository.findIds();
+        List<User> users = userRepository.findAll();
 
-        for(Long userId: userIds) {
-            LogDTO.PerformanceSummaryResponseDTO performanceSummaryDTO = fetchMetricSummary(userId);
+        for(User user : users) {
+            Long monitoringSshInfoId = user.getMonitoringSshId();
+            LogDTO.PerformanceSummaryResponseDTO performanceSummaryDTO = fetchMetricSummary(monitoringSshInfoId);
 
-            User userRef = userRepository.getReferenceById(userId);
             Summary performanceSummary = Summary.builder()
-                    .user(userRef)
+                    .user(user)
                     .content(performanceSummaryDTO.performanceSummary())
                     .summaryType(SummaryType.PERFORMANCE)
                     .build();
@@ -135,7 +137,7 @@ public class LlmService {
             summaryRepository.save(performanceSummary);
 
             // 업데이트 알람 생성
-            alarmService.generateAlarm(userId, PERFORMANCE_SUMMARY_ALARM, AlarmType.UPDATE);
+            alarmService.generateAlarm(user.getId(), PERFORMANCE_SUMMARY_ALARM, AlarmType.UPDATE);
 
             System.out.println(performanceSummaryDTO.performanceSummary());
         }
@@ -261,11 +263,11 @@ public class LlmService {
                 .block();
     }
 
-    private LogDTO.PerformanceSummaryResponseDTO fetchMetricSummary(Long userId){
+    private LogDTO.PerformanceSummaryResponseDTO fetchMetricSummary(Long sshInfoId){
         StringBuilder requestContentBuilder = new StringBuilder();
 
         // 1시간 전까지의 성능 지표
-        MetricResponse.FindMetricHistoryDTO metricHistory = metricService.findMetricHistory(METRIC_HISTORY_PREVIOUS_HOUR, userId);
+        MetricResponse.FindMetricHistoryDTO metricHistory = metricService.findMetricHistory(METRIC_HISTORY_PREVIOUS_HOUR, sshInfoId);
 
         requestContentBuilder.append(PERFORMANCE_SUMMARY_HEADER);
 

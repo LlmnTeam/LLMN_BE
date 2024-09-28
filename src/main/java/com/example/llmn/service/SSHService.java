@@ -16,7 +16,6 @@ import org.springframework.stereotype.Service;
 public class SSHService {
     private SSHCommandExecutor executor;
     private final RedisService redisService;
-    private final UserRepository userRepository;
     private final SshInfoRepository sshInfoRepository;
 
     private static final String REDIS_SSH_KEY = "SSH";
