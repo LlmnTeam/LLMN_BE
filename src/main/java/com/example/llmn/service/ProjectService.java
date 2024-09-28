@@ -7,6 +7,7 @@ import com.example.llmn.core.errors.ExceptionCode;
 import com.example.llmn.domain.*;
 import com.example.llmn.repository.ProjectRepository;
 import com.example.llmn.repository.SummaryRepository;
+import com.example.llmn.repository.UserRepository;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,7 +33,9 @@ public class ProjectService {
     private final LogService logService;
     private final ProjectRepository projectRepository;
     private final SummaryRepository summaryRepository;
+    private final UserRepository userRepository;
     private final EntityManager entityManager;
+    private final SSHService sshService;
 
     private static final String DOCKER_RESOURCE_KEY_CPU = "CPU";
     private static final String DOCKER_RESOURCE_KEY_MEMORY = "Memory";
@@ -256,6 +259,19 @@ public class ProjectService {
         );
 
         summary.updateIsChecked(!summary.isChecked());
+    }
+
+    @Transactional
+    public String executeCommandInHome(String command, Long userId){
+        Long monitoringSshId = userRepository.findMonitoringSshId(userId).orElseThrow(
+                () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
+        );
+
+        try {
+            return sshService.executeCommandInShell(command, monitoringSshId);
+        } catch (Exception e) {
+            return "명령어 실행에 실패하였습니다.";
+        }
     }
 
     private String formatLocalDateTime(LocalDateTime localDateTime) {

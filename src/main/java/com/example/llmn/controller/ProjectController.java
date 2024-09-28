@@ -1,6 +1,5 @@
 package com.example.llmn.controller;
 
-import com.example.llmn.controller.DTO.MetricRequest;
 import com.example.llmn.controller.DTO.ProjectRequest;
 import com.example.llmn.controller.DTO.ProjectResponse;
 import com.example.llmn.core.security.CustomUserDetails;
@@ -120,9 +119,9 @@ public class ProjectController {
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, null));
     }
 
-    @PostMapping("/command")
-    public ResponseEntity<?> executeCommand(@RequestBody MetricRequest.ExecuteCommandDTO requestDTO, @AuthenticationPrincipal CustomUserDetails userDetails) throws Exception {
-        String response = sshService.executeCommandInShell(requestDTO.command(), requestDTO.sshHost(), userDetails.getUser().getId());
+    @PostMapping("/command/home")
+    public ResponseEntity<?> executeCommandInHome(@RequestBody ProjectRequest.ExecuteCommandDTO requestDTO, @AuthenticationPrincipal CustomUserDetails userDetails) {
+        String response = projectService.executeCommandInHome(requestDTO.command(), userDetails.getUser().getId());
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, response));
     }
 }

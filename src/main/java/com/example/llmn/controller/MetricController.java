@@ -1,11 +1,8 @@
 package com.example.llmn.controller;
 
-import com.example.llmn.controller.DTO.MetricRequest;
-import com.example.llmn.controller.DTO.MetricResponse;
 import com.example.llmn.core.security.CustomUserDetails;
 import com.example.llmn.core.utils.ApiUtils;
 import com.example.llmn.service.MetricService;
-import com.example.llmn.service.SSHService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
