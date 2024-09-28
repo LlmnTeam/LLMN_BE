@@ -126,12 +126,12 @@ public class ProjectService {
 
     @Transactional
     public ProjectResponse.FindProjectListDTO findProjectList(Long userId, boolean isUsingCache) throws Exception {
-        List<Project> projects = projectRepository.findByUserId(userId);
+        List<Project> projects = projectRepository.findByUserIdWithSshInfo(userId);
 
         // 컨테이너 리소스 조회
-        Map<String, Map<String, String>> containersResourceMap = dockerService.findContainersResourceUsage(userId, isUsingCache);
+        Map<String, Map<String, String>> containersResourceMap = dockerService.findContainersResourceUsage(projects, userId, isUsingCache);
 
-        // 실행중인 컨테이너 목록 (Map의 키가 컨테이너 이름이니 이를 리스트로 변환)
+        // 실행중인 컨테이너 목록 (Map의 키가 컨테이너 이름인 것을 활용)
         List<String> runningContainerNames = new ArrayList<>(containersResourceMap.keySet());
 
         List<ProjectResponse.ProjectDTO> projectDTOS = projects.stream()

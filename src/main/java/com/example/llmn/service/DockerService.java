@@ -2,6 +2,7 @@ package com.example.llmn.service;
 
 import com.example.llmn.core.errors.CustomException;
 import com.example.llmn.core.errors.ExceptionCode;
+import com.example.llmn.domain.Project;
 import com.example.llmn.domain.SshInfo;
 import com.example.llmn.repository.ProjectRepository;
 import com.example.llmn.repository.SshInfoRepository;
@@ -88,7 +89,7 @@ public class DockerService {
     }
 
     // 컨테이너의 사용 리소스 조회
-    public Map<String, Map<String, String>> findContainersResourceUsage(Long userId, boolean isUsingCache) throws Exception {
+    public Map<String, Map<String, String>> findContainersResourceUsage(List<Project> projects, Long userId, boolean isUsingCache) throws Exception {
         // 1. 캐시를 사용하면 => 레디스에서 캐시된 값을 먼저 조회
         Map<String, Map<String, String>> cachedUsage = isUsingCache ? getCachedResourceUsage(userId) : null;
         if (cachedUsage != null) {
@@ -97,10 +98,8 @@ public class DockerService {
 
         // 2. 캐시를 사용하지 않거나 캐시된 값이 없음 => 명령어를 통해 조회
         Map<String, Map<String, String>> containerUsageMap = new HashMap<>();
-
-        List<SshInfo> sshInfos = sshInfoRepository.findByUserId(userId);
-        for(SshInfo sshInfo : sshInfos){
-            String commandResponse = sshService.executeCommandOnce(COMMAND_DOCKER_STATS, sshInfo.getId());
+        for(Project project : projects){
+            String commandResponse = sshService.executeCommandOnce(COMMAND_DOCKER_STATS, project.getSshInfo().getId());
             Map<String, Map<String, String>> parsedMap = parseCommandResponse(commandResponse);
 
             containerUsageMap.putAll(parsedMap);
