@@ -5,49 +5,58 @@ import com.example.llmn.core.errors.CustomException;
 import com.example.llmn.core.errors.ExceptionCode;
 import com.example.llmn.core.utils.SSHCommandExecutor;
 import com.example.llmn.domain.SshInfo;
-import com.example.llmn.domain.User;
 import com.example.llmn.repository.SshInfoRepository;
-import com.example.llmn.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 @RequiredArgsConstructor
 public class SSHService {
-    private SSHCommandExecutor executor;
+
     private final RedisService redisService;
     private final SshInfoRepository sshInfoRepository;
 
+    // SSH Executor(세션)을 저장하고 있는 맵
+    private final Map<Long, SSHCommandExecutor> executorMap = new ConcurrentHashMap<>();
     private static final String REDIS_SSH_KEY = "SSH";
-    public static final Long REDIS_SSH_KEY_EXP = 60L * 60 * 24 * 180; // 180일
+    public static final Long REDIS_SSH_KEY_EXP = 60L * 60 * 24 * 30; // 30일
     private static final String DELIMITER = "-";
     
     // 명령어 실행
     public String executeCommandInShell(String command, Long sshInfoId) throws Exception {
-        connectIfNecessary(sshInfoId);
+        SSHCommandExecutor executor = getSshExecutor(sshInfoId);
         return executor.executeCommandInShell(command);
     }
 
     public String executeCommandOnce(String command, Long sshInfoId) throws Exception {
-        connectIfNecessary(sshInfoId);
+        SSHCommandExecutor executor = getSshExecutor(sshInfoId);
         return executor.executeCommandOnce(command);
     }
 
     // SSH 세션 종료
-    public void closeSession() throws Exception {
+    public void closeSession(Long sshInfoId) {
+        SSHCommandExecutor executor = executorMap.get(sshInfoId);
+
         if (executor != null) {
             executor.close();
         }
     }
 
-    private synchronized void connectIfNecessary(Long sshInfoId) throws Exception {
-        // Redis 또는 DB에서 SSH 정보를 가져옴
-        SshInfoDTO sshInfoDTO = getSshInfo(sshInfoId);
+    private synchronized SSHCommandExecutor getSshExecutor(Long sshInfoId) throws Exception {
+        SSHCommandExecutor executor = executorMap.get(sshInfoId);
 
-        // SSHCommandExecutor가 없거나, 세션이 연결되어 있지 않다면 세션을 생성
+        // executor가 없거나, 세션이 끊어졌다면 executor 새로 생성
         if (executor == null || !executor.isConnected()) {
-            this.executor = new SSHCommandExecutor(sshInfoDTO.remoteHost(), sshInfoDTO.remoteName(), sshInfoDTO.remoteKeyPath());
+            SshInfoDTO sshInfoDTO = getSshInfo(sshInfoId);
+            executor = new SSHCommandExecutor(sshInfoDTO.remoteHost(), sshInfoDTO.remoteName(), sshInfoDTO.remoteKeyPath());
+
+            executorMap.put(sshInfoId, executor);
         }
+
+        return executor;
     }
 
     private SshInfoDTO getSshInfo(Long sshInfoId) {

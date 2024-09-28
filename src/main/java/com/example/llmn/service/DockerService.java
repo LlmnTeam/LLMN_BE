@@ -97,9 +97,14 @@ public class DockerService {
         }
 
         // 2. 캐시를 사용하지 않거나 캐시된 값이 없음 => 명령어를 통해 조회
+        List<SshInfo> sshInfos = projects.stream()
+                .map(Project::getSshInfo)
+                .distinct()
+                .toList();
+
         Map<String, Map<String, String>> containerUsageMap = new HashMap<>();
-        for(Project project : projects){
-            String commandResponse = sshService.executeCommandOnce(COMMAND_DOCKER_STATS, project.getSshInfo().getId());
+        for(SshInfo sshInfo : sshInfos){
+            String commandResponse = sshService.executeCommandOnce(COMMAND_DOCKER_STATS, sshInfo.getId());
             Map<String, Map<String, String>> parsedMap = parseCommandResponse(commandResponse);
 
             containerUsageMap.putAll(parsedMap);
