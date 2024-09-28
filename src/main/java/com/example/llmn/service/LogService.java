@@ -27,6 +27,7 @@ import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -398,7 +399,7 @@ public class LogService {
             String logFileName = String.format("logs/%s-log-%s.txt", containerName, timestamp);
 
             try {
-                writeBufferAsFile(logFileName, logMaps);
+                writeBufferAsFile(logFileName, logMaps, timestamp);
             } catch (IOException e) {
                 log.error("로그 파일에 기록하는 중 오류 발생", e);
             }
@@ -412,11 +413,11 @@ public class LogService {
         }
     }
 
-    private void writeBufferAsFile(String logFileName, List<Map<String, Object>> logMaps) throws IOException {
+    private void writeBufferAsFile(String logFileName, List<Map<String, Object>> logMaps, String timestamp) throws IOException {
         // 파일에 기록하기 위한 BufferedWriter 생성
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(logFileName, true))) {
             for (Map<String, Object> logMap : logMaps) {
-                String logMessage = formatLogToStr(logMap);
+                String logMessage = formatLogToStr(logMap, timestamp);
 
                 if (logMessage != null) {
                     writer.write(logMessage);
@@ -427,10 +428,8 @@ public class LogService {
         }
     }
 
-    private String formatLogToStr(Map<String, Object> logMap) {
+    private String formatLogToStr(Map<String, Object> logMap, String timestamp) {
         // 필요한 로그 데이터만 추출하여 포맷팅
-        Object timestamp = logMap.get(LOG_KEY_TIMESTAMP);
-        Object logLevel = logMap.get(LOG_KEY_LEVEL);
         Object message = logMap.get(LOG_KEY_MESSAGE);
 
         // timestamp 또는 message가 없으면 해당 로그는 무시
@@ -439,9 +438,8 @@ public class LogService {
         }
 
         // 로그 데이터를 원하는 형식으로 포맷
-        return String.format("[%s] %s: %s",
-                timestamp.toString(),
-                logLevel != null ? logLevel.toString() : LOG_LEVEL_INFO,
+        return String.format("[%s]: %s",
+                timestamp,
                 message.toString());
     }
 
@@ -463,5 +461,14 @@ public class LogService {
         } catch (IOException e) {
             log.info("ElasticSearch 인덱스 생성 실패!");
         }
+    }
+
+    private String formatLocalDateTime(LocalDateTime localDateTime) {
+        if(localDateTime == null){
+            return null;
+        }
+
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+        return localDateTime.format(formatter);
     }
 }

@@ -41,6 +41,7 @@ public class ProjectService {
     private static final String NOT_EXIST_SUMMARY = "로그 요약본이 존재하지 않습니다.";
     private static final String NOT_EXIST_LOG = "로그값이 존재하지 않습니다";
     private static final String SORT_BY_DATE = "createdDate";
+    private static final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH");
 
     @Transactional
     public ProjectResponse.CreateProjectDTO createProject(ProjectRequest.CreateProjectDTO requestDTO, Long userId){
@@ -187,11 +188,7 @@ public class ProjectService {
                 .orElse(null);
 
         // 최신 로그 가져오기
-        String recentLog = logService.searchRecentLogInStr(project.getContainerName(), 2L);
-
-        if (recentLog.isEmpty()) {
-            recentLog = NOT_EXIST_LOG;
-        }
+        String recentLog = getRecentLog(project);
 
         return new ProjectResponse.FindProjectByIdDTO(
                 project.getProjectName(),
@@ -199,6 +196,27 @@ public class ProjectService {
                 summaryContent,
                 formatLocalDateTime(updateTime),
                 recentLog);
+    }
+
+    private String getRecentLog(Project project){
+        List<String> logFileList = logService.findLogFileList();
+
+        String latestLogFile = logFileList.stream()
+                .filter(logFile -> logFile.startsWith(project.getContainerName() + "-log"))
+                .max((file1, file2) -> { // 최신 파일을 찾기 위해 비교
+                    LocalDateTime dateTime1 = extractDateTimeFromFile(file1);
+                    LocalDateTime dateTime2 = extractDateTimeFromFile(file2);
+                    return dateTime1.compareTo(dateTime2);
+                })
+                .orElse(null);
+
+        if(latestLogFile == null){
+            return NOT_EXIST_LOG;
+        }
+
+        String logContent = logService.readLogFile(latestLogFile);
+
+        return getLastTwoLogs(logContent);
     }
 
     @Transactional(readOnly = true)
@@ -311,4 +329,34 @@ public class ProjectService {
 
         return String.format("%s (%s)", remoteName, remoteHost);
     }
+
+    public String getLatestLogFile(List<String> files) {
+        return files.stream()
+                .max((file1, file2) -> {
+                    LocalDateTime dateTime1 = extractDateTimeFromFile(file1);
+                    LocalDateTime dateTime2 = extractDateTimeFromFile(file2);
+                    return dateTime1.compareTo(dateTime2);  // 최신 파일을 찾기 위해 비교
+                })
+                .orElse(null);
+    }
+
+    private LocalDateTime extractDateTimeFromFile(String file) {
+        // 파일 이름에서 "log-" 뒤부터 ".txt" 앞까지의 부분 추출
+        String dateTimePart = file.substring(file.indexOf("log-") + 4, file.lastIndexOf(".txt"));
+        return LocalDateTime.parse(dateTimePart, formatter);
+    }
+
+    public String getLastTwoLogs(String logContent) {
+        // 로그를 공백 줄을 기준으로 분리
+        String[] logs = logContent.split("\\n\\s*\\n");
+
+        // 만약 로그가 2개 이하라면 전체 로그 반환
+        if (logs.length <= 2) {
+            return logContent.trim();
+        }
+
+        // 마지막 두 개의 로그를 추출하여 반환
+        return logs[logs.length - 2].trim() + "\n\n" + logs[logs.length - 1].trim();
+    }
+
 }
