@@ -21,8 +21,6 @@ import java.util.Map;
 public class MetricController {
 
     private final MetricService metricService;
-    private final SSHService sshService;
-    private static final int METRIC_HISTORY_PREVIOUS_HOUR = 24;
 
     /*@GetMapping("/metrics/history")
     public ResponseEntity<?> findMetricHistory(@AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -34,11 +32,5 @@ public class MetricController {
     public ResponseEntity<?> collectRemoteMetrics(@AuthenticationPrincipal CustomUserDetails userDetails) throws Exception {
         Map<String, Double> stringObjectMap = metricService.collectTopMetrics(userDetails.getUser().getId());
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, stringObjectMap));
-    }
-
-    @PostMapping("/command")
-    public ResponseEntity<?> executeCommand(@RequestBody MetricRequest.ExecuteCommandDTO requestDTO, @AuthenticationPrincipal CustomUserDetails userDetails) throws Exception {
-        String response = sshService.executeCommandInShell(requestDTO.command(), userDetails.getUser().getId());
-        return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, response));
     }
 }

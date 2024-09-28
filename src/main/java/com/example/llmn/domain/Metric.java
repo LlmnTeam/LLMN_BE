@@ -17,8 +17,8 @@ public class Metric extends TimeStamp {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id")
-    private User user;
+    @JoinColumn(name = "ssh_info_id")
+    private SshInfo sshInfo;
 
     @Column
     private double cpuUsage;
@@ -36,8 +36,8 @@ public class Metric extends TimeStamp {
     private double totalBytesSent;
 
     @Builder
-    public Metric(User user, double cpuUsage, double totalMemory, double usedMemory, double totalBytesReceived, double totalBytesSent) {
-        this.user = user;
+    public Metric(SshInfo sshInfo, double cpuUsage, double totalMemory, double usedMemory, double totalBytesReceived, double totalBytesSent) {
+        this.sshInfo = sshInfo;
         this.cpuUsage = cpuUsage;
         this.totalMemory = totalMemory;
         this.usedMemory = usedMemory;

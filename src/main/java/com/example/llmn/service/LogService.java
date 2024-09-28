@@ -7,7 +7,7 @@ import co.elastic.clients.elasticsearch._types.query_dsl.BoolQuery;
 import co.elastic.clients.elasticsearch.core.*;
 import co.elastic.clients.elasticsearch.indices.CreateIndexRequest;
 import co.elastic.clients.json.JsonData;
-import com.example.llmn.controller.DTO.LogData;
+import com.example.llmn.controller.DTO.LogDataDTO;
 import com.example.llmn.core.errors.CustomException;
 import com.example.llmn.core.errors.ExceptionCode;
 import com.example.llmn.core.utils.LogDataParser;
@@ -76,7 +76,7 @@ public class LogService {
         log.info("업데이트 완료");
     }
 
-    public List<LogData> searchLogList(Instant startTime, Instant endTime, String logLevel, String containerName) {
+    public List<LogDataDTO> searchLogList(Instant startTime, Instant endTime, String logLevel, String containerName) {
         try {
             // Elasticsearch 쿼리 생성
             SearchRequest.Builder searchBuilder = new SearchRequest.Builder()
@@ -251,7 +251,7 @@ public class LogService {
         return new UrlResource(logFilePath.toUri());
     }
 
-    private LogData convertToLogData(Map<String, Object> source) {
+    private LogDataDTO convertToLogData(Map<String, Object> source) {
         String containerName = Optional.ofNullable((String) source.get(LOG_KEY_CONTAINER_NAME))
                 .orElse(UNKNOWN_CONTAINER);
 
@@ -266,7 +266,7 @@ public class LogService {
         String logLevel = Optional.ofNullable((String) source.get(LOG_KEY_LEVEL))
                 .orElse(LOG_LEVEL_UNKNOWN);
 
-        return new LogData(containerName, timestamp, formattedMessage, isProcessed, logLevel);
+        return new LogDataDTO(containerName, timestamp, formattedMessage, isProcessed, logLevel);
     }
 
     private String convertToString(Map<String, Object> source) {

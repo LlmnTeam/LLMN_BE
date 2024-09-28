@@ -1,11 +1,13 @@
 package com.example.llmn.controller;
 
+import com.example.llmn.controller.DTO.MetricRequest;
 import com.example.llmn.controller.DTO.ProjectRequest;
 import com.example.llmn.controller.DTO.ProjectResponse;
 import com.example.llmn.core.security.CustomUserDetails;
 import com.example.llmn.core.utils.ApiUtils;
 import com.example.llmn.service.DockerService;
 import com.example.llmn.service.ProjectService;
+import com.example.llmn.service.SSHService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -25,6 +27,7 @@ public class ProjectController {
 
     private final ProjectService projectService;
     private final DockerService dockerService;
+    private final SSHService sshService;
     private static final String SORT_BY_DATE = "createdDate";
     private static final boolean USING_CACHE = true;
     private static final boolean NOT_USING_CACHE = false;
@@ -115,5 +118,11 @@ public class ProjectController {
     public ResponseEntity<?> checkSummary(@PathVariable Long summaryId){
         projectService.checkSummary(summaryId);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, null));
+    }
+
+    @PostMapping("/command")
+    public ResponseEntity<?> executeCommand(@RequestBody MetricRequest.ExecuteCommandDTO requestDTO, @AuthenticationPrincipal CustomUserDetails userDetails) throws Exception {
+        String response = sshService.executeCommandInShell(requestDTO.command(), requestDTO.sshHost(), userDetails.getUser().getId());
+        return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, response));
     }
 }

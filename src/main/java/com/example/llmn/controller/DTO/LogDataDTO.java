@@ -2,7 +2,7 @@ package com.example.llmn.controller.DTO;
 
 import java.time.Instant;
 
-public record LogData(
+public record LogDataDTO(
         String serviceName,
         Instant timestamp,
         String message,

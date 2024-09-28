@@ -3,8 +3,10 @@ package com.example.llmn.service;
 import com.example.llmn.controller.DTO.MetricResponse;
 import com.example.llmn.domain.Metric;
 
+import com.example.llmn.domain.SshInfo;
 import com.example.llmn.domain.User;
 import com.example.llmn.repository.MetricRepository;
+import com.example.llmn.repository.SshInfoRepository;
 import com.example.llmn.repository.UserRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -23,6 +25,7 @@ public class MetricService {
 
     private final MetricRepository metricRepository;
     private final UserRepository userRepository;
+    private final SshInfoRepository sshInfoRepository;
     private final RedisService redisService;
     private final SSHService sshService;
     private final ObjectMapper objectMapper;
@@ -51,29 +54,37 @@ public class MetricService {
         List<Long> userIds = userRepository.findIds();
 
         for(Long userId : userIds){
-            User userRef = userRepository.getReferenceById(userId);
+            List<SshInfo> sshInfos = sshInfoRepository.findByUserId(userId);
+            Long monitoringSshId = userRepository.findMonitoringSshId(userId).get();
 
-            Map<String, Double> topMetrics = collectTopMetrics(userId);
-            Map<String, Double> networkMetrics = collectNetworkMetrics(userId, UPDATE_CACHE);
+            for(SshInfo sshInfo : sshInfos){
+                // CPU, Memory 지표
+                Map<String, Double> topMetrics = collectTopMetrics(sshInfo.getId());
 
-            Metric metric = Metric.builder()
-                    .user(userRef)
-                    .cpuUsage(topMetrics.get(METRIC_MAP_CPU_USAGE))
-                    .totalMemory(topMetrics.get(METRIC_MAP_TOTAL_MEMORY))
-                    .usedMemory(topMetrics.get(METRIC_MAP_USED_MEMORY))
-                    .totalBytesReceived(networkMetrics.get(METRIC_MAP_NETWORK_REC)) // 10분 간격의 네트워크 트래픽
-                    .totalBytesSent(networkMetrics.get(METRIC_MAP_NETWORK_SENT))
-                    .build();
+                // 네트워크 지표 (모니터링하는 인스턴스의 경우 캐싱을 함)
+                Map<String, Double> networkMetrics = monitoringSshId.equals(sshInfo.getId())
+                        ? collectNetworkMetrics(sshInfo.getId(), UPDATE_CACHE)
+                        : collectNetworkMetrics(sshInfo.getId(), NOT_UPDATE_CACHE);
 
-            metricRepository.save(metric);
+                Metric metric = Metric.builder()
+                        .sshInfo(sshInfo)
+                        .cpuUsage(topMetrics.get(METRIC_MAP_CPU_USAGE))
+                        .totalMemory(topMetrics.get(METRIC_MAP_TOTAL_MEMORY))
+                        .usedMemory(topMetrics.get(METRIC_MAP_USED_MEMORY))
+                        .totalBytesReceived(networkMetrics.get(METRIC_MAP_NETWORK_REC)) // 10분 간격의 네트워크 트래픽
+                        .totalBytesSent(networkMetrics.get(METRIC_MAP_NETWORK_SENT))
+                        .build();
+
+                metricRepository.save(metric);
+            }
         }
     }
 
-    public Map<String, Double> collectTopMetrics(Long userId) throws Exception {
+    public Map<String, Double> collectTopMetrics(Long sshInfoId) throws Exception {
         Map<String, Double> metricsMap = new HashMap<>();
 
         // CPU와 메모리 사용량을 동시에 얻기 위해 top 명령어 실행
-        String commandResponse = sshService.executeCommandOnce(COMMAND_TOP, userId);
+        String commandResponse = sshService.executeCommandOnce(COMMAND_TOP, sshInfoId);
 
         // 명령어 응답 파싱
         String[] lines = commandResponse.split("\n");
@@ -118,11 +129,11 @@ public class MetricService {
     }
 
     // 네트워크 송수신량을 수집하고 레디스에 저장
-    public Map<String, Double> collectNetworkMetrics(Long userId, boolean updateCache) throws Exception {
+    public Map<String, Double> collectNetworkMetrics(Long sshInfoId, boolean updateCache) throws Exception {
         Map<String, Double> metricsMap = new HashMap<>();
 
         // 현재 네트워크 사용량 조회
-        Map<String, Double> currentNetworkMetric = collectNetworkUsage(userId);
+        Map<String, Double> currentNetworkMetric = collectNetworkUsage(sshInfoId);
 
         // 레디스에서 이전 네트워크 사용량 조회 (없으면 0.0)
         Double previousReceived = redisService.getDataInDouble(REDIS_KEY_NETWORK_REC);
@@ -238,9 +249,9 @@ public class MetricService {
     }
 
     // 네트워크 송수신량 수집
-    private Map<String, Double> collectNetworkUsage(Long userId) throws Exception {
+    private Map<String, Double> collectNetworkUsage(Long sshInfoId) throws Exception {
         // 네트워크 송/수신 기록 조회 명령어 실행
-        String commandResponse = sshService.executeCommandOnce(COMMAND_NETWORK_USAGE, userId);
+        String commandResponse = sshService.executeCommandOnce(COMMAND_NETWORK_USAGE, sshInfoId);
 
         // eth0: 905961216 722194  0  0  0  0  0  0  21378581  162883  0  0  0  0  0  0
         String[] parts = commandResponse.trim().split("\\s+");

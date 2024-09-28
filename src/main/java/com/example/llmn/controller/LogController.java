@@ -1,6 +1,6 @@
 package com.example.llmn.controller;
 
-import com.example.llmn.controller.DTO.LogData;
+import com.example.llmn.controller.DTO.LogDataDTO;
 import com.example.llmn.core.utils.ApiUtils;
 import com.example.llmn.service.LogService;
 import lombok.RequiredArgsConstructor;
@@ -28,7 +28,7 @@ public class LogController {
                                         @RequestParam Instant endTime,
                                         @RequestParam(required = false) String logLevel,
                                         @RequestParam(required = false) String serviceName) {
-        List<LogData> responseDTO = logService.searchLogList(startTime, endTime, logLevel, serviceName);
+        List<LogDataDTO> responseDTO = logService.searchLogList(startTime, endTime, logLevel, serviceName);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 

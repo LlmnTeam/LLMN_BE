@@ -1,5 +1,6 @@
 package com.example.llmn.service;
 
+import com.example.llmn.controller.DTO.SshInfoDTO;
 import com.example.llmn.core.errors.CustomException;
 import com.example.llmn.core.errors.ExceptionCode;
 import com.example.llmn.core.utils.SSHCommandExecutor;
@@ -23,13 +24,13 @@ public class SSHService {
     private static final String DELIMITER = "-";
     
     // 명령어 실행
-    public String executeCommandInShell(String command, Long userId) throws Exception {
-        connectIfNecessary(userId);
+    public String executeCommandInShell(String command, Long sshInfoId) throws Exception {
+        connectIfNecessary(sshInfoId);
         return executor.executeCommandInShell(command);
     }
 
-    public String executeCommandOnce(String command, Long userId) throws Exception {
-        connectIfNecessary(userId);
+    public String executeCommandOnce(String command, Long sshInfoId) throws Exception {
+        connectIfNecessary(sshInfoId);
         return executor.executeCommandOnce(command);
     }
 
@@ -40,50 +41,44 @@ public class SSHService {
         }
     }
 
-    private synchronized void connectIfNecessary(Long userId) throws Exception {
+    private synchronized void connectIfNecessary(Long sshInfoId) throws Exception {
         // Redis 또는 DB에서 SSH 정보를 가져옴
-        SshInfo sshInfo = getSshInfo(userId);
+        SshInfoDTO sshInfoDTO = getSshInfo(sshInfoId);
 
         // SSHCommandExecutor가 없거나, 세션이 연결되어 있지 않다면 세션을 생성
         if (executor == null || !executor.isConnected()) {
-            this.executor = new SSHCommandExecutor(sshInfo.getRemoteHost(), sshInfo.getRemoteName(), sshInfo.getRemoteKeyPath());
+            this.executor = new SSHCommandExecutor(sshInfoDTO.remoteHost(), sshInfoDTO.remoteName(), sshInfoDTO.remoteKeyPath());
         }
     }
 
-    private SshInfo getSshInfo(Long userId) {
-        String sshInfoStr = redisService.getDataInStr(REDIS_SSH_KEY, userId.toString());
+    private SshInfoDTO getSshInfo(Long sshInfoId) {
+        String sshInfoStr = redisService.getDataInStr(REDIS_SSH_KEY, sshInfoId.toString());
 
         // 레디스에 캐시된 값이 없으면 DB에서 가져옴
         if (sshInfoStr == null) {
-            Long monitoringSshInfoId = userRepository.findMonitoringSshId(userId).orElseThrow(
-                    () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
-            );
-
-            SshInfo sshInfoInDB = sshInfoRepository.findById(monitoringSshInfoId).orElseThrow(
+            SshInfo sshInfoInDB = sshInfoRepository.findById(sshInfoId).orElseThrow(
                     () -> new CustomException(ExceptionCode.SSH_NOT_FOUND)
             );
 
             // remoteHost, remoteName, keyPath를 하나의 문자로 합쳐서 저장
             String combinedInfo = String.join(DELIMITER, sshInfoInDB.getRemoteHost(), sshInfoInDB.getRemoteName(), sshInfoInDB.getRemoteKeyPath());
-            redisService.storeValue(REDIS_SSH_KEY, userId.toString(), combinedInfo, REDIS_SSH_KEY_EXP);
+            redisService.storeValue(REDIS_SSH_KEY, sshInfoId.toString(), combinedInfo, REDIS_SSH_KEY_EXP);
 
-            return sshInfoInDB;
+            return new SshInfoDTO(sshInfoInDB.getRemoteHost(), sshInfoInDB.getRemoteName(), sshInfoInDB.getRemoteKeyPath());
         } else {
-            return parseSshInfo(sshInfoStr, userId);
+            return parseSshInfo(sshInfoStr);
         }
     }
 
     // 문자인 sshInfoStr을 SsshInfo 객체로 변환
-    private SshInfo parseSshInfo(String sshInfoStr, Long userId) {
+    private SshInfoDTO parseSshInfo(String sshInfoStr) {
         String[] parts = sshInfoStr.split(DELIMITER);
 
         if (parts.length != 3) {
             throw new IllegalArgumentException("잘못된 SSH 정보 형식입니다.");
         }
 
-        User userRef = userRepository.getReferenceById(userId);
-
-        return new SshInfo(userRef ,parts[0], parts[1], parts[2]);
+        return new SshInfoDTO(parts[0], parts[1], parts[2]);
     }
 }
 
