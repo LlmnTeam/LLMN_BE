@@ -10,25 +10,24 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
 @Configuration
 public class ElasticsearchConfig {
 
-    @Value("${elasticsearch.host}")
-    private String ELASTIC_SEARCH_HOST;
-
+    private final Map<String, ElasticsearchClient> clientCache = new ConcurrentHashMap<>();
     private static final String HTTP_PROTOCOL = "http";
 
-    @Bean
-    public ElasticsearchClient elasticsearchClient() {
-        // REST 클라이언트를 생성
-        RestClient restClient = RestClient.builder(
-                new HttpHost(ELASTIC_SEARCH_HOST, 9200, HTTP_PROTOCOL)).build();
 
-        // JSONP Mapper를 설정
-        ElasticsearchTransport transport = new RestClientTransport(
-                restClient, new JacksonJsonpMapper());
+    public ElasticsearchClient createElasticsearchClient(String host) {
+        return clientCache.computeIfAbsent(host, h -> {
+            // REST 클라이언트를 생성
+            RestClient restClient = RestClient.builder(new HttpHost(h, 9200, HTTP_PROTOCOL)).build();
 
-        // ElasticsearchClient를 생성
-        return new ElasticsearchClient(transport);
+            // JSONP Mapper를 설정
+            ElasticsearchTransport transport = new RestClientTransport(restClient, new JacksonJsonpMapper());
+            return new ElasticsearchClient(transport);
+        });
     }
 }

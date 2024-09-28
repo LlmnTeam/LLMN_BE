@@ -8,11 +8,13 @@ import co.elastic.clients.elasticsearch.core.*;
 import co.elastic.clients.elasticsearch.indices.CreateIndexRequest;
 import co.elastic.clients.json.JsonData;
 import com.example.llmn.controller.DTO.LogDataDTO;
+import com.example.llmn.core.config.ElasticsearchConfig;
 import com.example.llmn.core.errors.CustomException;
 import com.example.llmn.core.errors.ExceptionCode;
 import com.example.llmn.core.utils.LogDataParser;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -38,7 +40,10 @@ import java.util.stream.Stream;
 @Slf4j
 public class LogService {
 
-    private final ElasticsearchClient client;
+    private final ElasticsearchConfig elasticsearchConfig;
+
+    @Value("${elasticsearch.host}")
+    private String ELASTIC_SEARCH_HOST;
 
     private static final String LOGS_DIRECTORY = "logs";
     private static final String LOG_LEVEL_INFO = "INFO";
@@ -79,6 +84,8 @@ public class LogService {
 
     public List<LogDataDTO> searchLogList(Instant startTime, Instant endTime, String logLevel, String containerName) {
         try {
+            ElasticsearchClient client = elasticsearchConfig.createElasticsearchClient(ELASTIC_SEARCH_HOST);
+
             // Elasticsearch 쿼리 생성
             SearchRequest.Builder searchBuilder = new SearchRequest.Builder()
                     .index("docker-logs-*")
@@ -126,6 +133,8 @@ public class LogService {
 
     public String searchLogInStr(Instant startTime, Instant endTime, String containerName) {
         try {
+            ElasticsearchClient client = elasticsearchConfig.createElasticsearchClient(ELASTIC_SEARCH_HOST);
+
             // Elasticsearch 쿼리 생성
             SearchRequest.Builder searchBuilder = new SearchRequest.Builder()
                     .index("docker-logs-*")
@@ -166,6 +175,8 @@ public class LogService {
 
     public String searchRecentLogInStr(String containerName, Long cnt) {
         try {
+            ElasticsearchClient client = elasticsearchConfig.createElasticsearchClient(ELASTIC_SEARCH_HOST);
+
             // Elasticsearch 쿼리 생성
             SearchRequest.Builder searchBuilder = new SearchRequest.Builder()
                     .index("docker-logs-*")
@@ -280,6 +291,8 @@ public class LogService {
         String indexName = getTodayIndexName();
 
         try {
+            ElasticsearchClient client = elasticsearchConfig.createElasticsearchClient(ELASTIC_SEARCH_HOST);
+
             // is_processed가 false인 데이터 검색
             SearchRequest searchRequest = new SearchRequest.Builder()
                     .index(indexName)
@@ -335,6 +348,8 @@ public class LogService {
     }
 
     private void updateToElasticSearch(List<Map<String, Object>> updatedLogMaps) throws IOException {
+        ElasticsearchClient client = elasticsearchConfig.createElasticsearchClient(ELASTIC_SEARCH_HOST);
+
         String indexName = getTodayIndexName();
 
         for (Map<String, Object> logMap : updatedLogMaps) {
@@ -367,6 +382,8 @@ public class LogService {
     }
 
     private void deleteOldLogs(Instant lastCollectedTime) throws IOException {
+        ElasticsearchClient client = elasticsearchConfig.createElasticsearchClient(ELASTIC_SEARCH_HOST);
+
         // Elasticsearch에서 lastCollectedTime 이전의 로그 삭제
         DeleteByQueryRequest deleteRequest = DeleteByQueryRequest.of(d -> d
                 .index("docker-logs-*")
@@ -445,6 +462,8 @@ public class LogService {
 
     private void createIndexIfNotExists(String indexName)  {
         try {
+            ElasticsearchClient client = elasticsearchConfig.createElasticsearchClient(ELASTIC_SEARCH_HOST);
+
             CreateIndexRequest createIndexRequest = new CreateIndexRequest.Builder()
                     .index(indexName)
                     .mappings(m -> m

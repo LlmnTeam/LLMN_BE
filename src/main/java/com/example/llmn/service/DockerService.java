@@ -24,7 +24,6 @@ public class DockerService {
     private final SSHService sshService;
     private final RedisService redisService;
     private final ProjectRepository projectRepository;
-    private final SshInfoRepository sshInfoRepository;
     private final ObjectMapper objectMapper;
 
     private static final String RESOURCE_KEY = "resource";
@@ -114,24 +113,6 @@ public class DockerService {
         redisService.storeValue(RESOURCE_KEY, userId.toString(), objectMapper.writeValueAsString(containerUsageMap), RESOURCE_EXP);
 
         return containerUsageMap;
-    }
-
-    // 명령어 실행 함수
-    private void executeCommand(String command) throws Exception {
-        ProcessBuilder processBuilder = new ProcessBuilder();
-        processBuilder.command("bash", "-c", command);
-        Process process = processBuilder.start();
-
-        BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-        String line;
-        while ((line = reader.readLine()) != null) {
-            System.out.println(line);
-        }
-
-        int exitCode = process.waitFor();
-        if (exitCode != 0) {
-            throw new RuntimeException("명령어 실행 실패: " + exitCode);
-        }
     }
 
     private Map<String, Map<String, String>> getCachedResourceUsage(Long userId) {
