@@ -30,7 +30,7 @@ public class UserController {
     private static final String CODE_TYPE_JOIN = "join";
 
     @PostMapping("/auth/login")
-    public ResponseEntity<?> login(@RequestBody @Valid UserRequest.LoginDTO requestDTO, HttpServletRequest request) throws MessagingException {
+    public ResponseEntity<?> login(@RequestBody @Valid UserRequest.LoginDTO requestDTO, HttpServletRequest request) {
         Map<String, String> tokens = userService.login(requestDTO, request);
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, userService.createRefreshTokenCookie(tokens.get("refreshToken")))
@@ -58,7 +58,7 @@ public class UserController {
     }
 
     @PostMapping("/accounts/check/email")
-    public ResponseEntity<?> checkEmailAndSendCode(@RequestBody @Valid UserRequest.EmailDTO requestDTO) throws MessagingException {
+    public ResponseEntity<?> checkEmailAndSendCode(@RequestBody @Valid UserRequest.EmailDTO requestDTO) {
         UserResponse.CheckEmailExistDTO responseDTO = userService.checkEmailExist(requestDTO.email());
         userService.sendCodeWithValidation(requestDTO.email(), CODE_TYPE_JOIN, responseDTO.isValid());
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));

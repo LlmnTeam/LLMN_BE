@@ -78,7 +78,7 @@ public class UserService {
     public static final Long REDIS_SSH_KEY_EXP = 60L * 60 * 24 * 180; // 180일
 
     @Transactional
-    public Map<String, String> login(UserRequest.@Valid LoginDTO requestDTO, HttpServletRequest request) throws MessagingException {
+    public Map<String, String> login(UserRequest.@Valid LoginDTO requestDTO, HttpServletRequest request) {
         User user = userRepository.findByEmail(requestDTO.email()).orElseThrow(
                 () -> new CustomException(ExceptionCode.USER_ACCOUNT_WRONG)
         );
@@ -157,7 +157,7 @@ public class UserService {
     }
 
     @Async
-    public void sendCodeWithValidation(String email, String codeType, boolean isValid) throws MessagingException {
+    public void sendCodeWithValidation(String email, String codeType, boolean isValid) {
         // TTL 체크
         if(redisService.isDateExist(REDIS_KEY_EMAIL_CODE + codeType, email)){
             throw new CustomException(ExceptionCode.ALREADY_SEND_EMAIL);
@@ -356,7 +356,7 @@ public class UserService {
     }
 
     @Async
-    public void sendCodeByEmail(String email, String codeType) throws MessagingException {
+    public void sendCodeByEmail(String email, String codeType) {
         // 인증 코드 전송 및 레디스에 저장
         String verificationCode = generateVerificationCode();
 
@@ -370,21 +370,25 @@ public class UserService {
     }
 
     @Async
-    public void sendMail(String toEmail, String subject, String templateName, Map<String, Object> templateModel) throws MessagingException {
-        MimeMessage message = mailSender.createMimeMessage();
-        MimeMessageHelper helper = new MimeMessageHelper(message, true, UTF_EIGHT_ENCODING);
+    public void sendMail(String toEmail, String subject, String templateName, Map<String, Object> templateModel) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, UTF_EIGHT_ENCODING);
 
-        // 템플릿 설정
-        Context context = new Context();
-        templateModel.forEach(context::setVariable);
-        String htmlContent = templateEngine.process(templateName, context);
-        helper.setText(htmlContent, true);
+            // 템플릿 설정
+            Context context = new Context();
+            templateModel.forEach(context::setVariable);
+            String htmlContent = templateEngine.process(templateName, context);
+            helper.setText(htmlContent, true);
 
-        helper.setFrom(SERVICE_MAIL_ACCOUNT);
-        helper.setTo(toEmail);
-        helper.setSubject(subject);
+            helper.setFrom(SERVICE_MAIL_ACCOUNT);
+            helper.setTo(toEmail);
+            helper.setSubject(subject);
 
-        mailSender.send(message);
+            mailSender.send(message);
+        } catch (MessagingException e){
+            log.info(toEmail + "로의 메일 전송에 실패했습니다");
+        }
     }
 
     private Optional<String> getLatestHourlySummary(){
