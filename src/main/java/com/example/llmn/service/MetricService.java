@@ -18,6 +18,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 @RequiredArgsConstructor
@@ -46,10 +48,9 @@ public class MetricService {
     private static final String METRIC_MAP_DAILY_NET_SENT ="dailySent";
     private static final String COMMAND_TOP = "top -b -n1 | grep \"Cpu(s)\\|Mem\"";
     private static final String COMMAND_NETWORK_USAGE = "cat /proc/net/dev | grep eth0";
-    private static final String CPU_USAGE_PREFIX = "%Cpu(s):";
-    private static final String MEM_USAGE_PREFIX = "MiB Mem";
-    private static final String NUMERIC_REGEX = "[^0-9.]";
     private static final DateTimeFormatter formatterForHourAndMin = DateTimeFormatter.ofPattern("HH:mm"); // 시간 형식 "HH:mm"
+    private static final Pattern CPU_PATTERN = Pattern.compile("%Cpu\\(s\\):\\s+([\\d.]+)\\s+us,\\s+([\\d.]+)\\s+sy,.*");
+    private static final Pattern MEM_PATTERN = Pattern.compile("MiB Mem :\\s+([\\d.]+)\\s+total,\\s+([\\d.]+)\\s+free,\\s+([\\d.]+)\\s+used,.*");
 
     @Scheduled(cron = "0 0/10 * * * *")
     @Transactional
@@ -161,35 +162,22 @@ public class MetricService {
             line = line.trim();
 
             // CPU 사용량 라인 처리 (%Cpu(s): 0.0 us, 6.2 sy, 0.0 ni, 93.8 id, 0.0 wa, 0.0 hi, 0.0 si, 0.0 st)
-            if (line.startsWith(CPU_USAGE_PREFIX)) {
-                // 쉼표를 기준으로 분리
-                String[] cpuParts = line.split(",");
-
-                // us 값과 sy 값 추출
-                String usUsage = cpuParts[0].split(":")[1]
-                        .trim()
-                        .replaceAll(NUMERIC_REGEX, "")
-                        .trim();
-                String syUsage = cpuParts[1]
-                        .trim()
-                        .replaceAll(NUMERIC_REGEX, "")
-                        .trim();
-
-                // us와 sy를 합쳐서 CPU 부하량 계산
-                double cpuUsage = Double.parseDouble(usUsage) + Double.parseDouble(syUsage);
+            Matcher cpuMatcher = CPU_PATTERN.matcher(line);
+            if (cpuMatcher.matches()) {
+                double usUsage = Double.parseDouble(cpuMatcher.group(1));
+                double syUsage = Double.parseDouble(cpuMatcher.group(2));
+                double cpuUsage = usUsage + syUsage;
                 metricsMap.put(METRIC_MAP_CPU_USAGE, cpuUsage);
+                continue;
             }
 
             // 메모리 사용량 라인 처리 (MiB Mem : 949.2 total, 141.4 free, 325.1 used, 482.8 buff/cache)
-            if (line.startsWith(MEM_USAGE_PREFIX)) {
-                String[] memParts = line.split(",");
-
-                // 전체 메모리와 사용 메모리 추출
-                String memTotal = memParts[0].replaceAll(NUMERIC_REGEX, "").trim();
-                String memUsed = memParts[2].replaceAll(NUMERIC_REGEX, "").trim();
-
-                metricsMap.put(METRIC_MAP_TOTAL_MEMORY, Double.parseDouble(memTotal));
-                metricsMap.put(METRIC_MAP_USED_MEMORY, Double.parseDouble(memUsed));
+            Matcher memMatcher = MEM_PATTERN.matcher(line);
+            if (memMatcher.matches()) {
+                double memTotal = Double.parseDouble(memMatcher.group(1));
+                double memUsed = Double.parseDouble(memMatcher.group(3));
+                metricsMap.put(METRIC_MAP_TOTAL_MEMORY, memTotal);
+                metricsMap.put(METRIC_MAP_USED_MEMORY, memUsed);
             }
         }
 
