@@ -173,43 +173,6 @@ public class LogService {
         }
     }
 
-    public String searchRecentLogInStr(String containerName, Long cnt) {
-        try {
-            ElasticsearchClient client = elasticsearchConfig.createElasticsearchClient(ELASTIC_SEARCH_HOST);
-
-            // Elasticsearch 쿼리 생성
-            SearchRequest.Builder searchBuilder = new SearchRequest.Builder()
-                    .index("docker-logs-*")
-                    .query(q -> q.bool(b -> b
-                            .filter(f -> f.term(t -> t
-                                    .field(LOG_KEY_CONTAINER_NAME)
-                                    .value(containerName)
-                            ))
-                    ))
-                    .sort(s -> s
-                            .field(f -> f
-                                    .field(LOG_KEY_TIMESTAMP)  // 타임스탬프 기준으로 정렬
-                                    .order(SortOrder.Desc)  // 가장 최근 순으로 정렬 (내림차순)
-                            )
-                    )
-                    .size(cnt.intValue()); // 최대 cnt 개만큼의 로그를 가져옴
-
-            SearchResponse<Map> response = client.search(searchBuilder.build(), Map.class);
-
-            // 검색 결과를 LogData로 변환한 후 역순으로 정렬하여 반환
-            List<String> messages = response.hits().hits().stream()
-                    .map(hit -> convertToString(hit.source()))
-                    .collect(Collectors.toList());
-
-            // 내림차순으로 받아온 데이터를 다시 역순으로 뒤집어 가장 오래된 로그가 먼저 오도록 함
-            Collections.reverse(messages);
-
-            return String.join("\n\n", messages);  // 각 로그 사이에 줄 바꿈 추가
-        } catch (IOException e) {
-            throw new CustomException(ExceptionCode.ELASTIC_SEARCH_ERROR);
-        }
-    }
-
     public List<String> findLogFileList() {
         // logs 디렉토리 경로
         Path logDirPath = Paths.get(LOGS_DIRECTORY);
@@ -304,7 +267,8 @@ public class LogService {
                     .build();
 
             return client.search(searchRequest, Map.class);
-        } catch (ElasticsearchException e) { // 인덱스가 없을 경우 생성
+        } catch (ElasticsearchException e) {
+            // 인덱스가 없을 경우 생성
             createIndexIfNotExists(indexName);
             return new SearchResponse.Builder<Map>().build();
         }
@@ -397,7 +361,7 @@ public class LogService {
         client.deleteByQuery(deleteRequest);
     }
 
-    private void saveLogsToFile(List<Map<String, Object>> logs) throws IOException {
+    private void saveLogsToFile(List<Map<String, Object>> logs) {
         if (logs.isEmpty()) {
             return;
         }
@@ -410,29 +374,30 @@ public class LogService {
         createLogDirectoryIfNotExist();
 
         // 3. 로그 파일 저장
-        String timestamp = new SimpleDateFormat("yyyy-MM-dd_HH").format(new Date()); // 시 단위까지 포함
+        Date now = new Date();
+        String timestampForTitle = new SimpleDateFormat("yyyy-MM-dd_HH").format(now);
+        String timestampForText = new SimpleDateFormat("yyyy-MM-dd_HH:mm").format(now);
 
         logsByContainerName.forEach((containerName, logMaps) -> {
-            String logFileName = String.format("logs/%s-log-%s.txt", containerName, timestamp);
-
-            try {
-                writeBufferAsFile(logFileName, logMaps, timestamp);
-            } catch (IOException e) {
-                log.error("로그 파일에 기록하는 중 오류 발생", e);
-            }
+            String fileTitle = String.format("logs/%s-log-%s.txt", containerName, timestampForTitle);
+            writeBufferAsFile(fileTitle, logMaps, timestampForText);
         });
     }
 
-    private void createLogDirectoryIfNotExist() throws IOException {
-        Path logDirPath = Paths.get(LOGS_DIRECTORY);
-        if (!Files.exists(logDirPath)) {
-            Files.createDirectories(logDirPath);
+    private void createLogDirectoryIfNotExist() {
+        try {
+            Path logDirPath = Paths.get(LOGS_DIRECTORY);
+            if (!Files.exists(logDirPath)) {
+                Files.createDirectories(logDirPath);
+            }
+        } catch (IOException e){
+            log.error("로그 파일 저장을 위한 디렉토리 생성 실패.", e);
         }
     }
 
-    private void writeBufferAsFile(String logFileName, List<Map<String, Object>> logMaps, String timestamp) throws IOException {
+    private void writeBufferAsFile(String fileTitle, List<Map<String, Object>> logMaps, String timestamp) {
         // 파일에 기록하기 위한 BufferedWriter 생성
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(logFileName, true))) {
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(fileTitle, true))) {
             for (Map<String, Object> logMap : logMaps) {
                 String logMessage = formatLogToStr(logMap, timestamp);
 
@@ -442,6 +407,8 @@ public class LogService {
                     writer.newLine();  // 가독성을 위해 빈 줄 추가
                 }
             }
+        } catch (IOException e) {
+            log.error("로그 파일에 기록하는 중 오류 발생", e);
         }
     }
 
@@ -449,13 +416,13 @@ public class LogService {
         // 필요한 로그 데이터만 추출하여 포맷팅
         Object message = logMap.get(LOG_KEY_MESSAGE);
 
-        // timestamp 또는 message가 없으면 해당 로그는 무시
-        if (timestamp == null || message == null) {
+        if (message == null) {
             return null;
         }
 
+
         // 로그 데이터를 원하는 형식으로 포맷
-        return String.format("[%s]: %s",
+        return String.format("[%s]\n%s",
                 timestamp,
                 message.toString());
     }
@@ -480,14 +447,5 @@ public class LogService {
         } catch (IOException e) {
             log.info("ElasticSearch 인덱스 생성 실패!");
         }
-    }
-
-    private String formatLocalDateTime(LocalDateTime localDateTime) {
-        if(localDateTime == null){
-            return null;
-        }
-
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
-        return localDateTime.format(formatter);
     }
 }
