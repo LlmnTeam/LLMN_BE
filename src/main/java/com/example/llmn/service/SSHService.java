@@ -8,6 +8,7 @@ import com.example.llmn.domain.SshInfo;
 import com.example.llmn.repository.SshInfoRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -46,7 +47,8 @@ public class SSHService {
         }
     }
 
-    private synchronized SSHCommandExecutor getSshExecutor(Long sshInfoId) {
+    @Transactional
+    public synchronized SSHCommandExecutor getSshExecutor(Long sshInfoId) {
         return executorMap.computeIfAbsent(sshInfoId, id -> {
             SshInfoDTO sshInfoDTO = getSshInfo(id);
 
@@ -68,6 +70,7 @@ public class SSHService {
                     () -> new CustomException(ExceptionCode.SSH_NOT_FOUND)
             );
 
+            // 만약 작동중이 아니라면 예외 (사용자가 설정에서 다시 유효성 체크 해야함)
             if(!sshInfoInDB.isWorking()){
                 throw new CustomException(ExceptionCode.SSH_INFO_WRONG);
             }

@@ -2,7 +2,6 @@ package com.example.llmn.service;
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.elasticsearch._types.ElasticsearchException;
-import co.elastic.clients.elasticsearch._types.SortOrder;
 import co.elastic.clients.elasticsearch._types.query_dsl.BoolQuery;
 import co.elastic.clients.elasticsearch.core.*;
 import co.elastic.clients.elasticsearch.indices.CreateIndexRequest;
@@ -31,6 +30,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -60,6 +60,9 @@ public class LogService {
     private static final String CONTAINER_KEY_NAME = "name";
     private static final String UNKNOWN_CONTAINER = "unknown_container";
     private static final String NO_MESSAGE = "No message";
+    private static final String BLANK_STRING = "";
+    private static final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH");
+    private static final DateTimeFormatter formatterWithMinute = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH:mm");
 
     @Scheduled(fixedRate = 60000)  // 1분마다 실행
     public void processAndUpdateLogs() {
@@ -230,6 +233,27 @@ public class LogService {
         } catch (IOException e){
             throw new CustomException(ExceptionCode.LOG_CONVERT_TO_FILE_FAIL);
         }
+    }
+
+    public String getLogWithin30Minutes(String containerName){
+        List<String> logFileList = findLogFileList();
+
+        String latestLogFile = logFileList.stream()
+                .filter(logFile -> logFile.startsWith(containerName + "-log"))
+                .max((file1, file2) -> { // 최신 파일을 찾기 위해 비교
+                    LocalDateTime dateTime1 = extractDateTimeFromFile(file1);
+                    LocalDateTime dateTime2 = extractDateTimeFromFile(file2);
+                    return dateTime1.compareTo(dateTime2);
+                })
+                .orElse(null);
+
+        if(latestLogFile == null){
+            return BLANK_STRING;
+        }
+
+        String logContent = readLogFile(latestLogFile);
+
+        return extractLogWithin30Minutes(logContent);
     }
 
     private LogDataDTO convertToLogData(Map<String, Object> source) {
@@ -463,5 +487,42 @@ public class LogService {
         } catch (IOException e) {
             log.info("ElasticSearch 인덱스 생성 실패!");
         }
+    }
+
+    private String extractLogWithin30Minutes(String logContent) {
+        StringBuilder resultLogs = new StringBuilder();
+
+        // 로그 헤더의 날짜 패턴
+        String[] logs = logContent.split("(?=\\[\\d{4}-\\d{2}-\\d{2}_\\d{2}:\\d{2}\\])");
+
+        // 30분 전 시간
+        LocalDateTime thirtyMinutesAgo = LocalDateTime.now().minus(30, ChronoUnit.MINUTES);
+
+        // 각 로그의 시간을 비교하여 30분 이내의 로그만 추가
+        for (String log : logs) {
+            if (log.trim().isEmpty()) continue;  // 빈 로그는 건너뜀
+
+            // 로그의 헤더에서 시간을 추출 ([yyyy-MM-dd_HH:mm] 형식)
+            String header = log.substring(1, 17);
+            LocalDateTime logTime = LocalDateTime.parse(header, formatterWithMinute);
+
+            // 로그 시간이 30분 이내인지 확인
+            if (logTime.isAfter(thirtyMinutesAgo)) {
+                resultLogs.append(log.trim()).append("\n\n");
+            }
+        }
+
+        // 결과가 없으면 빈 문자열 반환
+        if (resultLogs.length() == 0) {
+            return BLANK_STRING;
+        }
+
+        return resultLogs.toString().trim();
+    }
+
+    private LocalDateTime extractDateTimeFromFile(String file) {
+        // 파일 이름에서 "log-" 뒤부터 ".txt" 앞까지의 부분 추출
+        String dateTimePart = file.substring(file.indexOf("log-") + 4, file.lastIndexOf(".txt"));
+        return LocalDateTime.parse(dateTimePart, formatter);
     }
 }

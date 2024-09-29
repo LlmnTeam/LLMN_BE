@@ -75,13 +75,10 @@ public class LlmService {
                 .filter(project -> !project.getContainerStatus().equals(ContainerStatus.NOT_CONNECTED))
                 .toList();
 
-        Instant endTime = Instant.now();
-        Instant startTime = endTime.minus(30, ChronoUnit.MINUTES);
-
         projects.stream()
                 .filter(project -> !project.getContainerStatus().equals(ContainerStatus.NOT_CONNECTED))
                 .forEach(project -> {
-                    LogDTO.SummaryResponseDTO summaryDTO = fetchLogSummary(startTime, endTime, project.getContainerName());
+                    LogDTO.SummaryResponseDTO summaryDTO = fetchLogSummary(project.getContainerName());
 
                     if(summaryDTO == null){
                         return;
@@ -236,14 +233,14 @@ public class LlmService {
         }
     }
 
-    private LogDTO.SummaryResponseDTO fetchLogSummary(Instant startTime, Instant endTime, String containerName) {
+    private LogDTO.SummaryResponseDTO fetchLogSummary(String containerName) {
         StringBuilder requestContentBuilder = new StringBuilder();
 
         // 로그 메시지는 ElasticSearch에서 조회
-        String logMessage = logService.searchLogInStr(startTime, endTime, containerName);
+        String logMessage = logService.getLogWithin30Minutes(containerName);
 
         // 검색 결과가 빈 값이면 null을 반환
-        if (logMessage.isEmpty()) {
+        if (logMessage.isBlank()) {
             return null;
         }
 

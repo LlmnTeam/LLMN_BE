@@ -6,7 +6,6 @@ import com.example.llmn.core.errors.CustomException;
 import com.example.llmn.core.errors.ExceptionCode;
 import com.example.llmn.domain.*;
 import com.example.llmn.repository.ProjectRepository;
-import com.example.llmn.repository.SshInfoRepository;
 import com.example.llmn.repository.SummaryRepository;
 import com.example.llmn.repository.UserRepository;
 import jakarta.persistence.EntityManager;
@@ -198,27 +197,6 @@ public class ProjectService {
                 recentLog);
     }
 
-    private String getRecentLog(Project project){
-        List<String> logFileList = logService.findLogFileList();
-
-        String latestLogFile = logFileList.stream()
-                .filter(logFile -> logFile.startsWith(project.getContainerName() + "-log"))
-                .max((file1, file2) -> { // 최신 파일을 찾기 위해 비교
-                    LocalDateTime dateTime1 = extractDateTimeFromFile(file1);
-                    LocalDateTime dateTime2 = extractDateTimeFromFile(file2);
-                    return dateTime1.compareTo(dateTime2);
-                })
-                .orElse(null);
-
-        if(latestLogFile == null){
-            return NOT_EXIST_LOG;
-        }
-
-        String logContent = logService.readLogFile(latestLogFile);
-
-        return getLastTwoLogs(logContent);
-    }
-
     @Transactional(readOnly = true)
     public ProjectResponse.FindProjectSummaryDTO findProjectSummary(Long projectId, Pageable pageable){
         // 존재하지 않으면 에러
@@ -342,7 +320,28 @@ public class ProjectService {
         return LocalDateTime.parse(dateTimePart, formatter);
     }
 
-    public String getLastTwoLogs(String logContent) {
+    private String getRecentLog(Project project){
+        List<String> logFileList = logService.findLogFileList();
+
+        String latestLogFile = logFileList.stream()
+                .filter(logFile -> logFile.startsWith(project.getContainerName() + "-log"))
+                .max((file1, file2) -> { // 최신 파일을 찾기 위해 비교
+                    LocalDateTime dateTime1 = extractDateTimeFromFile(file1);
+                    LocalDateTime dateTime2 = extractDateTimeFromFile(file2);
+                    return dateTime1.compareTo(dateTime2);
+                })
+                .orElse(null);
+
+        if(latestLogFile == null){
+            return NOT_EXIST_LOG;
+        }
+
+        String logContent = logService.readLogFile(latestLogFile);
+
+        return extractLastTwoLogs(logContent);
+    }
+
+    private String extractLastTwoLogs(String logContent) {
         // 날짜 패턴으로 로그를 분리
         String[] logs = logContent.split("(?=\\[\\d{4}-\\d{2}-\\d{2}_\\d{2}:\\d{2}\\])");
 
@@ -354,5 +353,4 @@ public class ProjectService {
         // 마지막 두 개의 로그를 추출하여 반환
         return logs[logs.length - 2].trim() + "\n\n" + logs[logs.length - 1].trim();
     }
-
 }
