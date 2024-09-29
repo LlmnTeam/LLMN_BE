@@ -10,6 +10,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.io.BufferedReader;
@@ -19,6 +20,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class DockerService {
 
     private final SSHService sshService;
@@ -36,7 +38,7 @@ public class DockerService {
     private static final Long RESOURCE_EXP = 10 * 60 * 1000L; // 10분
 
     // 도커 컨테이너 종료
-    public boolean stopContainerByName(String containerName, Long projectId) throws Exception {
+    public boolean stopContainerByName(String containerName, Long projectId) {
         Long sshInfoId = projectRepository.findSshInfoId(projectId).orElseThrow(
                 () -> new CustomException(ExceptionCode.PROJECT_NOT_FOUND)
         );
@@ -44,11 +46,15 @@ public class DockerService {
         String command = COMMAND_DOCKER_STOP + containerName;
         String commandResponse = sshService.executeCommandOnce(command, sshInfoId);
 
+        if(commandResponse.isBlank()){
+            return false;
+        }
+
         return commandResponse.trim().equals(containerName);  // 성공 여부 true/false로 리턴
     }
 
     // 도커 컨테이너 재시작
-    public boolean restartContainerByName(String containerName, Long projectId) throws Exception {
+    public boolean restartContainerByName(String containerName, Long projectId) {
         Long sshInfoId = projectRepository.findSshInfoId(projectId).orElseThrow(
                 () -> new CustomException(ExceptionCode.PROJECT_NOT_FOUND)
         );
@@ -56,31 +62,26 @@ public class DockerService {
         String command = COMMAND_DOCKER_RESTART + containerName;
         String commandResponse = sshService.executeCommandOnce(command, sshInfoId);
 
+        if(commandResponse.isBlank()){
+            return false;
+        }
+
         return commandResponse.trim().equals(containerName); // 성공 여부 true/false로 리턴
     }
 
     // 실행중인 도커 컨테이너 목록 조회
-    public List<String> findRunningContainerList(Long projectId) throws Exception {
-        Long sshInfoId = projectRepository.findSshInfoId(projectId).orElseThrow(
-                () -> new CustomException(ExceptionCode.PROJECT_NOT_FOUND)
-        );
+    public List<String> findRunningContainerList(Long projectId) {
+        Long sshInfoId = projectRepository.findSshInfoId(projectId)
+                .orElseThrow(() -> new CustomException(ExceptionCode.PROJECT_NOT_FOUND));
 
-        String commandResponse = sshService.executeCommandOnce(COMMAND_DOCKER_PS, sshInfoId);
-
-        // 줄 단위로 나눠서 리스트로 변환
-        List<String> containerNames = Arrays.asList(commandResponse.split("\n"));
-
-        // 각 항목의 앞뒤 공백을 제거
-        containerNames = containerNames.stream()
+        return Arrays.stream(sshService.executeCommandOnce(COMMAND_DOCKER_PS, sshInfoId).split("\n"))
                 .map(String::trim)
                 .filter(name -> !name.isEmpty())
                 .collect(Collectors.toList());
-
-        return containerNames;
     }
 
     // 특정 컨테이너의 실행 여부 확인
-    public boolean isContainerRunning(String containerName, Long projectId) throws Exception {
+    public boolean isContainerRunning(String containerName, Long projectId) {
         List<String> containerList = findRunningContainerList(projectId);
 
         return containerList.stream()
@@ -88,7 +89,7 @@ public class DockerService {
     }
 
     // 컨테이너의 사용 리소스 조회
-    public Map<String, Map<String, String>> findContainersResourceUsage(List<Project> projects, Long userId, boolean isUsingCache) throws Exception {
+    public Map<String, Map<String, String>> findContainersResourceUsage(List<Project> projects, Long userId, boolean isUsingCache) {
         // 1. 캐시를 사용하면 => 레디스에서 캐시된 값을 먼저 조회
         Map<String, Map<String, String>> cachedUsage = isUsingCache ? getCachedResourceUsage(userId) : null;
         if (cachedUsage != null) {
@@ -109,8 +110,11 @@ public class DockerService {
             containerUsageMap.putAll(parsedMap);
         }
 
-        // 유효 시간은 10분
-        redisService.storeValue(RESOURCE_KEY, userId.toString(), objectMapper.writeValueAsString(containerUsageMap), RESOURCE_EXP);
+        // 유효 시간 10분으로 저장
+        String value = convertMetricMapToString(containerUsageMap);
+        if(!value.isBlank()){
+            redisService.storeValue(RESOURCE_KEY, userId.toString(), value, RESOURCE_EXP);
+        }
 
         return containerUsageMap;
     }
@@ -157,5 +161,14 @@ public class DockerService {
             }
         }
         return containerUsageMap;
+    }
+
+    private String convertMetricMapToString(Map<String, Map<String, String>> metricMap){
+        try {
+            return objectMapper.writeValueAsString(metricMap);
+        } catch (JsonProcessingException e) {
+            log.info("MetricMap 파싱 실패");
+            return "";
+        }
     }
 }

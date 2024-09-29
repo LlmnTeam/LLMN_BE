@@ -7,6 +7,7 @@ import com.example.llmn.core.utils.SSHCommandExecutor;
 import com.example.llmn.domain.SshInfo;
 import com.example.llmn.repository.SshInfoRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,6 +16,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class SSHService {
 
     private final RedisService redisService;
@@ -26,15 +28,29 @@ public class SSHService {
     private static final String REDIS_SSH_KEY = "SSH";
     public static final Long REDIS_SSH_KEY_EXP = 60L * 60 * 24 * 30; // 30일
     private static final String DELIMITER = "-";
+    private static final String EXECUTE_FAIL_BY_SESSION = "세션이 연결되지 않아 명령어 실행을 실패하였습니다.";
     
-    // 명령어 실행
+    @Transactional
     public String executeCommandInShell(String command, Long sshInfoId) {
         SSHCommandExecutor executor = getSshExecutor(sshInfoId);
+
+        if(executor == null){
+            sshInfoRepository.updateIsWorking(sshInfoId, false);
+            return EXECUTE_FAIL_BY_SESSION;
+        }
+
         return executor.executeCommandInShell(command);
     }
 
+    @Transactional
     public String executeCommandOnce(String command, Long sshInfoId) {
         SSHCommandExecutor executor = getSshExecutor(sshInfoId);
+
+        if(executor == null){
+            sshInfoRepository.updateIsWorking(sshInfoId, false);
+            return "";
+        }
+
         return executor.executeCommandOnce(command);
     }
 
@@ -47,7 +63,6 @@ public class SSHService {
         }
     }
 
-    @Transactional
     public synchronized SSHCommandExecutor getSshExecutor(Long sshInfoId) {
         return executorMap.computeIfAbsent(sshInfoId, id -> {
             SshInfoDTO sshInfoDTO = getSshInfo(id);
@@ -55,8 +70,8 @@ public class SSHService {
             try {
                 return new SSHCommandExecutor(sshInfoDTO.remoteHost(), sshInfoDTO.remoteName(), sshInfoDTO.remoteKeyPath());
             } catch (Exception e) { // 세션 연결 실패
-                sshInfoRepository.updateIsWorking(sshInfoId, false);
-                throw new CustomException(ExceptionCode.SSH_SESSION_CONNECT_FAIL);
+                log.info("SSH 세션 연결을 실패하였습니다. 호스트, 유저, 키를 다시 확인해주세요.");
+                return null;
             }
         });
     }

@@ -502,25 +502,25 @@ async def generate_recommend(content: str):
 
 async def generate_hourly_summary(content: str):    
     prompt = (
-    "### Persona ###\n"
-    "You are an expert system log and performance analyst. Your task is to analyze the following logs and provide concise, one-line summaries highlighting critical issues or performance problems.\n"
-    "Only include the most important information that requires immediate attention. Ignore minor issues or events that do not significantly impact system performance.\n"
-    "Your responses should be in Korean"
-    "The summaries should focus on important errors, performance issues, or warnings that require immediate attention. Each summary should include the time of the event, the criticality level, a brief description of the problem, and a recommended action if necessary.\n"
-    "Each summary should be formatted as follows:\n"
-    "[Criticality] [Event Time]: [Issue Description]. [Recommended Action]\n"
-    "Use appropriate emojis for criticality: ❗ for Critical, ⚠️ for Warning, ℹ️ for Info.\n"
-    "Ensure that the summaries are short, actionable, and easy to understand.\n"
-    "\n"
-    "### Log and Performance Data ###\n"
-    f"{content}\n"
-    "\n"
-    "### One-Line Summaries ###\n"
-    "1. [First summary]\n"
-    "2. [Second summary]\n"
-    "3. [Third summary]\n"
-    "..."
-)
+        "### Persona ###\n"
+        "You are an expert system log and performance analyst. Your task is to analyze the following logs and provide concise, one-line summaries highlighting critical issues or performance problems.\n"
+        "Only include the most important information that requires immediate attention. Ignore minor issues or events that do not significantly impact system performance.\n"
+        "Your responses should be in Korean"
+        "The summaries should focus on important errors, performance issues, or warnings that require immediate attention. Each summary should include the time of the event, the criticality level, a brief description of the problem, and a recommended action if necessary.\n"
+        "Each summary should be formatted as follows:\n"
+        "[Criticality] [Event Time]: [Issue Description]. [Recommended Action]\n"
+        "Use appropriate emojis for criticality: ❗ for Critical, ⚠️ for Warning, ℹ️ for Info.\n"
+        "Ensure that the summaries are short, actionable, and easy to understand.\n"
+        "\n"
+        "### Log and Performance Data ###\n"
+        f"{content}\n"
+        "\n"
+        "### One-Line Summaries ###\n"
+        "1. [First summary]\n"
+        "2. [Second summary]\n"
+        "3. [Third summary]\n"
+        "..."
+    )
 
     chatmodel = ChatOpenAI(
         model="gpt-4o-mini",

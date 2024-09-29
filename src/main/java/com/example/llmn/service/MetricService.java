@@ -51,6 +51,7 @@ public class MetricService {
     public static final String NUMERIC_REGEX = "[^0-9.]";
 
     @Scheduled(cron = "0 0/10 * * * *")
+    @Transactional
     public void collectMetrics() {
         List<Long> userIds = userRepository.findIds();
 
