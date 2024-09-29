@@ -75,7 +75,8 @@ public class UserService {
     private static final String SORT_BY_DATE = "createdDate";
     private static final String MODEL_KEY_CODE = "code";
     private static final String DELIMITER = "-";
-    public static final Long REDIS_SSH_KEY_EXP = 60L * 60 * 24 * 180; // 180일
+    private static final Long REDIS_SSH_KEY_EXP = 60L * 60 * 24 * 180; // 180일
+    private static final String NOT_AVAILABLE = "N/A";
 
     @Transactional
     public Map<String, String> login(UserRequest.@Valid LoginDTO requestDTO, HttpServletRequest request) {
@@ -213,12 +214,23 @@ public class UserService {
 
         // 현재 지표
         MetricResponse.FindCurrentMetricDTO currentMetric = metricService.findCurrentMetric(sshInfoId);
-        String cpuUsage = String.format("%.2f%%", currentMetric.cpuUsage());
-        String memoryUsage = currentMetric.totalMemory() > 0
-                ? String.format("%.2f%%", (currentMetric.usedMemory() / currentMetric.totalMemory()) * 100)
-                : "N/A";
-        String networkReceived = String.format("%.2f MB", currentMetric.networkReceived());
-        String networkSent = String.format("%.2f MB", currentMetric.networkSent());
+
+        String cpuUsage = Optional.ofNullable(currentMetric)
+                .map(metric -> String.format("%.2f%%", metric.cpuUsage()))
+                .orElse(NOT_AVAILABLE);
+
+        String memoryUsage = Optional.ofNullable(currentMetric)
+                .filter(metric -> metric.totalMemory() > 0)
+                .map(metric -> String.format("%.2f%%", (metric.usedMemory() / metric.totalMemory()) * 100))
+                .orElse(NOT_AVAILABLE);
+
+        String networkReceived = Optional.ofNullable(currentMetric)
+                .map(metric -> String.format("%.2f MB", metric.networkReceived()))
+                .orElse(NOT_AVAILABLE);
+
+        String networkSent = Optional.ofNullable(currentMetric)
+                .map(metric -> String.format("%.2f MB", metric.networkSent()))
+                .orElse(NOT_AVAILABLE);
 
         // 과거 지표
         MetricResponse.FindMetricHistoryDTO metricHistory = metricService.findMetricHistory(24, sshInfoId);

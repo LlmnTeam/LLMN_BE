@@ -24,10 +24,4 @@ public class MetricController {
         MetricResponse.FindMetricHistoryDTO responseDTO = metricService.findMetricHistory(METRIC_HISTORY_PREVIOUS_HOUR, userDetails.getUser().getId());
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }*/
-
-    @GetMapping("/metrics/remote")
-    public ResponseEntity<?> collectRemoteMetrics(@AuthenticationPrincipal CustomUserDetails userDetails) {
-        Map<String, Double> stringObjectMap = metricService.collectTopMetrics(userDetails.getUser().getId());
-        return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, stringObjectMap));
-    }
 }

@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
@@ -20,7 +21,6 @@ import java.util.concurrent.ConcurrentHashMap;
 public class SSHService {
 
     private final RedisService redisService;
-    private final AlarmService alarmService;
     private final SshInfoRepository sshInfoRepository;
 
     // SSH Executor(세션)을 저장하고 있는 맵
@@ -29,6 +29,7 @@ public class SSHService {
     public static final Long REDIS_SSH_KEY_EXP = 60L * 60 * 24 * 30; // 30일
     private static final String DELIMITER = "-";
     private static final String EXECUTE_FAIL_BY_SESSION = "세션이 연결되지 않아 명령어 실행을 실패하였습니다.";
+    private static final String BLANK_STRING = "";
     
     @Transactional
     public String executeCommandInShell(String command, Long sshInfoId) {
@@ -48,7 +49,7 @@ public class SSHService {
 
         if(executor == null){
             sshInfoRepository.updateIsWorking(sshInfoId, false);
-            return "";
+            return BLANK_STRING;
         }
 
         return executor.executeCommandOnce(command);
@@ -64,16 +65,16 @@ public class SSHService {
     }
 
     public synchronized SSHCommandExecutor getSshExecutor(Long sshInfoId) {
-        return executorMap.computeIfAbsent(sshInfoId, id -> {
-            SshInfoDTO sshInfoDTO = getSshInfo(id);
-
-            try {
-                return new SSHCommandExecutor(sshInfoDTO.remoteHost(), sshInfoDTO.remoteName(), sshInfoDTO.remoteKeyPath());
-            } catch (Exception e) { // 세션 연결 실패
-                log.info("SSH 세션 연결을 실패하였습니다. 호스트, 유저, 키를 다시 확인해주세요.");
-                return null;
-            }
-        });
+        return executorMap.computeIfAbsent(sshInfoId, id -> Optional.ofNullable(getSshInfo(id))
+                .map(sshInfoDTO -> {
+                    try {
+                        return new SSHCommandExecutor(sshInfoDTO.remoteHost(), sshInfoDTO.remoteName(), sshInfoDTO.remoteKeyPath());
+                    } catch (Exception e) {
+                        log.info("SSH 세션 연결을 실패하였습니다. 호스트, 유저, 키를 다시 확인해주세요.");
+                        return null;
+                    }
+                })
+                .orElse(null));
     }
 
     private SshInfoDTO getSshInfo(Long sshInfoId) {
@@ -87,7 +88,7 @@ public class SSHService {
 
             // 만약 작동중이 아니라면 예외 (사용자가 설정에서 다시 유효성 체크 해야함)
             if(!sshInfoInDB.isWorking()){
-                throw new CustomException(ExceptionCode.SSH_INFO_WRONG);
+                return null;
             }
 
             // remoteHost, remoteName, keyPath를 하나의 문자로 합쳐서 저장

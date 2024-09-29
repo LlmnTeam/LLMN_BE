@@ -48,7 +48,8 @@ public class MetricService {
     private static final String COMMAND_NETWORK_USAGE = "cat /proc/net/dev | grep eth0";
     private static final String CPU_USAGE_PREFIX = "%Cpu(s):";
     private static final String MEM_USAGE_PREFIX = "MiB Mem";
-    public static final String NUMERIC_REGEX = "[^0-9.]";
+    private static final String NUMERIC_REGEX = "[^0-9.]";
+    private static final DateTimeFormatter formatterForHourAndMin = DateTimeFormatter.ofPattern("HH:mm"); // 시간 형식 "HH:mm"
 
     @Scheduled(cron = "0 0/10 * * * *")
     @Transactional
@@ -68,6 +69,11 @@ public class MetricService {
                         ? collectNetworkMetrics(sshInfo.getId(), UPDATE_CACHE)
                         : collectNetworkMetrics(sshInfo.getId(), NOT_UPDATE_CACHE);
 
+                // 지표 조회 실패 => 저장하지 않음
+                if(topMetrics.isEmpty() || networkMetrics.isEmpty()){
+                    continue;
+                }
+
                 Metric metric = Metric.builder()
                         .sshInfo(sshInfo)
                         .cpuUsage(topMetrics.get(METRIC_MAP_CPU_USAGE))
@@ -82,7 +88,71 @@ public class MetricService {
         }
     }
 
-    public Map<String, Double> collectTopMetrics(Long sshInfoId) {
+    public MetricResponse.FindCurrentMetricDTO findCurrentMetric(Long sshInfoId) {
+        // 1. 레디스에서 캐시된 값을 먼저 조회
+        MetricResponse.FindCurrentMetricDTO cachedMetric = getCachedMetric(sshInfoId);
+        if (cachedMetric != null) {
+            return cachedMetric;
+        }
+
+        // 2. 캐시된 값이 없으면 새로운 Metric 수집 후 저장
+        Map<String, Double> topMetrics = collectTopMetrics(sshInfoId);
+        Map<String, Double> networkMetrics = collectNetworkMetrics(sshInfoId, NOT_UPDATE_CACHE);
+
+        // 지표 조회 실패 => null 반환
+        if(topMetrics.isEmpty() || networkMetrics.isEmpty()){
+            return null;
+        }
+
+        MetricResponse.FindCurrentMetricDTO metricDTO = new MetricResponse.FindCurrentMetricDTO(
+                topMetrics.getOrDefault(METRIC_MAP_CPU_USAGE, 0.0),
+                topMetrics.getOrDefault(METRIC_MAP_TOTAL_MEMORY, 0.0),
+                topMetrics.getOrDefault(METRIC_MAP_USED_MEMORY, 0.0),
+                networkMetrics.getOrDefault(METRIC_MAP_NETWORK_REC, 0.0),
+                networkMetrics.getOrDefault(METRIC_MAP_NETWORK_SENT, 0.0)
+        );
+
+        // 유효 시간은 10분으로 저장
+        String value = convertMetricDtoToString(metricDTO);
+        if(!value.isBlank()) {
+            redisService.storeValue(METRIC_KEY, sshInfoId.toString(), value, METRIC_EXP);
+        }
+
+        return metricDTO;
+    }
+
+    @Transactional(readOnly = true)
+    public MetricResponse.FindMetricHistoryDTO findMetricHistory(int minusHour, Long sshInfoId){
+        // minusHour 내 지표들을 모두 가져옴
+        LocalDateTime now = LocalDateTime.now().withMinute(0).withSecond(0).withNano(0);
+        List<Metric> metrics = metricRepository.findALlWithinDate(now.minusHours(minusHour), sshInfoId);
+
+        // CPU, 메모리, 네트워크 수신/송신 데이터 추출 및 변환
+        List<MetricResponse.CpuMetricDTO> cpuMetricDTOS = new ArrayList<>();
+        List<MetricResponse.MemoryMetricDTO> memoryMetricDTOS = new ArrayList<>();
+        List<MetricResponse.NetworkInMetricDTO> networkInMetricDTOS = new ArrayList<>();
+        List<MetricResponse.NetworkOutMetricDTO> networkOutMetricDTOS = new ArrayList<>();
+
+        metrics.forEach(metric -> {
+            String time = metric.getCreatedDate().format(formatterForHourAndMin);
+
+            // CPU 데이터
+            cpuMetricDTOS.add(new MetricResponse.CpuMetricDTO(time, metric.getCpuUsage()));
+
+            // 메모리 사용량 (%로 변환)
+            double memoryUsage = metric.getTotalMemory() > 0 ? (metric.getUsedMemory() / metric.getTotalMemory() * 100) : 0.0;
+            memoryMetricDTOS.add(new MetricResponse.MemoryMetricDTO(time, memoryUsage));
+
+            // 네트워크 수신/송신
+            networkInMetricDTOS.add(new MetricResponse.NetworkInMetricDTO(time, metric.getTotalBytesReceived()));
+            networkOutMetricDTOS.add(new MetricResponse.NetworkOutMetricDTO(time, metric.getTotalBytesSent()));
+        });
+
+        return new MetricResponse.FindMetricHistoryDTO(cpuMetricDTOS, memoryMetricDTOS, networkInMetricDTOS, networkOutMetricDTOS);
+    }
+
+    // 만약 명령어 실패 => 비어있는 맵 반환
+    private Map<String, Double> collectTopMetrics(Long sshInfoId) {
         Map<String, Double> metricsMap = new HashMap<>();
 
         // CPU와 메모리 사용량을 동시에 얻기 위해 top 명령어 실행
@@ -131,20 +201,24 @@ public class MetricService {
     }
 
     // 네트워크 송수신량을 수집하고 레디스에 저장
-    public Map<String, Double> collectNetworkMetrics(Long sshInfoId, boolean updateCache) {
-        Map<String, Double> metricsMap = new HashMap<>();
-
+    private Map<String, Double> collectNetworkMetrics(Long sshInfoId, boolean updateCache) {
         // 현재 네트워크 사용량 조회
-        Map<String, Double> currentNetworkMetric = collectNetworkUsage(sshInfoId);
+        Map<String, Double> currentNetworkMetric = collectCurrentNetworkMetrics(sshInfoId);
+
+        // 현재 네트워크 사용량 조회 실패 => 비어있는 맵 반환
+        if(currentNetworkMetric.isEmpty()){
+            return Collections.emptyMap();
+        }
 
         // 레디스에서 이전 네트워크 사용량 조회 (없으면 0.0)
-        Double previousReceived = redisService.getDataInDouble(REDIS_KEY_NETWORK_REC);
-        Double previousTransmitted = redisService.getDataInDouble(REDIS_KEY_NETWORK_TRANS);
+        double previousReceived = redisService.getDataInDouble(REDIS_KEY_NETWORK_REC);
+        double previousTransmitted = redisService.getDataInDouble(REDIS_KEY_NETWORK_TRANS);
 
         // 특정 기간 동안의 네트워크 사용량 계산 (설정한 기간에 따라 달라짐)
         double receivedDiff = currentNetworkMetric.get(METRIC_MAP_NETWORK_REC) - previousReceived;
         double transmittedDiff = currentNetworkMetric.get(METRIC_MAP_NETWORK_SENT) - previousTransmitted;
 
+        Map<String, Double> metricsMap = new HashMap<>();
         metricsMap.put(METRIC_MAP_NETWORK_REC, receivedDiff);
         metricsMap.put(METRIC_MAP_NETWORK_SENT, transmittedDiff);
 
@@ -157,83 +231,8 @@ public class MetricService {
         return metricsMap;
     }
 
-    public MetricResponse.FindCurrentMetricDTO findCurrentMetric(Long sshInfoId) {
-        // 1. 레디스에서 캐시된 값을 먼저 조회
-        MetricResponse.FindCurrentMetricDTO cachedMetric = getCachedMetric(sshInfoId);
-        if (cachedMetric != null) {
-            return cachedMetric;
-        }
-
-        // 2. 캐시된 값이 없으면 새로운 Metric 수집 후 저장
-        Map<String, Double> topMetrics = collectTopMetrics(sshInfoId);
-        Map<String, Double> networkMetrics = collectNetworkMetrics(sshInfoId, NOT_UPDATE_CACHE);
-
-        MetricResponse.FindCurrentMetricDTO metricDTO = new MetricResponse.FindCurrentMetricDTO(
-                topMetrics.get(METRIC_MAP_CPU_USAGE),
-                topMetrics.get(METRIC_MAP_TOTAL_MEMORY),
-                topMetrics.get(METRIC_MAP_USED_MEMORY),
-                networkMetrics.get(METRIC_MAP_NETWORK_REC),
-                networkMetrics.get(METRIC_MAP_NETWORK_SENT)
-        );
-
-        // 유효 시간은 10분으로 저장
-        String value = convertMetricDtoToString(metricDTO);
-        if(!value.isBlank()) {
-            redisService.storeValue(METRIC_KEY, sshInfoId.toString(), value, METRIC_EXP);
-        }
-
-        return metricDTO;
-    }
-
-    @Transactional(readOnly = true)
-    public MetricResponse.FindMetricHistoryDTO findMetricHistory(int minusHour, Long sshInfoId){
-        // minusHour 내 지표들을 모두 가져옴
-        LocalDateTime now = LocalDateTime.now().withMinute(0).withSecond(0).withNano(0);
-        List<Metric> metrics = metricRepository.findALlWithinDate(now.minusHours(minusHour), sshInfoId);
-
-        // 시간 형식 "HH:mm"
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm");
-
-        // CPU 데이터
-        List<MetricResponse.CpuMetricDTO> cpuMetricDTOS = metrics.stream()
-                .map(metric -> new MetricResponse.CpuMetricDTO(
-                        metric.getCreatedDate().format(formatter),
-                        metric.getCpuUsage()))
-                .toList();
-
-        // 메모리 사용량은 퍼센티지로 변환
-        List<MetricResponse.MemoryMetricDTO> memoryMetricDTOS = metrics.stream()
-                .map(metric -> {
-                    String time = metric.getCreatedDate().format(formatter);
-
-                    double memoryUsage = metric.getTotalMemory() > 0
-                            ? metric.getUsedMemory() / metric.getTotalMemory() * 100
-                            : 0.0;
-
-                    return new MetricResponse.MemoryMetricDTO(time, memoryUsage);
-                })
-                .toList();
-
-        // 네트워크 수신
-        List<MetricResponse.NetworkInMetricDTO> networkInMetricDTOS = metrics.stream()
-                .map(metric -> new MetricResponse.NetworkInMetricDTO(
-                        metric.getCreatedDate().format(formatter),
-                        metric.getTotalBytesReceived()))
-                .toList();
-
-        // 네트워크 송신
-        List<MetricResponse.NetworkOutMetricDTO> networkOutMetricDTOS = metrics.stream()
-                .map(metric -> new MetricResponse.NetworkOutMetricDTO(
-                        metric.getCreatedDate().format(formatter),
-                        metric.getTotalBytesSent()
-                ))
-                .toList();
-
-        return new MetricResponse.FindMetricHistoryDTO(cpuMetricDTOS, memoryMetricDTOS, networkInMetricDTOS, networkOutMetricDTOS);
-    }
-
     // 하루 동안의 누적 네트워크 트래픽 계산
-    public Map<String, Long> getTodayNetworkTraffic(Long sshInfoId) {
+    private Map<String, Long> getTodayNetworkTraffic(Long sshInfoId) {
         // minusHour 내 지표들을 모두 가져옴
         LocalDateTime todayStart = LocalDateTime.now().withHour(0).withMinute(0).withSecond(0).withNano(0);
         List<Metric> metrics = metricRepository.findALlWithinDate(todayStart, sshInfoId);
@@ -253,8 +252,8 @@ public class MetricService {
         return dailyTraffic;
     }
 
-    // 네트워크 송수신량 수집
-    private Map<String, Double> collectNetworkUsage(Long sshInfoId) {
+    // 조회 실패 => 비어있는 맵 반환
+    private Map<String, Double> collectCurrentNetworkMetrics(Long sshInfoId) {
         // 네트워크 송/수신 기록 조회 명령어 실행
         String commandResponse = sshService.executeCommandOnce(COMMAND_NETWORK_USAGE, sshInfoId);
 
