@@ -17,6 +17,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class SSHService {
 
     private final RedisService redisService;
+    private final AlarmService alarmService;
     private final SshInfoRepository sshInfoRepository;
 
     // SSH Executor(세션)을 저장하고 있는 맵
@@ -52,7 +53,7 @@ public class SSHService {
             try {
                 return new SSHCommandExecutor(sshInfoDTO.remoteHost(), sshInfoDTO.remoteName(), sshInfoDTO.remoteKeyPath());
             } catch (Exception e) { // 세션 연결 실패
-
+                sshInfoRepository.updateIsWorking(sshInfoId, false);
                 throw new CustomException(ExceptionCode.SSH_SESSION_CONNECT_FAIL);
             }
         });
@@ -66,6 +67,10 @@ public class SSHService {
             SshInfo sshInfoInDB = sshInfoRepository.findById(sshInfoId).orElseThrow(
                     () -> new CustomException(ExceptionCode.SSH_NOT_FOUND)
             );
+
+            if(!sshInfoInDB.isWorking()){
+                throw new CustomException(ExceptionCode.SSH_INFO_WRONG);
+            }
 
             // remoteHost, remoteName, keyPath를 하나의 문자로 합쳐서 저장
             String combinedInfo = String.join(DELIMITER, sshInfoInDB.getRemoteHost(), sshInfoInDB.getRemoteName(), sshInfoInDB.getRemoteKeyPath());
