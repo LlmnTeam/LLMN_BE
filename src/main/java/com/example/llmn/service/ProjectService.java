@@ -343,8 +343,8 @@ public class ProjectService {
     }
 
     public String getLastTwoLogs(String logContent) {
-        // 로그를 공백 줄을 기준으로 분리
-        String[] logs = logContent.split("\\n\\s*\\n");
+        // 날짜 패턴으로 로그를 분리
+        String[] logs = logContent.split("(?=\\[\\d{4}-\\d{2}-\\d{2}_\\d{2}:\\d{2}\\])");
 
         // 만약 로그가 2개 이하라면 전체 로그 반환
         if (logs.length <= 2) {
