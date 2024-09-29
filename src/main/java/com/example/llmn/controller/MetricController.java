@@ -26,7 +26,7 @@ public class MetricController {
     }*/
 
     @GetMapping("/metrics/remote")
-    public ResponseEntity<?> collectRemoteMetrics(@AuthenticationPrincipal CustomUserDetails userDetails) throws Exception {
+    public ResponseEntity<?> collectRemoteMetrics(@AuthenticationPrincipal CustomUserDetails userDetails) {
         Map<String, Double> stringObjectMap = metricService.collectTopMetrics(userDetails.getUser().getId());
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, stringObjectMap));
     }

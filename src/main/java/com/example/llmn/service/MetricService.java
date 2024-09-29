@@ -4,13 +4,13 @@ import com.example.llmn.controller.DTO.MetricResponse;
 import com.example.llmn.domain.Metric;
 
 import com.example.llmn.domain.SshInfo;
-import com.example.llmn.domain.User;
 import com.example.llmn.repository.MetricRepository;
 import com.example.llmn.repository.SshInfoRepository;
 import com.example.llmn.repository.UserRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,6 +21,7 @@ import java.util.*;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class MetricService {
 
     private final MetricRepository metricRepository;
@@ -50,7 +51,7 @@ public class MetricService {
     public static final String NUMERIC_REGEX = "[^0-9.]";
 
     @Scheduled(cron = "0 0/10 * * * *")
-    public void collectMetrics() throws Exception {
+    public void collectMetrics() {
         List<Long> userIds = userRepository.findIds();
 
         for(Long userId : userIds){
@@ -80,7 +81,7 @@ public class MetricService {
         }
     }
 
-    public Map<String, Double> collectTopMetrics(Long sshInfoId) throws Exception {
+    public Map<String, Double> collectTopMetrics(Long sshInfoId) {
         Map<String, Double> metricsMap = new HashMap<>();
 
         // CPU와 메모리 사용량을 동시에 얻기 위해 top 명령어 실행
@@ -129,7 +130,7 @@ public class MetricService {
     }
 
     // 네트워크 송수신량을 수집하고 레디스에 저장
-    public Map<String, Double> collectNetworkMetrics(Long sshInfoId, boolean updateCache) throws Exception {
+    public Map<String, Double> collectNetworkMetrics(Long sshInfoId, boolean updateCache) {
         Map<String, Double> metricsMap = new HashMap<>();
 
         // 현재 네트워크 사용량 조회
@@ -155,7 +156,7 @@ public class MetricService {
         return metricsMap;
     }
 
-    public MetricResponse.FindCurrentMetricDTO findCurrentMetric(Long sshInfoId) throws Exception {
+    public MetricResponse.FindCurrentMetricDTO findCurrentMetric(Long sshInfoId) {
         // 1. 레디스에서 캐시된 값을 먼저 조회
         MetricResponse.FindCurrentMetricDTO cachedMetric = getCachedMetric(sshInfoId);
         if (cachedMetric != null) {
@@ -174,8 +175,11 @@ public class MetricService {
                 networkMetrics.get(METRIC_MAP_NETWORK_SENT)
         );
 
-        // 유효 시간은 10분
-        redisService.storeValue(METRIC_KEY, sshInfoId.toString(), objectMapper.writeValueAsString(metricDTO), METRIC_EXP);
+        // 유효 시간은 10분으로 저장
+        String value = convertMetricDtoToString(metricDTO);
+        if(!value.isBlank()) {
+            redisService.storeValue(METRIC_KEY, sshInfoId.toString(), value, METRIC_EXP);
+        }
 
         return metricDTO;
     }
@@ -249,7 +253,7 @@ public class MetricService {
     }
 
     // 네트워크 송수신량 수집
-    private Map<String, Double> collectNetworkUsage(Long sshInfoId) throws Exception {
+    private Map<String, Double> collectNetworkUsage(Long sshInfoId) {
         // 네트워크 송/수신 기록 조회 명령어 실행
         String commandResponse = sshService.executeCommandOnce(COMMAND_NETWORK_USAGE, sshInfoId);
 
@@ -284,11 +288,21 @@ public class MetricService {
         return convertStringToMetricDTO(cachedValue);
     }
 
-    private MetricResponse.FindCurrentMetricDTO convertStringToMetricDTO(String cachedValue) {
+    private MetricResponse.FindCurrentMetricDTO convertStringToMetricDTO(String value) {
         try {
-            return objectMapper.readValue(cachedValue, MetricResponse.FindCurrentMetricDTO.class);
+            return objectMapper.readValue(value, MetricResponse.FindCurrentMetricDTO.class);
         } catch (JsonProcessingException e) {;
+            log.info("ObjectMapper 파싱 과정에서 에러 발생");
             return null; // 변환에 실패한 경우 null 반환
+        }
+    }
+
+    private String convertMetricDtoToString(MetricResponse.FindCurrentMetricDTO metricDTO){
+        try {
+            return objectMapper.writeValueAsString(metricDTO);
+        } catch (JsonProcessingException e) {
+            log.info("ObjectMapper 파싱 과정에서 에러 발생");
+            return "";
         }
     }
 }

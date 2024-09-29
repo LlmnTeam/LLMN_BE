@@ -202,7 +202,7 @@ public class UserService {
     }
 
     @Transactional(readOnly = true)
-    public UserResponse.FindDashboardDTO findDashboard(Long userId) throws Exception {
+    public UserResponse.FindDashboardDTO findDashboard(Long userId) {
         Long sshInfoId = userRepository.findMonitoringSshId(userId).orElseThrow(
                 () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
         );
