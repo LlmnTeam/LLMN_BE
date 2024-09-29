@@ -64,12 +64,11 @@ public class MetricService {
                 // CPU, Memory 지표
                 Map<String, Double> topMetrics = collectTopMetrics(sshInfo.getId());
 
-                // 네트워크 지표 (모니터링하는 인스턴스의 경우 캐싱을 함)
-                Map<String, Double> networkMetrics = monitoringSshId.equals(sshInfo.getId())
-                        ? collectNetworkMetrics(sshInfo.getId(), UPDATE_CACHE)
-                        : collectNetworkMetrics(sshInfo.getId(), NOT_UPDATE_CACHE);
+                // 네트워크 지표 => 모니터링 하는 인스턴스의 경우 캐싱
+                boolean updateCache = sshInfo.getId().equals(monitoringSshId);
+                Map<String, Double> networkMetrics = collectNetworkMetrics(sshInfo.getId(), updateCache);
 
-                // 지표 조회 실패 => 저장하지 않음
+                // 지표 조회 실패 시 다음 반복으로 넘어감
                 if(topMetrics.isEmpty() || networkMetrics.isEmpty()){
                     continue;
                 }
@@ -95,7 +94,7 @@ public class MetricService {
             return cachedMetric;
         }
 
-        // 2. 캐시된 값이 없으면 새로운 Metric 수집 후 저장
+        // 2. 캐시된 값이 없음 => 새로운 Metric 수집
         Map<String, Double> topMetrics = collectTopMetrics(sshInfoId);
         Map<String, Double> networkMetrics = collectNetworkMetrics(sshInfoId, NOT_UPDATE_CACHE);
 
@@ -112,11 +111,8 @@ public class MetricService {
                 networkMetrics.getOrDefault(METRIC_MAP_NETWORK_SENT, 0.0)
         );
 
-        // 유효 시간은 10분으로 저장
-        String value = convertMetricDtoToString(metricDTO);
-        if(!value.isBlank()) {
-            redisService.storeValue(METRIC_KEY, sshInfoId.toString(), value, METRIC_EXP);
-        }
+        // 3. 새로운 Metric 저장
+        cacheMetricDTO(sshInfoId, metricDTO);
 
         return metricDTO;
     }
@@ -136,14 +132,14 @@ public class MetricService {
         metrics.forEach(metric -> {
             String time = metric.getCreatedDate().format(formatterForHourAndMin);
 
-            // CPU 데이터
+            // 1. CPU 데이터
             cpuMetricDTOS.add(new MetricResponse.CpuMetricDTO(time, metric.getCpuUsage()));
 
-            // 메모리 사용량 (%로 변환)
+            // 2. 메모리 사용량 (%로 변환)
             double memoryUsage = metric.getTotalMemory() > 0 ? (metric.getUsedMemory() / metric.getTotalMemory() * 100) : 0.0;
             memoryMetricDTOS.add(new MetricResponse.MemoryMetricDTO(time, memoryUsage));
 
-            // 네트워크 수신/송신
+            // 3. 네트워크 수신/송신
             networkInMetricDTOS.add(new MetricResponse.NetworkInMetricDTO(time, metric.getTotalBytesReceived()));
             networkOutMetricDTOS.add(new MetricResponse.NetworkOutMetricDTO(time, metric.getTotalBytesSent()));
         });
@@ -200,32 +196,30 @@ public class MetricService {
         return metricsMap;
     }
 
-    // 네트워크 송수신량을 수집하고 레디스에 저장
     private Map<String, Double> collectNetworkMetrics(Long sshInfoId, boolean updateCache) {
         // 현재 네트워크 사용량 조회
         Map<String, Double> currentNetworkMetric = collectCurrentNetworkMetrics(sshInfoId);
 
-        // 현재 네트워크 사용량 조회 실패 => 비어있는 맵 반환
+        // 조회 실패 시 빈 맵 반환
         if(currentNetworkMetric.isEmpty()){
             return Collections.emptyMap();
         }
 
-        // 레디스에서 이전 네트워크 사용량 조회 (없으면 0.0)
+        // Redis에서 이전 네트워크 사용량 조회 (없으면 0.0 반환)
         double previousReceived = redisService.getDataInDouble(REDIS_KEY_NETWORK_REC);
         double previousTransmitted = redisService.getDataInDouble(REDIS_KEY_NETWORK_TRANS);
 
-        // 특정 기간 동안의 네트워크 사용량 계산 (설정한 기간에 따라 달라짐)
-        double receivedDiff = currentNetworkMetric.get(METRIC_MAP_NETWORK_REC) - previousReceived;
-        double transmittedDiff = currentNetworkMetric.get(METRIC_MAP_NETWORK_SENT) - previousTransmitted;
+        // 네트워크 사용량 차이 계산
+        double receivedDiff = currentNetworkMetric.getOrDefault(METRIC_MAP_NETWORK_REC, 0.0) - previousReceived;
+        double transmittedDiff = currentNetworkMetric.getOrDefault(METRIC_MAP_NETWORK_SENT, 0.0) - previousTransmitted;
 
         Map<String, Double> metricsMap = new HashMap<>();
         metricsMap.put(METRIC_MAP_NETWORK_REC, receivedDiff);
         metricsMap.put(METRIC_MAP_NETWORK_SENT, transmittedDiff);
 
-        // 업데이트 플래그가 존재 => 현재 네트워크 사용량으로 업데이트
+        // 캐시 업데이트
         if(updateCache) {
-            redisService.storeValue(REDIS_KEY_NETWORK_REC, String.valueOf(currentNetworkMetric.get(METRIC_MAP_NETWORK_REC)));
-            redisService.storeValue(REDIS_KEY_NETWORK_TRANS, String.valueOf(currentNetworkMetric.get(METRIC_MAP_NETWORK_SENT)));
+            updateNetworkCache(currentNetworkMetric);
         }
 
         return metricsMap;
@@ -304,5 +298,17 @@ public class MetricService {
             log.info("ObjectMapper 파싱 과정에서 에러 발생");
             return "";
         }
+    }
+
+    private void cacheMetricDTO(Long sshInfoId, MetricResponse.FindCurrentMetricDTO metricDTO) {
+        String value = convertMetricDtoToString(metricDTO);
+        if (!value.isBlank()) {
+            redisService.storeValue(METRIC_KEY, sshInfoId.toString(), value, METRIC_EXP);
+        }
+    }
+
+    private void updateNetworkCache(Map<String, Double> currentNetworkMetric) {
+        redisService.storeValue(REDIS_KEY_NETWORK_REC, String.valueOf(currentNetworkMetric.get(METRIC_MAP_NETWORK_REC)));
+        redisService.storeValue(REDIS_KEY_NETWORK_TRANS, String.valueOf(currentNetworkMetric.get(METRIC_MAP_NETWORK_SENT)));
     }
 }
