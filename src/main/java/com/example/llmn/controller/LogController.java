@@ -33,7 +33,7 @@ public class LogController {
     }
 
     @GetMapping("/logs/{logFileName}/download")
-    public ResponseEntity<Resource> downloadLogFile(@PathVariable String logFileName) throws IOException {
+    public ResponseEntity<Resource> downloadLogFile(@PathVariable String logFileName) {
         Resource resource = logService.getLogFileAsResource(logFileName);
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType(MediaType.TEXT_PLAIN_VALUE))

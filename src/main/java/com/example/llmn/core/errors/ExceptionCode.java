@@ -32,6 +32,7 @@ public enum ExceptionCode {
     LOG_FILE_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 로그 파일이 존재하지 않습니다."),
     LOG_FILE_READ_FAIL(HttpStatus.BAD_REQUEST, "로그 파일을 읽는 중 오류 발생했습니다."),
     LOG_FILE_LIST_READ_FAIL(HttpStatus.BAD_REQUEST, "로그 파일 목록을 가져오는 중 오류 발생했습니다."),
+    LOG_CONVERT_TO_FILE_FAIL(HttpStatus.INTERNAL_SERVER_ERROR, "로그를 파일로 변환하는 작업 중 오류가 발생했습니다."),
 
     // 요약 관련 에러
     SUMMARY_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 요약이 존재하지 않습니다."),
