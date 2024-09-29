@@ -52,6 +52,7 @@ public class SSHService {
             try {
                 return new SSHCommandExecutor(sshInfoDTO.remoteHost(), sshInfoDTO.remoteName(), sshInfoDTO.remoteKeyPath());
             } catch (Exception e) { // 세션 연결 실패
+
                 throw new CustomException(ExceptionCode.SSH_SESSION_CONNECT_FAIL);
             }
         });

@@ -29,12 +29,16 @@ public class SshInfo extends TimeStamp{
     @Column
     private String remoteKeyPath;
 
+    @Column
+    private boolean isWorking;
+
     @Builder
     public SshInfo(User user, String remoteHost, String remoteName, String remoteKeyPath) {
         this.user = user;
         this.remoteName = remoteName;
         this.remoteHost = remoteHost;
         this.remoteKeyPath = remoteKeyPath;
+        this.isWorking = true;
     }
 
     public void updateSshInfo(String remoteHost, String remoteName, String remoteKeyPath){
