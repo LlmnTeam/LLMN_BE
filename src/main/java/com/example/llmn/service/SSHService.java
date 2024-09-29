@@ -26,12 +26,12 @@ public class SSHService {
     private static final String DELIMITER = "-";
     
     // 명령어 실행
-    public String executeCommandInShell(String command, Long sshInfoId) throws Exception {
+    public String executeCommandInShell(String command, Long sshInfoId) {
         SSHCommandExecutor executor = getSshExecutor(sshInfoId);
         return executor.executeCommandInShell(command);
     }
 
-    public String executeCommandOnce(String command, Long sshInfoId) throws Exception {
+    public String executeCommandOnce(String command, Long sshInfoId) {
         SSHCommandExecutor executor = getSshExecutor(sshInfoId);
         return executor.executeCommandOnce(command);
     }
@@ -45,18 +45,16 @@ public class SSHService {
         }
     }
 
-    private synchronized SSHCommandExecutor getSshExecutor(Long sshInfoId) throws Exception {
-        SSHCommandExecutor executor = executorMap.get(sshInfoId);
+    private synchronized SSHCommandExecutor getSshExecutor(Long sshInfoId) {
+        return executorMap.computeIfAbsent(sshInfoId, id -> {
+            SshInfoDTO sshInfoDTO = getSshInfo(id);
 
-        // executor가 없거나, 세션이 끊어졌다면 executor 새로 생성
-        if (executor == null || !executor.isConnected()) {
-            SshInfoDTO sshInfoDTO = getSshInfo(sshInfoId);
-            executor = new SSHCommandExecutor(sshInfoDTO.remoteHost(), sshInfoDTO.remoteName(), sshInfoDTO.remoteKeyPath());
-
-            executorMap.put(sshInfoId, executor);
-        }
-
-        return executor;
+            try {
+                return new SSHCommandExecutor(sshInfoDTO.remoteHost(), sshInfoDTO.remoteName(), sshInfoDTO.remoteKeyPath());
+            } catch (Exception e) { // 세션 연결 실패
+                throw new CustomException(ExceptionCode.SSH_SESSION_CONNECT_FAIL);
+            }
+        });
     }
 
     private SshInfoDTO getSshInfo(Long sshInfoId) {

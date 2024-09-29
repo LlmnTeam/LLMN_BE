@@ -307,11 +307,7 @@ public class ProjectService {
                 () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
         );
 
-        try {
-            return sshService.executeCommandInShell(command, monitoringSshId);
-        } catch (Exception e) {
-            return "명령어 실행에 실패하였습니다.";
-        }
+        return sshService.executeCommandInShell(command, monitoringSshId);
     }
 
     private String formatLocalDateTime(LocalDateTime localDateTime) {

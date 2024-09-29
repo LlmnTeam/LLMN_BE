@@ -28,7 +28,7 @@ public class SSHCommandExecutor {
     private final ClientSession session;
     private final ClientChannel shellChannel;
     private final OutputStream pipedIn;
-    private  InputStream pipedOut;
+    private final InputStream pipedOut;
     private final Jedis jedis;
 
     private static final int REDIS_PORT = 6379;
@@ -38,6 +38,7 @@ public class SSHCommandExecutor {
     private static final String PROMPT_UBUNTU = "ubuntu@";
     private static final String PROMPT_DOLLAR = "$ ";
     private static final int SSH_PORT = 22;
+    private static final String FAIL_COMMAND = "명령어 실행에 실패하였습니다.";
 
     public SSHCommandExecutor(String host, String username, String privateKeyPath) throws Exception {
         // 1. SSH 클라이언트를 기본 설정으로 초기화 => SSH 클라이언트를 시작하여 연결을 수락할 준비를 함
@@ -90,32 +91,39 @@ public class SSHCommandExecutor {
     }
 
     // 각 스레드가 동시에 동일한 SSH 세션에 접근하여 명령어를 실행하고, 동일한 pipedIn과 pipedOut 스트림에 동시 접근할 수 있는 문제 방지를 위해 syschronizrd 사용
-    public synchronized String executeCommandInShell(String command) throws Exception {
-        clearOutputStream();
+    public synchronized String executeCommandInShell(String command) {
+        try {
+            clearOutputStream();
 
-        // 명령어를 지속적으로 입력받아 실행
-        pipedIn.write((command + "\n").getBytes());
-        pipedIn.flush();
+            // 명령어를 지속적으로 입력받아 실행
+            pipedIn.write((command + "\n").getBytes());
+            pipedIn.flush();
 
-        // 결과를 비동기적으로 읽음 => 응답이 완료될 때까지
-        StringBuilder resultBuilder = new StringBuilder();
-        byte[] buffer = new byte[4096];
-        boolean commandCompleted = false;
+            // 결과를 비동기적으로 읽음 => 응답이 완료될 때까지
+            StringBuilder resultBuilder = new StringBuilder();
+            byte[] buffer = new byte[4096];
+            boolean commandCompleted = false;
 
-        while (!commandCompleted) {
-            readAvailableOutput(resultBuilder, buffer);
+            while (!commandCompleted) {
+                readAvailableOutput(resultBuilder, buffer);
 
-            // 결과값을 통해 완료 여부 체크 => 프롬프트가 나타나면 완료된 것으로 간주
-            commandCompleted = checkIfCommandCompleted(resultBuilder.toString());
-            if (!commandCompleted) {
-                Thread.sleep(100); // CPU 자원 낭비 방지
+                // 결과값을 통해 완료 여부 체크 => 프롬프트가 나타나면 완료된 것으로 간주
+                commandCompleted = checkIfCommandCompleted(resultBuilder.toString());
+                if (!commandCompleted) {
+                    Thread.sleep(100); // CPU 자원 낭비 방지
+                }
             }
+            return resultBuilder.toString();
+        } catch (IOException e){
+            log.info("<SSHD> ShellChannel에서 '" + command + "' 명령어 실행 실패 : " + e);
+            return FAIL_COMMAND;
+        } catch (InterruptedException e) {
+            log.info("<SSHD> 명령어 실행 중 쓰레드에 문제 발생 : " + e);
+            return FAIL_COMMAND;
         }
-
-        return resultBuilder.toString();
     }
 
-    public String executeCommandOnce(String command) throws Exception {
+    public String executeCommandOnce(String command)  {
         StringBuilder resultBuilder = new StringBuilder();
 
         try (ClientChannel channel = session.createExecChannel(command)) {
@@ -127,10 +135,13 @@ public class SSHCommandExecutor {
             // 명령어가 완료될 때까지 대기 (기본적으로 5분)
             Set<ClientChannelEvent> events = channel.waitFor(EnumSet.of(ClientChannelEvent.CLOSED), TimeUnit.MINUTES.toMillis(5));
             if (events.contains(ClientChannelEvent.TIMEOUT)) {
-                throw new Exception("커맨드 타임아웃 발생");
+                throw new CustomException(ExceptionCode.SSH_TIME_OUT);
             }
 
             resultBuilder.append(new String(responseStream.toByteArray(), StandardCharsets.UTF_8));
+        } catch (IOException e){
+            log.info("<SSHD> ClientChannel에서 '" + command + "' 명령어 실행 실패 : " + e);
+            throw new CustomException(ExceptionCode.SSH_COMMAND_FAIL);
         }
 
         return resultBuilder.toString();
@@ -180,26 +191,26 @@ public class SSHCommandExecutor {
         }
     }
 
-    private boolean checkIfCommandCompleted(String result) {
-        return result.contains(PROMPT_UBUNTU) || result.endsWith(PROMPT_DOLLAR);
-    }
-
-    private void flushInitialMessage() throws IOException {
+    private void flushInitialMessage() {
         StringBuilder resultBuilder = new StringBuilder();
         byte[] buffer = new byte[4096];
-        boolean flushCompleted = false;
 
-        while (!flushCompleted) {
-            while (pipedOut.available() > 0) {
-                int bytesRead = pipedOut.read(buffer);
+        try {
+            while (checkIfCommandCompleted(resultBuilder.toString())) {
+                while (pipedOut.available() > 0) {
+                    int bytesRead = pipedOut.read(buffer);
 
-                if (bytesRead != -1) {
-                    String output = new String(buffer, 0, bytesRead, StandardCharsets.UTF_8);
-                    resultBuilder.append(output);
+                    if (bytesRead != -1) {
+                        resultBuilder.append(new String(buffer, 0, bytesRead, StandardCharsets.UTF_8));
+                    }
                 }
             }
-
-            flushCompleted = checkIfCommandCompleted(resultBuilder.toString());
+        } catch (IOException e){
+            log.info("리눅스 초기 메시지 flush 작업 실패!");
         }
+    }
+
+    private boolean checkIfCommandCompleted(String result) {
+        return result.contains(PROMPT_UBUNTU) || result.endsWith(PROMPT_DOLLAR);
     }
 }
