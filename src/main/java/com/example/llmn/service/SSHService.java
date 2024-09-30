@@ -61,29 +61,29 @@ public class SSHService {
         }
     }
 
-    public synchronized SSHCommandExecutor getSshExecutor(Long sshInfoId) {
-        return executorSession.computeIfAbsent(sshInfoId, id -> {
-            SshInfoDTO sshInfoDTO = getSshInfo(id);
+    private synchronized SSHCommandExecutor getSshExecutor(Long sshInfoId) {
+        // 세션이 열려있으면 그대로 반환
+        SSHCommandExecutor executor = executorSession.get(sshInfoId);
+        if(executor != null && executor.isConnected()){
+            return executorSession.get(sshInfoId);
+        }
 
-            if (sshInfoDTO == null) {
-                log.info("SSH 정보가 존재하지 않거나 작동하지 않습니다. SSH 정보 ID: " + sshInfoId);
-                return null;
-            }
+        // SSH 정보 가져오기
+        SshInfoDTO sshInfoDTO = getSshInfo(sshInfoId);
+        if (sshInfoDTO == null) {
+            log.info("SSH 정보가 존재하지 않거나 작동하지 않습니다. SSH 정보 ID: " + sshInfoId);
+            return null;
+        }
 
-            try {
-                SSHCommandExecutor executor = new SSHCommandExecutor(sshInfoDTO.remoteHost(), sshInfoDTO.remoteName(), sshInfoDTO.remoteKeyPath());
-
-                if (executor.isConnected()) {
-                    return executor;
-                } else {
-                    log.info("SSH 세션 연결에 실패했습니다. SSH 정보 ID: " + sshInfoId);
-                    return null;
-                }
-            } catch (Exception e) {
-                log.info("SSH 세션 연결 중 예외가 발생했습니다. SSH 정보 ID: " + sshInfoId + " 오류: " + e.getMessage());
-                return null;
-            }
-        });
+        // 새로운 세션 생성 후 저장
+        try {
+            SSHCommandExecutor newExecutor = new SSHCommandExecutor(sshInfoDTO.remoteHost(), sshInfoDTO.remoteName(), sshInfoDTO.remoteKeyPath());
+            executorSession.put(sshInfoId, newExecutor);
+            return newExecutor;
+        } catch (Exception e) {
+            log.info("SSH 세션 연결 중 예외가 발생했습니다. SSH 정보 ID: " + sshInfoId + " 오류: " + e.getMessage());
+            return null;
+        }
     }
 
     private SshInfoDTO getSshInfo(Long sshInfoId) {

@@ -126,13 +126,16 @@ public class SSHCommandExecutor {
     public String executeCommandOnce(String command)  {
         StringBuilder resultBuilder = new StringBuilder();
 
+        if (!session.isOpen()) {
+            log.info("세션이 닫혀 있어 명령어를 실행할 수 없습니다.");
+        }
+
         try (ClientChannel channel = session.createExecChannel(command)) {
             ByteArrayOutputStream responseStream = new ByteArrayOutputStream();
             channel.setOut(responseStream);
 
             channel.open().verify(5, TimeUnit.SECONDS);
 
-            // 명령어가 완료될 때까지 대기 (기본적으로 5분)
             Set<ClientChannelEvent> events = channel.waitFor(EnumSet.of(ClientChannelEvent.CLOSED), TimeUnit.MINUTES.toMillis(5));
             if (events.contains(ClientChannelEvent.TIMEOUT)) {
                 throw new CustomException(ExceptionCode.SSH_TIME_OUT);
