@@ -12,7 +12,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Map;
-import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
@@ -22,15 +21,13 @@ public class SSHService {
 
     private final RedisService redisService;
     private final SshInfoRepository sshInfoRepository;
-
-    // SSH Executor(세션)을 저장하고 있는 맵
-    private final Map<Long, SSHCommandExecutor> executorMap = new ConcurrentHashMap<>();
+    private final Map<Long, SSHCommandExecutor> executorSession = new ConcurrentHashMap<>();
     private static final String REDIS_SSH_KEY = "SSH";
     public static final Long REDIS_SSH_KEY_EXP = 60L * 60 * 24 * 30; // 30일
     private static final String DELIMITER = "-";
     private static final String EXECUTE_FAIL_BY_SESSION = "세션이 연결되지 않아 명령어 실행을 실패하였습니다.";
     private static final String BLANK_STRING = "";
-    
+
     @Transactional
     public String executeCommandInShell(String command, Long sshInfoId) {
         SSHCommandExecutor executor = getSshExecutor(sshInfoId);
@@ -57,7 +54,7 @@ public class SSHService {
 
     // SSH 세션 종료
     public void closeSession(Long sshInfoId) {
-        SSHCommandExecutor executor = executorMap.get(sshInfoId);
+        SSHCommandExecutor executor = executorSession.get(sshInfoId);
 
         if (executor != null) {
             executor.close();
@@ -65,7 +62,7 @@ public class SSHService {
     }
 
     public synchronized SSHCommandExecutor getSshExecutor(Long sshInfoId) {
-        return executorMap.computeIfAbsent(sshInfoId, id -> {
+        return executorSession.computeIfAbsent(sshInfoId, id -> {
             SshInfoDTO sshInfoDTO = getSshInfo(id);
 
             if (sshInfoDTO == null) {
@@ -92,36 +89,36 @@ public class SSHService {
     private SshInfoDTO getSshInfo(Long sshInfoId) {
         String sshInfoStr = redisService.getDataInStr(REDIS_SSH_KEY, sshInfoId.toString());
 
-        // 레디스에 캐시된 값이 없으면 DB에서 가져옴
-        if (sshInfoStr == null) {
-            SshInfo sshInfoInDB = sshInfoRepository.findById(sshInfoId).orElseThrow(
-                    () -> new CustomException(ExceptionCode.SSH_NOT_FOUND)
-            );
-
-            // 만약 작동중이 아니라면 예외 (사용자가 설정에서 다시 유효성 체크 해야함)
-            if(!sshInfoInDB.isWorking()){
-                return null;
-            }
-
-            // remoteHost, remoteName, keyPath를 하나의 문자로 합쳐서 저장
-            String combinedInfo = String.join(DELIMITER, sshInfoInDB.getRemoteHost(), sshInfoInDB.getRemoteName(), sshInfoInDB.getRemoteKeyPath());
-            redisService.storeValue(REDIS_SSH_KEY, sshInfoId.toString(), combinedInfo, REDIS_SSH_KEY_EXP);
-
-            return new SshInfoDTO(sshInfoInDB.getRemoteHost(), sshInfoInDB.getRemoteName(), sshInfoInDB.getRemoteKeyPath());
-        } else {
-            return parseSshInfo(sshInfoStr);
+        // 1st 레디스에 값이 있으면 파싱하여 바로 반환
+        if (sshInfoStr != null) {
+            return convertStrToSshInfo(sshInfoStr);
         }
+
+        // 2nd 값이 없으면 DB에서 가져옴
+        SshInfo sshInfoInDB = sshInfoRepository.findById(sshInfoId).orElseThrow(
+                () -> new CustomException(ExceptionCode.SSH_NOT_FOUND)
+        );
+
+        // 만약 작동 중이 아니라면 null 반환 => 사용자가 설정에서 다시 유효성 체크 해야함
+        if(!sshInfoInDB.isWorking()){
+            return null;
+        }
+
+        // remoteHost, remoteName, keyPath를 하나의 문자로 합쳐서 레디스에 저장
+        String combinedInfo = String.join(DELIMITER, sshInfoInDB.getRemoteHost(), sshInfoInDB.getRemoteName(), sshInfoInDB.getRemoteKeyPath());
+        redisService.storeValue(REDIS_SSH_KEY, sshInfoId.toString(), combinedInfo, REDIS_SSH_KEY_EXP);
+
+        return new SshInfoDTO(sshInfoInDB.getRemoteHost(), sshInfoInDB.getRemoteName(), sshInfoInDB.getRemoteKeyPath());
     }
 
-    // 문자인 sshInfoStr을 SsshInfo 객체로 변환
-    private SshInfoDTO parseSshInfo(String sshInfoStr) {
+    private SshInfoDTO convertStrToSshInfo(String sshInfoStr) {
         String[] parts = sshInfoStr.split(DELIMITER);
 
         if (parts.length != 3) {
-            throw new IllegalArgumentException("잘못된 SSH 정보 형식입니다.");
+            log.info("잘못된 SSH 정보 형식입니다.");
+            return null;
         }
 
         return new SshInfoDTO(parts[0], parts[1], parts[2]);
     }
 }
-
