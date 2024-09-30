@@ -143,6 +143,32 @@ class ConversationManager:
 
 ######################################################################################################
 
+async def validate_openai_api_key(api_key: str) -> bool:
+    try:
+        # OpenAI Chat Model 호출을 위한 간단한 테스트 프롬프트
+        chatmodel = ChatOpenAI(
+            model="gpt-4o-mini",
+            temperature=0.3,
+            max_tokens=10,
+            openai_api_key=api_key
+        )
+        
+        prompt = (
+            "This is a test prompt to validate the OpenAI API key. "
+            "You can respond with just 'Hi'."
+        )
+        
+        prompt_template = PromptTemplate(input_variables=["prompt"], template="{prompt}")
+        formatted_prompt = prompt_template.format(prompt=prompt)
+
+        # API 호출
+        response = chatmodel.invoke(formatted_prompt)
+        
+        return True
+    except Exception as e:
+        # 오류 발생 시 유효하지 않음
+        return False
+
 async def generate_log_summary(content: str):    
     prompt = (
         "### Persona ###\n"
@@ -671,3 +697,12 @@ async def reload_api_key():
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"API key 로드 실패: {e}")
+    
+@app.post("/validate-api-key")
+async def validate_api_key(api_key: str):
+    is_valid = await validate_openai_api_key(api_key)
+    
+    if is_valid:
+        return {"isValid": True}
+    else:
+        raise HTTPException(status_code=400, detail="유효하지 않은 API 키.")
