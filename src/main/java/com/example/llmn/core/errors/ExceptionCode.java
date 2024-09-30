@@ -25,6 +25,7 @@ public enum ExceptionCode {
     ALREADY_EXIST_FILE(HttpStatus.BAD_REQUEST, "이미 존재하는 파일입니다."),
     NO_FILE_TO_UPLOAD(HttpStatus.BAD_REQUEST, "업로드할 파일이 존재하지 않습니다."),
     SAVE_FILE_FAIL(HttpStatus.INTERNAL_SERVER_ERROR, "파일 저장을 실패하였습니다."),
+    UPDATE_KEY_FAIL(HttpStatus.INTERNAL_SERVER_ERROR, "API 등록을 실패했습니다."),
 
     // SSH
     SSH_INFO_EMPTY(HttpStatus.BAD_REQUEST, "SSH 정보는 적어도 하나 이상 입력해야 합니다."),

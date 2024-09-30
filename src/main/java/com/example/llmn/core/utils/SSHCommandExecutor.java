@@ -52,7 +52,7 @@ public class SSHCommandExecutor {
         // 2. SSH 서버에 연결
         ConnectFuture connectFuture = client.connect(username, host, SSH_PORT);
         session = connectFuture
-                .verify(10, TimeUnit.SECONDS) // 10초 안에 연결을 확인하고 세션을 얻음
+                .verify(5, TimeUnit.SECONDS) // 10초 안에 연결을 확인하고 세션을 얻음
                 .getSession();
 
         // 3. 인증을 위해 개인 키를 로드하고 SSH 세션에 공개 키 인증을 추가
@@ -60,7 +60,7 @@ public class SSHCommandExecutor {
         session.addPublicKeyIdentity(keyPair);
 
         // 4. 세션 인증 수행
-        session.auth().verify(10, TimeUnit.SECONDS);
+        session.auth().verify(5, TimeUnit.SECONDS);
 
         // 5. Jedis 객체 초기화
         jedis = new Jedis(REDIS_HOST, REDIS_PORT, REDIS_TIMEOUT);
@@ -78,7 +78,7 @@ public class SSHCommandExecutor {
 
         // 8. Shell 체널 오픈
         if (shellChannel != null) {
-            shellChannel.open().verify(10, TimeUnit.SECONDS);
+            shellChannel.open().verify(5, TimeUnit.SECONDS);
 
             pipedIn = shellChannel.getInvertedIn(); // 표준 입력 스트림에 연결
             pipedOut = shellChannel.getInvertedOut(); // 표준 출력 스트림에 연결
@@ -141,7 +141,7 @@ public class SSHCommandExecutor {
                 throw new CustomException(ExceptionCode.SSH_TIME_OUT);
             }
 
-            resultBuilder.append(new String(responseStream.toByteArray(), StandardCharsets.UTF_8));
+            resultBuilder.append(responseStream.toString(StandardCharsets.UTF_8));
         } catch (IOException e){
             log.info("<SSHD> ClientChannel에서 '" + command + "' 명령어 실행 실패 : " + e);
             throw new CustomException(ExceptionCode.SSH_COMMAND_FAIL);

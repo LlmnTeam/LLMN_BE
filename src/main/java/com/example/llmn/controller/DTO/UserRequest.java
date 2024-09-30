@@ -35,7 +35,8 @@ public class UserRequest {
             List<SshInfoDTO> sshInfos,
             boolean receivingAlarm,
             @NotBlank(message = "모니터링할 클라우드 인스턴스를 선택해야 합니다.")
-            String monitoringSshHost) {}
+            String monitoringSshHost,
+            String openAiKey) {}
 
     public record SshInfoDTO(
             String remoteName,

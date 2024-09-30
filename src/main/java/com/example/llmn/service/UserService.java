@@ -39,6 +39,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.security.SecureRandom;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -77,6 +78,8 @@ public class UserService {
     private static final String DELIMITER = "-";
     private static final Long REDIS_SSH_KEY_EXP = 60L * 60 * 24 * 180; // 180일
     private static final String NOT_AVAILABLE = "N/A";
+    private static final String ENV_FILE_RELATIVE_PATH = "FastAPI/app/.env";
+    private static final String OPEN_API_KEY = "OPENAI_API_KEY";
 
     @Transactional
     public Map<String, String> login(UserRequest.@Valid LoginDTO requestDTO, HttpServletRequest request) {
@@ -147,6 +150,9 @@ public class UserService {
         if(monitoringSshInfo.isEmpty()){
             throw new CustomException(ExceptionCode.MONITORING_SSH_NOT_SELECT);
         }
+
+        // OpenAI API 키 저장
+        updateFastAPIEnvFile(OPEN_API_KEY, requestDTO.openAiKey());
 
         user.updateMonitoringSshInfoId(monitoringSshInfo.get().getId());
     }
@@ -497,6 +503,36 @@ public class UserService {
             }
         } catch (IOException e){
             throw new CustomException(ExceptionCode.CREATE_DIR_FAIL);
+        }
+    }
+
+    public void updateFastAPIEnvFile(String key, String value) {
+        try {
+            // 상대 경로로 파일에 접근
+            Path path = Paths.get(ENV_FILE_RELATIVE_PATH).toAbsolutePath();
+            List<String> lines = Files.readAllLines(path);
+            boolean keyExists = false;
+
+            // key가 이미 존재하는지 확인
+            for (int i = 0; i < lines.size(); i++) {
+                String line = lines.get(i);
+                if (line.startsWith(key + "=")) {
+                    lines.set(i, key + "=" + value);  // 기존 값 업데이트
+                    keyExists = true;
+                    break;
+                }
+            }
+
+            // key가 없으면 새로 추가
+            if (!keyExists) {
+                lines.add(key + "=" + value);
+            }
+
+            // 변경된 내용을 파일에 다시 씀
+            Files.write(path, lines, StandardOpenOption.TRUNCATE_EXISTING);
+        } catch (IOException e){
+            log.info("API 키 업데이트 실패");
+            throw new CustomException(ExceptionCode.LOG_CONVERT_TO_FILE_FAIL);
         }
     }
 }
