@@ -36,6 +36,7 @@ public class DockerService {
     public static final String COMMAND_DOCKER_PS = "docker ps --format \"{{.Names}}\"";
     public static final String COMMAND_DOCKER_STATS = "docker stats --no-stream --format \"{{.Name}}:{{.CPUPerc}}:{{.MemUsage}}\"";
     private static final Long RESOURCE_EXP = 10 * 60 * 1000L; // 10분
+    private static final String BLANK_STRING = "";
 
     // 도커 컨테이너 종료
     public boolean stopContainerByName(String containerName, Long projectId) {
@@ -168,7 +169,7 @@ public class DockerService {
             return objectMapper.writeValueAsString(metricMap);
         } catch (JsonProcessingException e) {
             log.info("MetricMap 파싱 실패");
-            return "";
+            return BLANK_STRING;
         }
     }
 }
