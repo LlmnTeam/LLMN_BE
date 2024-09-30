@@ -26,7 +26,6 @@ public class ProjectController {
 
     private final ProjectService projectService;
     private final DockerService dockerService;
-    private final SSHService sshService;
     private static final String SORT_BY_DATE = "createdDate";
     private static final boolean USING_CACHE = true;
     private static final boolean NOT_USING_CACHE = false;
@@ -38,7 +37,7 @@ public class ProjectController {
     }
 
     @GetMapping("/cloud")
-    public ResponseEntity<?> findCloudAndContainerInfo(@AuthenticationPrincipal CustomUserDetails userDetails) throws Exception {
+    public ResponseEntity<?> findCloudAndContainerInfo(@AuthenticationPrincipal CustomUserDetails userDetails) {
         ProjectResponse.FindCloudAndContainerInfoDTO responseDTO = projectService.findCloudAndContainerInfo(userDetails.getUser().getId());
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
@@ -58,13 +57,13 @@ public class ProjectController {
     }
 
     @GetMapping("/project")
-    public ResponseEntity<?> findProjectList(@AuthenticationPrincipal CustomUserDetails userDetails) throws Exception {
+    public ResponseEntity<?> findProjectList(@AuthenticationPrincipal CustomUserDetails userDetails) {
         ProjectResponse.FindProjectListDTO responseDTO = projectService.findProjectList(userDetails.getUser().getId(), USING_CACHE);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 
     @GetMapping("/project/refresh")
-    public ResponseEntity<?> findRefreshedProjectList(@AuthenticationPrincipal CustomUserDetails userDetails) throws Exception {
+    public ResponseEntity<?> findRefreshedProjectList(@AuthenticationPrincipal CustomUserDetails userDetails) {
         ProjectResponse.FindProjectListDTO responseDTO = projectService.findProjectList(userDetails.getUser().getId(), NOT_USING_CACHE);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
@@ -95,20 +94,20 @@ public class ProjectController {
     }
 
     @GetMapping("/project/{projectId}/container")
-    public ResponseEntity<?> findContainerList(@PathVariable Long projectId) throws Exception {
+    public ResponseEntity<?> findContainerList(@PathVariable Long projectId) {
         List<String> runningContainerNameList = dockerService.findRunningContainerList(projectId);
         ProjectResponse.FindContainerListDTO responseDTO = new ProjectResponse.FindContainerListDTO(runningContainerNameList);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 
     @PostMapping("/project/{projectId}/container/stop")
-    public ResponseEntity<?> stopContainer(@RequestBody ProjectRequest.ContainerDTO requestDTO, @PathVariable Long projectId) throws Exception {
+    public ResponseEntity<?> stopContainer(@RequestBody ProjectRequest.ContainerDTO requestDTO, @PathVariable Long projectId) {
         boolean response = dockerService.stopContainerByName(requestDTO.name(), projectId);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, response));
     }
 
     @PostMapping("/project/{projectId}/container/restart")
-    public ResponseEntity<?> restartContainer(@RequestBody ProjectRequest.ContainerDTO requestDTO, @PathVariable Long projectId) throws Exception {
+    public ResponseEntity<?> restartContainer(@RequestBody ProjectRequest.ContainerDTO requestDTO, @PathVariable Long projectId) {
         boolean response = dockerService.restartContainerByName(requestDTO.name(), projectId);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, response));
     }

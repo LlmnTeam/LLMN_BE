@@ -5,7 +5,6 @@ import com.example.llmn.controller.DTO.UserResponse;
 import com.example.llmn.core.security.CustomUserDetails;
 import com.example.llmn.core.utils.ApiUtils;
 import com.example.llmn.service.UserService;
-import jakarta.mail.MessagingException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -45,16 +44,8 @@ public class UserController {
 
     @PostMapping("/ssh")
     public ResponseEntity<?> uploadSSHKey(@RequestParam("file") MultipartFile file) {
-        try {
-            Path path = userService.uploadSSHKey(file);
-            return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.CREATED, path));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.ok().body(ApiUtils.error(e.getMessage(), HttpStatus.BAD_REQUEST));
-        } catch (FileAlreadyExistsException e) {
-            return ResponseEntity.ok().body(ApiUtils.error(e.getMessage(), HttpStatus.CONFLICT));
-        } catch (IOException e) {
-            return ResponseEntity.ok().body(ApiUtils.error("파일 업로드 중 오류가 발생했습니다.", HttpStatus.INTERNAL_SERVER_ERROR));
-        }
+        Path path = userService.uploadSSHKey(file);
+        return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.CREATED, path));
     }
 
     @PostMapping("/accounts/check/email")
@@ -71,7 +62,7 @@ public class UserController {
     }
 
     @GetMapping("/home")
-    public ResponseEntity<?> findDashboard(@AuthenticationPrincipal CustomUserDetails userDetails) throws Exception {
+    public ResponseEntity<?> findDashboard(@AuthenticationPrincipal CustomUserDetails userDetails) {
         UserResponse.FindDashboardDTO responseDTO = userService.findDashboard(userDetails.getUser().getId());
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
@@ -83,7 +74,7 @@ public class UserController {
     }
 
     @PatchMapping("/accounts")
-    public ResponseEntity<?> updateConfiguration(@RequestBody @Valid UserRequest.UpdateConfigurationDTO requestDTO, @AuthenticationPrincipal CustomUserDetails userDetails) throws Exception {
+    public ResponseEntity<?> updateConfiguration(@RequestBody @Valid UserRequest.UpdateConfigurationDTO requestDTO, @AuthenticationPrincipal CustomUserDetails userDetails) {
         userService.updateConfiguration(requestDTO, userDetails.getUser().getId());
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, null));
     }

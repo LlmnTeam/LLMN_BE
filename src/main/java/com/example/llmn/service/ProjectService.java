@@ -71,7 +71,7 @@ public class ProjectService {
     }
 
     @Transactional(readOnly = true)
-    public ProjectResponse.FindCloudAndContainerInfoDTO findCloudAndContainerInfo(Long userId) throws Exception {
+    public ProjectResponse.FindCloudAndContainerInfoDTO findCloudAndContainerInfo(Long userId) {
         List<Project> projects = projectRepository.findByUserIdWithSshInfo(userId);
 
         List<ProjectResponse.CloudInstanceDTO> cloudInstanceDTOS = new ArrayList<>();
@@ -125,7 +125,7 @@ public class ProjectService {
     }
 
     @Transactional
-    public ProjectResponse.FindProjectListDTO findProjectList(Long userId, boolean isUsingCache) throws Exception {
+    public ProjectResponse.FindProjectListDTO findProjectList(Long userId, boolean isUsingCache) {
         List<Project> projects = projectRepository.findByUserIdWithSshInfo(userId);
 
         // 컨테이너 리소스 조회

@@ -1,7 +1,6 @@
 package com.example.llmn.controller;
 
 import com.example.llmn.controller.DTO.InsightResponse;
-import com.example.llmn.core.errors.CustomException;
 import com.example.llmn.core.security.CustomUserDetails;
 import com.example.llmn.core.utils.ApiUtils;
 import com.example.llmn.domain.SummaryType;
@@ -15,7 +14,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 import java.util.List;

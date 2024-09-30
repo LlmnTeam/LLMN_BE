@@ -178,26 +178,30 @@ public class UserService {
         return new UserResponse.VerifyEmailCodeDTO(true);
     }
 
-    public Path uploadSSHKey(MultipartFile file) throws IOException {
+    public Path uploadSSHKey(MultipartFile file) {
+        // 요청으로 들어온 파일이 없음
         if (file.isEmpty()) {
-            throw new IllegalArgumentException("파일이 없습니다.");
+            throw new CustomException(ExceptionCode.NO_FILE_TO_UPLOAD);
         }
 
-        // 디렉토리가 없으면 생성
-        Path uploadPath = Paths.get(UPLOAD_DIR);
-        if (!Files.exists(uploadPath)) {
-            Files.createDirectories(uploadPath);
-        }
+        // 로그 파일 디렉토리가 없으면 생성
+        createDirIfNotExist();
 
+        // 파일 경로 구하기
         String fileName = file.getOriginalFilename();
         Path path = Paths.get(UPLOAD_DIR + File.separator + fileName);
 
-        // 파일이 이미 존재하는지 확인
+        // 경로에 해당 파일이 이미 존재하는지 확인
         if (Files.exists(path)) {
-            throw new FileAlreadyExistsException("파일이 이미 존재합니다.");
+            throw new CustomException(ExceptionCode.ALREADY_EXIST_FILE);
         }
 
-        Files.write(path, file.getBytes());
+        try {
+            Files.write(path, file.getBytes());
+        } catch (IOException e) {
+            log.info("업로드 파일 저장 실패");
+            throw new CustomException(ExceptionCode.SAVE_FILE_FAIL);
+        }
 
         return path;
     }
@@ -476,7 +480,18 @@ public class UserService {
                 return true;
             }
         }
-
         return false;
+    }
+
+    private void createDirIfNotExist() {
+        Path uploadPath = Paths.get(UPLOAD_DIR);
+
+        try {
+            if (!Files.exists(uploadPath)) {
+                Files.createDirectories(uploadPath);
+            }
+        } catch (IOException e){
+            throw new CustomException(ExceptionCode.CREATE_DIR_FAIL);
+        }
     }
 }

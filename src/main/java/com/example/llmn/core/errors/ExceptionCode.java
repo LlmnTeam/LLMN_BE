@@ -20,6 +20,12 @@ public enum ExceptionCode {
     USER_ALREADY_EXIT(HttpStatus.NOT_FOUND, "이미 탈퇴한 계정입니다."),
     ALREADY_SEND_EMAIL(HttpStatus.NOT_FOUND, "이미 이메일을 전송하였습니다. 5분 후에 다시 시도해주세요"),
 
+    // 파일
+    CREATE_DIR_FAIL(HttpStatus.INTERNAL_SERVER_ERROR, "디렉토리 생성을 실패했습니다."),
+    ALREADY_EXIST_FILE(HttpStatus.BAD_REQUEST, "이미 존재하는 파일입니다."),
+    NO_FILE_TO_UPLOAD(HttpStatus.BAD_REQUEST, "업로드할 파일이 존재하지 않습니다."),
+    SAVE_FILE_FAIL(HttpStatus.INTERNAL_SERVER_ERROR, "파일 저장을 실패하였습니다."),
+
     // SSH
     SSH_INFO_EMPTY(HttpStatus.BAD_REQUEST, "SSH 정보는 적어도 하나 이상 입력해야 합니다."),
     MONITORING_SSH_NOT_SELECT(HttpStatus.BAD_REQUEST, "모니터링 할 클라우드 인스턴스 호스트명이 잘못됐습니다."),
