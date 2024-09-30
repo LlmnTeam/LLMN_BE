@@ -59,7 +59,8 @@ public class SSHService {
             // SSH 접속 후 간단한 명령어 실행
             String response = executor.executeCommandOnce("uptime");
 
-            // 인스턴스가 유효한지 간단한 기준으로 판단
+            // 유효성 체크가 끝나면 세션 닫기
+            executor.close();
             return response.contains("load average");
         } catch (Exception e) {
             return false;
