@@ -65,7 +65,7 @@ public class UserRequest {
             @NotBlank(message = "코드를 입력해주세요.")
             String code){}
 
-    public record VerifyCloudDTO(
+    public record VerifySshConnectDTO(
             @NotBlank(message = "클라우드 인스턴스의 유저명을 입력해주세요.")
             String remoteName,
             @NotBlank(message = "클라우드 인스턴의 IP(호스트)를 입력해주세요.")

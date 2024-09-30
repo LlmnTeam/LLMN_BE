@@ -52,7 +52,7 @@ public class SSHService {
         return executor.executeCommandOnce(command);
     }
 
-    public boolean checkInstanceIsValid(String remoteHost, String remoteName, String remoteKeyPath) {
+    public boolean checkConnectionValid(String remoteHost, String remoteName, String remoteKeyPath) {
         try {
             SSHCommandExecutor executor = new SSHCommandExecutor(remoteHost, remoteName, remoteKeyPath);
 

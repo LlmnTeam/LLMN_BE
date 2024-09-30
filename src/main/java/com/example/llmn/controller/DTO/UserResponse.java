@@ -35,5 +35,5 @@ public class UserResponse {
 
     public record VerifyEmailCodeDTO(boolean isMatching) {}
 
-    public record VerifyCloudDTO(boolean isValid) {}
+    public record VerifySshConnectDTO(boolean isValid) {}
 }

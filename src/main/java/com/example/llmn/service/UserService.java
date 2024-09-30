@@ -178,9 +178,9 @@ public class UserService {
         return new UserResponse.VerifyEmailCodeDTO(true);
     }
 
-    public UserResponse.VerifyCloudDTO verifyCloud(UserRequest.VerifyCloudDTO requestDTO){
-        boolean isValid = sshService.checkInstanceIsValid(requestDTO.remoteHost(), requestDTO.remoteName(), requestDTO.remoteKeyPath());
-        return new UserResponse.VerifyCloudDTO(isValid);
+    public UserResponse.VerifySshConnectDTO verifySshConnect(UserRequest.VerifySshConnectDTO requestDTO){
+        boolean isValid = sshService.checkConnectionValid(requestDTO.remoteHost(), requestDTO.remoteName(), requestDTO.remoteKeyPath());
+        return new UserResponse.VerifySshConnectDTO(isValid);
     }
 
     public Path uploadSSHKey(MultipartFile file) {

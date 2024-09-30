@@ -61,6 +61,12 @@ public class UserController {
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 
+    @PostMapping("/accounts/validate/ssh")
+    public ResponseEntity<?> verifySshConnect(@RequestBody @Valid UserRequest.VerifySshConnectDTO requestDTO){
+        UserResponse.VerifySshConnectDTO responseDTO = userService.verifySshConnect(requestDTO);
+        return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
+    }
+
     @GetMapping("/home")
     public ResponseEntity<?> findDashboard(@AuthenticationPrincipal CustomUserDetails userDetails) {
         UserResponse.FindDashboardDTO responseDTO = userService.findDashboard(userDetails.getUser().getId());
