@@ -36,4 +36,6 @@ public class UserResponse {
     public record VerifyEmailCodeDTO(boolean isMatching) {}
 
     public record VerifySshConnectDTO(boolean isValid) {}
+
+    public record RequestApiKeyLoadDTO(boolean success){}
 }

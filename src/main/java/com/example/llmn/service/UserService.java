@@ -1,5 +1,6 @@
 package com.example.llmn.service;
 
+import com.example.llmn.controller.DTO.LogDTO;
 import com.example.llmn.controller.DTO.MetricResponse;
 import com.example.llmn.controller.DTO.UserRequest;
 import com.example.llmn.controller.DTO.UserResponse;
@@ -31,11 +32,14 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.util.UriComponentsBuilder;
 import org.thymeleaf.context.Context;
 import org.thymeleaf.spring6.SpringTemplateEngine;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -61,9 +65,13 @@ public class UserService {
     private final MetricService metricService;
     private final JavaMailSender mailSender;
     private final SpringTemplateEngine templateEngine;
+    private final WebClient webClient;
 
     @Value("${spring.mail.username}")
     private String SERVICE_MAIL_ACCOUNT;
+
+    @Value("${reload.uri}")
+    private String REQUEST_RELOAD_KEY_URI;
     private static final String REDIS_KEY_EMAIL_CODE = "code:";
     private static final String MAIL_TEMPLATE_FOR_CODE = "verification_code_email.html";
     private static final String UTF_EIGHT_ENCODING = "UTF-8";
@@ -151,10 +159,11 @@ public class UserService {
             throw new CustomException(ExceptionCode.MONITORING_SSH_NOT_SELECT);
         }
 
+        user.updateMonitoringSshInfoId(monitoringSshInfo.get().getId());
+
         // OpenAI API 키 저장
         updateFastAPIEnvFile(OPEN_API_KEY, requestDTO.openAiKey());
-
-        user.updateMonitoringSshInfoId(monitoringSshInfo.get().getId());
+        requestApiKeyLoad();
     }
 
     @Transactional(readOnly = true)
@@ -534,5 +543,22 @@ public class UserService {
             log.info("API 키 업데이트 실패");
             throw new CustomException(ExceptionCode.LOG_CONVERT_TO_FILE_FAIL);
         }
+    }
+
+    private void requestApiKeyLoad(){
+        UserResponse.RequestApiKeyLoadDTO responseDTO = webClient.post()
+                .uri(buildURI(REQUEST_RELOAD_KEY_URI))
+                .retrieve()
+                .bodyToMono(UserResponse.RequestApiKeyLoadDTO.class)
+                .block();
+
+        if(!Objects.requireNonNull(responseDTO).success()){
+            log.info("FastAPI에 API키가 정상 로드 되지 않음");
+        }
+    }
+
+    private URI buildURI(String uri) {
+        UriComponentsBuilder uriBuilder = UriComponentsBuilder.fromHttpUrl(uri);
+        return uriBuilder.build().encode().toUri();
     }
 }
