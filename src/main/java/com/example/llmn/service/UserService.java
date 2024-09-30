@@ -36,7 +36,6 @@ import org.thymeleaf.spring6.SpringTemplateEngine;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -55,6 +54,7 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
     private final UserRepository userRepository;
     private final SshInfoRepository sshInfoRepository;
+    private final SSHService sshService;
     private final RedisService redisService;
     private final SummaryRepository summaryRepository;
     private final MetricService metricService;
@@ -176,6 +176,11 @@ public class UserService {
             return new UserResponse.VerifyEmailCodeDTO(false);
 
         return new UserResponse.VerifyEmailCodeDTO(true);
+    }
+
+    public UserResponse.VerifyCloudDTO verifyCloud(UserRequest.VerifyCloudDTO requestDTO){
+        boolean isValid = sshService.checkInstanceIsValid(requestDTO.remoteHost(), requestDTO.remoteName(), requestDTO.remoteKeyPath());
+        return new UserResponse.VerifyCloudDTO(isValid);
     }
 
     public Path uploadSSHKey(MultipartFile file) {

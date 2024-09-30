@@ -52,6 +52,20 @@ public class SSHService {
         return executor.executeCommandOnce(command);
     }
 
+    public boolean checkInstanceIsValid(String remoteHost, String remoteName, String remoteKeyPath) {
+        try {
+            SSHCommandExecutor executor = new SSHCommandExecutor(remoteHost, remoteName, remoteKeyPath);
+
+            // SSH 접속 후 간단한 명령어 실행
+            String response = executor.executeCommandOnce("uptime");
+
+            // 인스턴스가 유효한지 간단한 기준으로 판단
+            return response.contains("load average");
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     // SSH 세션 종료
     public void closeSession(Long sshInfoId) {
         SSHCommandExecutor executor = executorSession.get(sshInfoId);
