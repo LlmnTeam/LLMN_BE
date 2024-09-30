@@ -658,3 +658,16 @@ async def process_logs_and_question(log_files_request: LogFilesRequest):
         conversation_manager.add_to_history(log_files_request.question, complete_response)
 
     return StreamingResponse(stream_response(), media_type='text/event-stream')
+
+# .env 파일을 다시 로드하여 새 API 키 적용
+@app.post("/reload-api-key")
+async def reload_api_key():
+    try:
+        global settings
+        settings = Settings()  
+        return {
+            "success": True
+        }
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"API key 로드 실패: {e}")
