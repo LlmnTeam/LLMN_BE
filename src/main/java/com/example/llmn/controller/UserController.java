@@ -87,6 +87,12 @@ public class UserController {
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 
+    @GetMapping("/cloud")
+    public ResponseEntity<?> findCloudInfo(@AuthenticationPrincipal CustomUserDetails userDetails) {
+        UserResponse.FindCloudInfoDTO responseDTO = userService.findCloudInfo(userDetails.getUser().getId());
+        return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
+    }
+
     @GetMapping("/accounts/info")
     public ResponseEntity<?> findConfigurationInfo(@AuthenticationPrincipal CustomUserDetails userDetails) {
         UserResponse.FindConfigurationInfoDTO responseDTO = userService.findConfigurationInfo(userDetails.getUser().getId());
