@@ -373,6 +373,11 @@ public class UserService {
         redisService.storeValue(REDIS_SSH_KEY, userId.toString(), combinedInfo, REDIS_SSH_KEY_EXP);
     }
 
+    public void updateApiKey(String apiKey){
+        updateFastAPIEnvFile(OPEN_API_KEY, apiKey);
+        requestApiKeyLoad();
+    }
+
     private Map<String, String> createToken(User user){
         String accessToken = JWTProvider.createAccessToken(user);
         String refreshToken = JWTProvider.createRefreshToken(user);
@@ -535,7 +540,7 @@ public class UserService {
                 );
     }
 
-    public boolean hasDuplicateRemoteHost(List<UserRequest.SshInfoDTO> sshInfos) {
+    private boolean hasDuplicateRemoteHost(List<UserRequest.SshInfoDTO> sshInfos) {
         Set<String> remoteHostSet = new HashSet<>();
 
         for (UserRequest.SshInfoDTO sshInfoDTO : sshInfos) {
@@ -558,7 +563,7 @@ public class UserService {
         }
     }
 
-    public void updateFastAPIEnvFile(String key, String value) {
+    private void updateFastAPIEnvFile(String key, String value) {
         try {
             // 상대 경로로 파일에 접근
             Path path = Paths.get(ENV_FILE_RELATIVE_PATH).toAbsolutePath();
