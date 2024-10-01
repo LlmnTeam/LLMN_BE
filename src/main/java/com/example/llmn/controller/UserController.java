@@ -117,4 +117,10 @@ public class UserController {
         userService.resetPassword(requestDTO);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, null));
     }
+
+    @DeleteMapping("/accounts/withdraw")
+    public ResponseEntity<?> withdrawMember(@AuthenticationPrincipal CustomUserDetails userDetails){
+        userService.withdrawMember(userDetails.getUser().getId());
+        return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, null));
+    }
 }
