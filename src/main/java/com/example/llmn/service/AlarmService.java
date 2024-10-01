@@ -26,6 +26,12 @@ public class AlarmService {
     @Transactional
     public void generateAlarm(Long receiverId, String content, AlarmType alarmType){
         User receiver = userRepository.getReferenceById(receiverId);
+
+        // 알람을 수신하지 않는다면 리턴
+        if(!receiver.isReceivingAlarm()){
+            return;
+        }
+
         Alarm alarm = Alarm.builder()
                 .receiver(receiver)
                 .content(content)
