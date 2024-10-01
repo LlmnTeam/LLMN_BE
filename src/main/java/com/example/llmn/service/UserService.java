@@ -323,6 +323,24 @@ public class UserService {
         return new UserResponse.FindCloudInfoDTO(cloudInfoDTOS);
     }
 
+    @Transactional
+    public void updateMonitoringSsh(Long userId ,String monitoringSshHost){
+        User user = userRepository.findById(userId).orElseThrow(
+                () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
+        );
+    
+        List<SshInfo> sshInfos = sshInfoRepository.findByUserId(userId);
+
+        SshInfo foundSshInfo = sshInfos.stream()
+                .filter(sshInfo -> sshInfo.getRemoteHost().equals(monitoringSshHost))
+                .findFirst()
+                .orElseThrow(
+                        () -> new CustomException(ExceptionCode.MONITORING_SSH_NOT_SELECT)
+                );
+
+        user.updateMonitoringSshInfoId(foundSshInfo.getId());
+    }
+
     @Transactional(readOnly = true)
     public UserResponse.FindConfigurationInfoDTO findConfigurationInfo(Long userId){
         User user = userRepository.findById(userId).orElseThrow(

@@ -558,11 +558,12 @@ async def generate_hourly_summary(content: str):
         openai_api_key=settings.OPENAI_API_KEY
     )
     
+
     prompt_template = PromptTemplate(input_variables=["prompt"], template="{prompt}")
     formatted_prompt = prompt_template.format(prompt=prompt)
 
     response = chatmodel.invoke(formatted_prompt)
-    hourly_summary = response.content  
+    hourly_summary = response.content
 
     return hourly_summary
 
