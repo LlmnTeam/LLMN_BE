@@ -22,4 +22,8 @@ public interface SshInfoRepository extends JpaRepository<SshInfo, Long> {
     @Modifying
     @Query("UPDATE SshInfo s SET s.isWorking = :isWorking WHERE s.id = :sshId")
     void updateIsWorking(@Param("sshId") Long sshId, @Param("isWorking") boolean isWorking);
+
+    @Modifying
+    @Query("DELETE FROM SshInfo s WHERE s.user.id = :userId")
+    void deleteByUserId(Long userId);
 }

@@ -7,6 +7,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -61,4 +62,8 @@ public interface SummaryRepository extends JpaRepository<Summary, Long> {
 
     @Query("DELETE FROM Summary s WHERE s.project.id = :projectId")
     void deleteByProjectId(@Param("projectId") Long projectId);
+
+    @Modifying
+    @Query("DELETE FROM Summary s WHERE s.user.id = :userId")
+    void deleteByUserId(Long userId);
 }

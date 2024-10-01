@@ -10,9 +10,7 @@ import com.example.llmn.core.security.JWTProvider;
 import com.example.llmn.domain.SshInfo;
 import com.example.llmn.domain.SummaryType;
 import com.example.llmn.domain.User;
-import com.example.llmn.repository.SshInfoRepository;
-import com.example.llmn.repository.SummaryRepository;
-import com.example.llmn.repository.UserRepository;
+import com.example.llmn.repository.*;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import jakarta.servlet.http.HttpServletRequest;
@@ -58,7 +56,10 @@ public class UserService {
 
     private final PasswordEncoder passwordEncoder;
     private final UserRepository userRepository;
+    private final ProjectRepository projectRepository;
     private final SshInfoRepository sshInfoRepository;
+    private final MetricRepository metricRepository;
+    private final AlarmRepository alarmRepository;
     private final SSHService sshService;
     private final RedisService redisService;
     private final SummaryRepository summaryRepository;
@@ -415,6 +416,34 @@ public class UserService {
         boolean isValid = userOP.isPresent();
 
         return new UserResponse.CheckAccountExistDTO(isValid);
+    }
+
+    @Transactional
+    public void withdrawMember(Long userId){
+        User user = userRepository.findById(userId).orElseThrow(
+                () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
+        );
+
+        // 알람 삭제
+        alarmRepository.deleteByUserId(userId);
+
+        // 프로젝트 삭제
+        projectRepository.deleteByUserId(userId);
+
+        // 요약 삭제
+        summaryRepository.deleteByUserId(userId);
+
+        // 메트릭 삭제
+        metricRepository.deleteByUserId(userId);
+
+        // SSH 정보 삭제
+        sshInfoRepository.deleteByUserId(userId);
+
+        // 세션에 저장된 토큰 삭제
+        redisService.removeData(REDIS_KEY_ACCESS_TOKEN, userId.toString());
+        redisService.removeData(REDIS_KEY_REFRESH_TOKEN, userId.toString());
+
+        userRepository.delete(user);
     }
 
     private void checkDuplicateNickname(String nickName) {

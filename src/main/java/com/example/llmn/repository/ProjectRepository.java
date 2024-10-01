@@ -3,6 +3,7 @@ package com.example.llmn.repository;
 import com.example.llmn.domain.Project;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -31,4 +32,8 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
             "JOIN p.sshInfo s " +
             "WHERE p.id = :projectId")
     Optional<Long> findSshInfoId(@Param("projectId") Long projectId);
+
+    @Modifying
+    @Query("DELETE FROM Project p WHERE p.user.id = :userId")
+    void deleteByUserId(Long userId);
 }
