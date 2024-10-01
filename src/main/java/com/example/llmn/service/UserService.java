@@ -90,6 +90,7 @@ public class UserService {
     private static final String NOT_AVAILABLE = "N/A";
     private static final String ENV_FILE_RELATIVE_PATH = "FastAPI/app/.env";
     private static final String OPEN_API_KEY = "OPENAI_API_KEY";
+    private static final String CODE_TO_EMAIL_KEY_PREFIX = "codeToEmail";
 
     @Transactional
     public Map<String, String> login(UserRequest.@Valid LoginDTO requestDTO, HttpServletRequest request) {
@@ -235,6 +236,25 @@ public class UserService {
                 .retrieve()
                 .bodyToMono(UserResponse.ValidateOpenAIKeyDTO.class)
                 .block();
+    }
+
+    @Transactional
+    public void resetPassword(UserRequest.ResetPasswordDTO requestDTO){
+        // 전송한 코드로 세션에서 해당 이메일을 꺼내옴 (비밀번호 재설정 시 코드 전송을 거침)
+        String email = redisService.getDataInStr(CODE_TO_EMAIL_KEY_PREFIX, requestDTO.code());
+        if(email == null){
+            throw new CustomException(ExceptionCode.BAD_APPROACH);
+        }
+
+        // CODE_TO_EMAIL 키 삭제
+        redisService.removeData(CODE_TO_EMAIL_KEY_PREFIX, requestDTO.code());
+
+        User user = userRepository.findByEmail(email).orElseThrow(
+                () -> new CustomException(ExceptionCode.USER_EMAIL_NOT_FOUND)
+        );
+
+        // 새로운 비밀번호로 업데이트
+        user.updatePassword(passwordEncoder.encode(requestDTO.newPassword()));
     }
 
     @Transactional(readOnly = true)

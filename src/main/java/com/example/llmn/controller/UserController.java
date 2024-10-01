@@ -67,7 +67,7 @@ public class UserController {
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 
-    @PostMapping("/accounts/validate/Key")
+    @PostMapping("/accounts/validate/key")
     public ResponseEntity<?> validateOpenAIKey(@RequestBody @Valid UserRequest.ValidateOpenAIKeyDTO requestDTO){
         UserResponse.ValidateOpenAIKeyDTO responseDTO = userService.validateOpenAIKey(requestDTO.apiKey());
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
