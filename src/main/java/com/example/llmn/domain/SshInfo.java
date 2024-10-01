@@ -46,4 +46,8 @@ public class SshInfo extends TimeStamp{
         this.remoteName = remoteName;
         this.remoteKeyPath = remoteKeyPath;
     }
+
+    public void updateIsWorking(boolean isWorking){
+        this.isWorking = isWorking;
+    }
 }

@@ -8,9 +8,11 @@ import com.example.llmn.domain.SshInfo;
 import com.example.llmn.repository.SshInfoRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -50,6 +52,15 @@ public class SSHService {
         }
 
         return executor.executeCommandOnce(command);
+    }
+
+    @Scheduled(cron = "0 32 12 * * *") // 매일 12시 32분
+    public void checkSshConnection(){
+        List<SshInfo> sshInfos = sshInfoRepository.findAll();
+
+        sshInfos.forEach(sshInfo -> {
+            sshInfo.updateIsWorking(checkConnectionValid(sshInfo.getRemoteHost(), sshInfo.getRemoteName(), sshInfo.getRemoteKeyPath()));
+        });
     }
 
     public boolean checkConnectionValid(String remoteHost, String remoteName, String remoteKeyPath) {

@@ -1,20 +1,10 @@
-# Filebeat가 어떤 소스에서 로그를 수집할지 정의
 filebeat.inputs:
   - type: container
     paths:
       - /var/lib/docker/containers/*/*.log
     processors:
-      - add_docker_metadata: ~  # 수집된 로그에 해당 로그가 속한 Docker 컨테이너의 메타데이터(컨테이너 이름, ID 등)를 자동으로 추가하는 프로세서
-
-processors:
-#  - drop_event.when.not:
-#      or:
-#        - equals:
-#            log.level: "ERROR"
-#        - equals:
-#            log.level: "WARNING"
-
-# 수집된 로그 데이터를 어디로 전송할지 정의
+      - add_docker_metadata: ~
+      
 output.logstash:
-  hosts: ["logstash:5044"] # 로그를 전송할 Logstash의 호스트 주소와 포트 번호를 지정
+  hosts: ["logstash:5044"]
 
