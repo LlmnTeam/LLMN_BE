@@ -73,4 +73,10 @@ public class UserRequest {
             String remoteHost,
             @NotBlank(message = "Pem키 파일의 경로를 입력해주세요.")
             String remoteKeyPath){}
+
+    public record RequestValidateKeyDTO(String apiKey){}
+
+    public record ValidateOpenAIKeyDTO(
+            @NotBlank(message = "OpenAI API키를 입력해주세요.")
+            String apiKey){}
 }

@@ -228,9 +228,10 @@ public class UserService {
         return path;
     }
 
-    public UserResponse.ValidateOpenAIKeyDTO validateOpenAIKey(){
+    public UserResponse.ValidateOpenAIKeyDTO validateOpenAIKey(String apiKey){
         return webClient.post()
                 .uri(buildURI(REQUEST_VALIDATE_KEY_URI))
+                .bodyValue(new UserRequest.RequestValidateKeyDTO(apiKey))
                 .retrieve()
                 .bodyToMono(UserResponse.ValidateOpenAIKeyDTO.class)
                 .block();
