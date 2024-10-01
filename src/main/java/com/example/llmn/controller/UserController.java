@@ -63,6 +63,12 @@ public class UserController {
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 
+    @PostMapping("/accounts/resend/code")
+    public ResponseEntity<?> resendCode(@RequestBody @Valid UserRequest.EmailDTO requestDTO, @RequestParam String codeType) {
+        userService.sendCodeWithValidation(requestDTO.email(), codeType, true);
+        return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, null));
+    }
+
     @PostMapping("/accounts/validate/ssh")
     public ResponseEntity<?> verifySshConnect(@RequestBody @Valid UserRequest.VerifySshConnectDTO requestDTO){
         UserResponse.VerifySshConnectDTO responseDTO = userService.verifySshConnect(requestDTO);
