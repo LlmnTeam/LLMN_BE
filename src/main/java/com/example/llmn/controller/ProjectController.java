@@ -36,7 +36,7 @@ public class ProjectController {
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 
-    @GetMapping("/cloud")
+    @GetMapping("/project/cloud")
     public ResponseEntity<?> findCloudAndContainerInfo(@AuthenticationPrincipal CustomUserDetails userDetails) {
         ProjectResponse.FindCloudAndContainerInfoDTO responseDTO = projectService.findCloudAndContainerInfo(userDetails.getUser().getId());
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));

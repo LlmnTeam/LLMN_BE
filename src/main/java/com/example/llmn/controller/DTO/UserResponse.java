@@ -33,6 +33,10 @@ public class UserResponse {
             String remoteKeyPath
     ){}
 
+    public record FindCloudInfoDTO(List<CloudInfoDTO> clouds){}
+
+    public record CloudInfoDTO(String remoteName, String remoteHost){}
+
     public record VerifyEmailCodeDTO(boolean isMatching) {}
 
     public record VerifySshConnectDTO(boolean isValid) {}
