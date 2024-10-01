@@ -72,6 +72,8 @@ public class UserService {
 
     @Value("${reload.uri}")
     private String REQUEST_RELOAD_KEY_URI;
+    @Value("${validate_key.uri}")
+    private String REQUEST_VALIDATE_KEY_URI;
     private static final String REDIS_KEY_EMAIL_CODE = "code:";
     private static final String MAIL_TEMPLATE_FOR_CODE = "verification_code_email.html";
     private static final String UTF_EIGHT_ENCODING = "UTF-8";
@@ -224,6 +226,14 @@ public class UserService {
         }
 
         return path;
+    }
+
+    public UserResponse.ValidateOpenAIKeyDTO validateOpenAIKey(){
+        return webClient.post()
+                .uri(buildURI(REQUEST_VALIDATE_KEY_URI))
+                .retrieve()
+                .bodyToMono(UserResponse.ValidateOpenAIKeyDTO.class)
+                .block();
     }
 
     @Transactional(readOnly = true)

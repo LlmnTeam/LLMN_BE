@@ -38,4 +38,6 @@ public class UserResponse {
     public record VerifySshConnectDTO(boolean isValid) {}
 
     public record RequestApiKeyLoadDTO(boolean success){}
+
+    public record ValidateOpenAIKeyDTO(boolean isValid){}
 }

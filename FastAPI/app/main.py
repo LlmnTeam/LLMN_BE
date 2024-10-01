@@ -63,6 +63,9 @@ class  LogFilesRequest(BaseModel):
     question: str
     isFirstQuestion: bool  # 첫 번째 질문 여부를 나타내는 변수
 
+class ValidateAPIRequest(BaseModel):
+    apiKey: str
+
 # OpenAI API 스트리밍
 class StreamingHandler(BaseCallbackHandler):
     def __init__(self, queue) -> None:
@@ -661,11 +664,11 @@ async def process_hourly_summary(request: LogRequest):
     }
 
 @app.post("/logs/question")
-async def process_logs_and_question(log_files_request: LogFilesRequest):
-    conversation_manager = ConversationManager(log_files_request.userId)
+async def process_logs_and_question(request: LogFilesRequest):
+    conversation_manager = ConversationManager(request.userId)
 
     # 로그와 질문을 포함한 최종 질문 생성
-    final_question = combine_logs_and_question(log_files_request, conversation_manager)
+    final_question = combine_logs_and_question(request, conversation_manager)
 
     # OpnAI API 호출
     rag_service = Rag_Service()
@@ -681,7 +684,7 @@ async def process_logs_and_question(log_files_request: LogFilesRequest):
 
         # async 루프 완료(스트리밍이 종료) => 대화 히스토리에 저장
         complete_response = ''.join(response_collector)
-        conversation_manager.add_to_history(log_files_request.question, complete_response)
+        conversation_manager.add_to_history(request.question, complete_response)
 
     return StreamingResponse(stream_response(), media_type='text/event-stream')
 
@@ -691,18 +694,16 @@ async def reload_api_key():
     try:
         global settings
         settings = Settings()  
-        return {
-            "success": True
-        }
+        return {"success": True}
     
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"API key 로드 실패: {e}")
+        return {"success": False}
     
 @app.post("/validate-api-key")
-async def validate_api_key(api_key: str):
-    is_valid = await validate_openai_api_key(api_key)
+async def validate_api_key(request: ValidateAPIRequest):
+    is_valid = await validate_openai_api_key(request.apiKey)
     
     if is_valid:
         return {"isValid": True}
     else:
-        raise HTTPException(status_code=400, detail="유효하지 않은 API 키.")
+        return {"isValid": False}
