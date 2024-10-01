@@ -59,6 +59,10 @@ public class UserRequest {
             String monitoringSshHost
     ){}
 
+    public record UpdateAPiKeyDTO(
+            @NotBlank(message="API키를 입력해주세요.")
+            String apiKey){}
+
     public record VerifyCodeDTO(
             @NotBlank
             @Pattern(regexp = "^[\\w._%+-]+@[\\w.-]+\\.[a-zA-Z]{2,6}$", message = "올바른 이메일 형식을 입력해주세요.")

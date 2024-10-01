@@ -99,6 +99,12 @@ public class UserController {
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, null));
     }
 
+    @PatchMapping("/accounts/apiKey")
+    public ResponseEntity<?> updateApiKey(@RequestBody @Valid UserRequest.UpdateAPiKeyDTO requestDTO){
+        userService.updateApiKey(requestDTO.apiKey());
+        return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, null));
+    }
+
     @PostMapping("/accounts/recovery/code")
     public ResponseEntity<?> sendCodeForRecovery(@RequestBody @Valid UserRequest.EmailDTO requestDTO) {
         UserResponse.CheckAccountExistDTO responseDTO = userService.checkLocalAccountExist(requestDTO);
