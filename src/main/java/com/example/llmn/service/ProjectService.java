@@ -6,6 +6,7 @@ import com.example.llmn.core.errors.CustomException;
 import com.example.llmn.core.errors.ExceptionCode;
 import com.example.llmn.domain.*;
 import com.example.llmn.repository.ProjectRepository;
+import com.example.llmn.repository.SshInfoRepository;
 import com.example.llmn.repository.SummaryRepository;
 import com.example.llmn.repository.UserRepository;
 import jakarta.persistence.EntityManager;
@@ -30,6 +31,7 @@ public class ProjectService {
     private final LogService logService;
     private final ProjectRepository projectRepository;
     private final SummaryRepository summaryRepository;
+    private final SshInfoRepository sshInfoRepository;
     private final UserRepository userRepository;
     private final EntityManager entityManager;
     private final SSHService sshService;
@@ -70,21 +72,22 @@ public class ProjectService {
         return new ProjectResponse.CreateProjectDTO(project.getId());
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public ProjectResponse.FindCloudAndContainerInfoDTO findCloudAndContainerInfo(Long userId) {
-        List<Project> projects = projectRepository.findByUserIdWithSshInfo(userId);
-
         List<ProjectResponse.CloudInstanceDTO> cloudInstanceDTOS = new ArrayList<>();
 
-        for(Project project : projects){
-            List<String> runningContainers = dockerService.findRunningContainerList(project.getId());
+        List<SshInfo> sshInfos = sshInfoRepository.findByUserId(userId);
+        for(SshInfo sshInfo : sshInfos){
+            // 해당 클라우드 인스턴스에 실행중인 컨테이너
+            List<String> runningContainers = dockerService.findRunningContainerList(sshInfo.getId());
             List<ProjectResponse.ContainerDTO> containerDTOS = runningContainers.stream()
                     .map(ProjectResponse.ContainerDTO::new)
                     .toList();
 
-            String cloudName = getSshInfoName(project.getSshInfo());
+            // 클라우드 이름
+            String cloudName = getSshInfoName(sshInfo);
 
-            ProjectResponse.CloudInstanceDTO cloudInstanceDTO = new ProjectResponse.CloudInstanceDTO(cloudName, project.getSshInfo().getId(), containerDTOS);
+            ProjectResponse.CloudInstanceDTO cloudInstanceDTO = new ProjectResponse.CloudInstanceDTO(cloudName, sshInfo.getId(), containerDTOS);
             cloudInstanceDTOS.add(cloudInstanceDTO);
         }
 

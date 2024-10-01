@@ -93,9 +93,9 @@ public class ProjectController {
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 
-    @GetMapping("/project/{projectId}/container")
-    public ResponseEntity<?> findContainerList(@PathVariable Long projectId) {
-        List<String> runningContainerNameList = dockerService.findRunningContainerList(projectId);
+    @GetMapping("/containers")
+    public ResponseEntity<?> findContainerList(@RequestParam Long sshId) {
+        List<String> runningContainerNameList = dockerService.findRunningContainerList(sshId);
         ProjectResponse.FindContainerListDTO responseDTO = new ProjectResponse.FindContainerListDTO(runningContainerNameList);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }

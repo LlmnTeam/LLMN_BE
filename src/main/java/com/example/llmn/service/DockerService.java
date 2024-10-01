@@ -26,6 +26,7 @@ public class DockerService {
     private final SSHService sshService;
     private final RedisService redisService;
     private final ProjectRepository projectRepository;
+    private final SshInfoRepository sshInfoRepository;
     private final ObjectMapper objectMapper;
 
     private static final String RESOURCE_KEY = "resource";
@@ -71,19 +72,16 @@ public class DockerService {
     }
 
     // 실행중인 도커 컨테이너 목록 조회
-    public List<String> findRunningContainerList(Long projectId) {
-        Long sshInfoId = projectRepository.findSshInfoId(projectId)
-                .orElseThrow(() -> new CustomException(ExceptionCode.PROJECT_NOT_FOUND));
-
-        return Arrays.stream(sshService.executeCommandOnce(COMMAND_DOCKER_PS, sshInfoId).split("\n"))
+    public List<String> findRunningContainerList(Long sshId) {
+        return Arrays.stream(sshService.executeCommandOnce(COMMAND_DOCKER_PS, sshId).split("\n"))
                 .map(String::trim)
                 .filter(name -> !name.isEmpty())
-                .collect(Collectors.toList());
+                .toList();
     }
 
     // 특정 컨테이너의 실행 여부 확인
-    public boolean isContainerRunning(String containerName, Long projectId) {
-        List<String> containerList = findRunningContainerList(projectId);
+    public boolean isContainerRunning(String containerName, Long sshId) {
+        List<String> containerList = findRunningContainerList(sshId);
 
         return containerList.stream()
                 .anyMatch(name -> name.equals(containerName));
