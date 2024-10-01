@@ -91,6 +91,7 @@ public class UserService {
     private static final String ENV_FILE_RELATIVE_PATH = "FastAPI/app/.env";
     private static final String OPEN_API_KEY = "OPENAI_API_KEY";
     private static final String CODE_TO_EMAIL_KEY_PREFIX = "codeToEmail";
+    private static final String CODE_TYPE_RECOVERY = "recovery";
 
     @Transactional
     public Map<String, String> login(UserRequest.@Valid LoginDTO requestDTO, HttpServletRequest request) {
@@ -188,10 +189,13 @@ public class UserService {
         }
     }
 
-    public UserResponse.VerifyEmailCodeDTO verifyCode(UserRequest.VerifyCodeDTO requestDTO){
+    public UserResponse.VerifyEmailCodeDTO verifyCode(UserRequest.VerifyCodeDTO requestDTO, String codeType){
         // 레디스를 통해 해당 코드가 유효한지 확인
         if(!redisService.validateData(REDIS_KEY_EMAIL_CODE, requestDTO.email(), requestDTO.code()))
             return new UserResponse.VerifyEmailCodeDTO(false);
+
+        if(codeType.equals(CODE_TYPE_RECOVERY))
+            redisService.storeValue(CODE_TO_EMAIL_KEY_PREFIX, requestDTO.code(), requestDTO.email(), 5 * 60 * 1000L);
 
         return new UserResponse.VerifyEmailCodeDTO(true);
     }
@@ -398,6 +402,14 @@ public class UserService {
                 .sameSite("Lax")
                 .maxAge(JWTProvider.REFRESH_EXP_SEC)
                 .build().toString();
+    }
+
+    @Transactional(readOnly = true)
+    public UserResponse.CheckAccountExistDTO checkLocalAccountExist(UserRequest.EmailDTO requestDTO){
+        Optional<User> userOP = userRepository.findByEmail(requestDTO.email());
+        boolean isValid = userOP.isPresent();
+
+        return new UserResponse.CheckAccountExistDTO(isValid);
     }
 
     private void checkDuplicateNickname(String nickName) {

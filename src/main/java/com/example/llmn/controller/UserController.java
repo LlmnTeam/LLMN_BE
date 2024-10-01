@@ -5,6 +5,7 @@ import com.example.llmn.controller.DTO.UserResponse;
 import com.example.llmn.core.security.CustomUserDetails;
 import com.example.llmn.core.utils.ApiUtils;
 import com.example.llmn.service.UserService;
+import jakarta.mail.MessagingException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +28,7 @@ public class UserController {
 
     private final UserService userService;
     private static final String CODE_TYPE_JOIN = "join";
+    private static final String CODE_TYPE_RECOVERY = "recovery";
 
     @PostMapping("/auth/login")
     public ResponseEntity<?> login(@RequestBody @Valid UserRequest.LoginDTO requestDTO, HttpServletRequest request) {
@@ -56,8 +58,8 @@ public class UserController {
     }
 
     @PostMapping("/accounts/verify/code")
-    public ResponseEntity<?> verifyCode(@RequestBody @Valid UserRequest.VerifyCodeDTO requestDTO){
-        UserResponse.VerifyEmailCodeDTO responseDTO = userService.verifyCode(requestDTO);
+    public ResponseEntity<?> verifyCode(@RequestBody @Valid UserRequest.VerifyCodeDTO requestDTO, @RequestParam String codeType){
+        UserResponse.VerifyEmailCodeDTO responseDTO = userService.verifyCode(requestDTO, codeType);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 
@@ -89,6 +91,13 @@ public class UserController {
     public ResponseEntity<?> updateConfiguration(@RequestBody @Valid UserRequest.UpdateConfigurationDTO requestDTO, @AuthenticationPrincipal CustomUserDetails userDetails) {
         userService.updateConfiguration(requestDTO, userDetails.getUser().getId());
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, null));
+    }
+
+    @PostMapping("/accounts/recovery/code")
+    public ResponseEntity<?> sendCodeForRecovery(@RequestBody @Valid UserRequest.EmailDTO requestDTO) {
+        UserResponse.CheckAccountExistDTO responseDTO = userService.checkLocalAccountExist(requestDTO);
+        userService.sendCodeWithValidation(requestDTO.email(), CODE_TYPE_RECOVERY, responseDTO.isValid());
+        return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 
     @PostMapping("/accounts/recovery/reset")

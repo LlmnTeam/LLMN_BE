@@ -40,4 +40,6 @@ public class UserResponse {
     public record RequestApiKeyLoadDTO(boolean success){}
 
     public record ValidateOpenAIKeyDTO(boolean isValid){}
+
+    public record CheckAccountExistDTO(boolean isValid) {}
 }
