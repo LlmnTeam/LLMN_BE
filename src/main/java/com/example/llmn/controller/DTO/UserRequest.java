@@ -59,9 +59,7 @@ public class UserRequest {
             String monitoringSshHost
     ){}
 
-    public record UpdateAPiKeyDTO(
-            @NotBlank(message="API키를 입력해주세요.")
-            String apiKey){}
+    public record UpdateAPiKeyDTO(@NotBlank(message="API키를 입력해주세요.") String apiKey){}
 
     public record VerifyCodeDTO(
             @NotBlank
@@ -80,9 +78,7 @@ public class UserRequest {
 
     public record RequestValidateKeyDTO(String apiKey){}
 
-    public record ValidateOpenAIKeyDTO(
-            @NotBlank(message = "OpenAI API키를 입력해주세요.")
-            String apiKey){}
+    public record ValidateOpenAIKeyDTO(@NotBlank(message = "OpenAI API키를 입력해주세요.") String apiKey){}
 
     public record ResetPasswordDTO(
             @NotBlank(message = "코드를 입력해주세요.")
@@ -92,4 +88,6 @@ public class UserRequest {
             @Pattern(regexp = "^(?=.*[a-zA-Z])(?=.*\\d)(?=.*[@#$%^&+=!~`<>,./?;:'\"\\[\\]{}\\\\()|_-])\\S*$", message = "올바른 비밀번호 형식을 입력해주세요.")
             String newPassword
     ){}
+
+    public record UpdateMonitoringSshDTO(@NotBlank(message = "모니터링할 호스트(ip)를 입력해주세요.") String remoteHost){}
 }

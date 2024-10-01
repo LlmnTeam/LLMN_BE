@@ -328,7 +328,7 @@ public class UserService {
         User user = userRepository.findById(userId).orElseThrow(
                 () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
         );
-    
+
         List<SshInfo> sshInfos = sshInfoRepository.findByUserId(userId);
 
         SshInfo foundSshInfo = sshInfos.stream()

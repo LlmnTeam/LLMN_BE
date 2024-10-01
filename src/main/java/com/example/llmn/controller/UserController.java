@@ -93,6 +93,12 @@ public class UserController {
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 
+    @PatchMapping("/cloud")
+    public ResponseEntity<?> updateMonitoringSsh(@RequestBody @Valid UserRequest.UpdateMonitoringSshDTO requestDTO, @AuthenticationPrincipal CustomUserDetails userDetails) {
+        userService.updateMonitoringSsh(userDetails.getUser().getId(), requestDTO.remoteHost());
+        return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, null));
+    }
+
     @GetMapping("/accounts/info")
     public ResponseEntity<?> findConfigurationInfo(@AuthenticationPrincipal CustomUserDetails userDetails) {
         UserResponse.FindConfigurationInfoDTO responseDTO = userService.findConfigurationInfo(userDetails.getUser().getId());
