@@ -44,7 +44,7 @@ public class UserController {
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.CREATED, null));
     }
 
-    @PostMapping("/ssh")
+    @PostMapping("/accounts/ssh")
     public ResponseEntity<?> uploadSSHKey(@RequestParam("file") MultipartFile file) {
         Path path = userService.uploadSSHKey(file);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.CREATED, path));
