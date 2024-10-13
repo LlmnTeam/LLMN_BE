@@ -125,11 +125,6 @@ public class SSHService {
                 () -> new CustomException(ExceptionCode.SSH_NOT_FOUND)
         );
 
-        // 만약 작동 중이 아니라면 null 반환 => 사용자가 설정에서 다시 유효성 체크 해야함
-        if(!sshInfoInDB.isWorking()){
-            return null;
-        }
-
         // remoteHost, remoteName, keyPath를 하나의 문자로 합쳐서 레디스에 저장
         String combinedInfo = String.join(DELIMITER, sshInfoInDB.getRemoteHost(), sshInfoInDB.getRemoteName(), sshInfoInDB.getRemoteKeyPath());
         redisService.storeValue(REDIS_SSH_KEY, sshInfoId.toString(), combinedInfo, REDIS_SSH_KEY_EXP);

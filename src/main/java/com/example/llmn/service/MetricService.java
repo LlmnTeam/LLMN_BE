@@ -47,7 +47,7 @@ public class MetricService {
     private static final String METRIC_MAP_DAILY_NET_REC = "dailyReceived";
     private static final String METRIC_MAP_DAILY_NET_SENT ="dailySent";
     private static final String COMMAND_TOP = "top -b -n1 | grep \"Cpu(s)\\|Mem\"";
-    private static final String COMMAND_NETWORK_USAGE = "cat /proc/net/dev | grep eth0";
+    private static final String COMMAND_NETWORK_USAGE = "cat /proc/net/dev";
     private static final DateTimeFormatter formatterForHourAndMin = DateTimeFormatter.ofPattern("HH:mm"); // 시간 형식 "HH:mm"
     private static final Pattern CPU_PATTERN = Pattern.compile("%Cpu\\(s\\):\\s+([\\d.]+)\\s+us,\\s+([\\d.]+)\\s+sy,.*");
     private static final Pattern MEM_PATTERN = Pattern.compile("MiB Mem :\\s+([\\d.]+)\\s+total,\\s+([\\d.]+)\\s+free,\\s+([\\d.]+)\\s+used,.*");
@@ -98,6 +98,9 @@ public class MetricService {
         // 2. 캐시된 값이 없음 => 새로운 Metric 수집
         Map<String, Double> topMetrics = collectTopMetrics(sshInfoId);
         Map<String, Double> networkMetrics = collectNetworkMetrics(sshInfoId, NOT_UPDATE_CACHE);
+
+        System.out.println("topMetrics => " + topMetrics.toString());
+        System.out.println("networkMetrics => " + networkMetrics.toString());
 
         // 지표 조회 실패 => null 반환
         if(topMetrics.isEmpty() || networkMetrics.isEmpty()){
@@ -154,6 +157,7 @@ public class MetricService {
 
         // CPU와 메모리 사용량을 동시에 얻기 위해 top 명령어 실행
         String commandResponse = sshService.executeCommandOnce(COMMAND_TOP, sshInfoId);
+        System.out.println("commandResponse: " + commandResponse);
 
         // 명령어 응답 파싱
         String[] lines = commandResponse.split("\n");
@@ -236,23 +240,42 @@ public class MetricService {
 
     // 조회 실패 => 비어있는 맵 반환
     private Map<String, Double> collectCurrentNetworkMetrics(Long sshInfoId) {
-        // 네트워크 송/수신 기록 조회 명령어 실행
         String commandResponse = sshService.executeCommandOnce(COMMAND_NETWORK_USAGE, sshInfoId);
 
-        // eth0: 905961216 722194  0  0  0  0  0  0  21378581  162883  0  0  0  0  0  0
-        String[] parts = commandResponse.trim().split("\\s+");
-
         Map<String, Double> networkUsageMap = new HashMap<>();
-        if (parts.length >= 10) {
-            long receivedBytes = Long.parseLong(parts[1]);  // 수신된 바이트
-            long transmittedBytes = Long.parseLong(parts[9]);  // 송신된 바이트
 
-            // 바이트를 MB로 변환
-            double receivedMB = receivedBytes / (1024.0 * 1024.0);
-            double transmittedMB = transmittedBytes / (1024.0 * 1024.0);
+        // 주요 네트워크 인터페이스 패턴을 정규식으로 정의
+        Pattern pattern = Pattern.compile("^(eth|ens|enp|wlan)\\S*:");
 
-            networkUsageMap.put(METRIC_MAP_NETWORK_REC, receivedMB);
-            networkUsageMap.put(METRIC_MAP_NETWORK_SENT, transmittedMB);
+        String[] lines = commandResponse.split("\\n");
+        for (String line : lines) {
+            String trimmedLine = line.trim();
+
+            // 패턴에 매칭되는 인터페이스인지 확인
+            Matcher matcher = pattern.matcher(trimmedLine);
+            if (matcher.find()) {
+                String[] parts = trimmedLine.split("\\s+");
+                if (parts.length >= 10) {
+                    try {
+                        long receivedBytes = Long.parseLong(parts[1]);  // 수신된 바이트
+                        long transmittedBytes = Long.parseLong(parts[9]);  // 송신된 바이트
+
+                        // 바이트를 MB로 변환
+                        double receivedMB = receivedBytes / (1024.0 * 1024.0);
+                        double transmittedMB = transmittedBytes / (1024.0 * 1024.0);
+
+                        networkUsageMap.put(METRIC_MAP_NETWORK_REC, receivedMB);
+                        networkUsageMap.put(METRIC_MAP_NETWORK_SENT, transmittedMB);
+                        break;  // 최초로 찾은 유효한 인터페이스만 처리 후 종료
+                    } catch (NumberFormatException e) {
+                        log.error("네트워크 사용량 파싱 중 오류 발생: " + line + ", 오류 메시지: " + e.getMessage());
+                    }
+                }
+            }
+        }
+
+        if (networkUsageMap.isEmpty()) {
+            log.error("유효한 네트워크 인터페이스가 존재하지 않음.");
         }
 
         return networkUsageMap;

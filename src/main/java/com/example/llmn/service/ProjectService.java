@@ -244,7 +244,7 @@ public class ProjectService {
     @Transactional(readOnly = true)
     public ProjectResponse.FindProjectLogByNameDTO findProjectLogByName(Long projectId, String fileName){
         Project project = projectRepository.findById(projectId).orElseThrow(
-                () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
+                () -> new CustomException(ExceptionCode.PROJECT_NOT_FOUND)
         );
 
         String logMessage = logService.readLogFile(fileName);
@@ -261,7 +261,7 @@ public class ProjectService {
     @Transactional
     public void deleteProjectById(Long userId, Long projectId){
         Project project = projectRepository.findById(projectId).orElseThrow(
-                () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
+                () -> new CustomException(ExceptionCode.PROJECT_NOT_FOUND)
         );
 
         // 권한 체크

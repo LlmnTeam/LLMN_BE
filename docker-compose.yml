@@ -35,6 +35,8 @@ services:
     container_name: spring
     ports:
       - "8080:8080"
+    volumes:
+      - /Users/lhh/ssh_data:/ssh
     networks:
       - network
     depends_on:
