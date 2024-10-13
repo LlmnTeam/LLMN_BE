@@ -73,8 +73,13 @@ public class UserService {
 
     @Value("${reload.uri}")
     private String REQUEST_RELOAD_KEY_URI;
+
     @Value("${validate_key.uri}")
     private String REQUEST_VALIDATE_KEY_URI;
+
+    @Value("${update_env.uri}")
+    private String UPDATE_ENV_URI;
+
     private static final String REDIS_KEY_EMAIL_CODE = "code:";
     private static final String MAIL_TEMPLATE_FOR_CODE = "verification_code_email.html";
     private static final String UTF_EIGHT_ENCODING = "UTF-8";
@@ -623,29 +628,18 @@ public class UserService {
 
     private void updateFastAPIEnvFile(String key, String value) {
         try {
-            // 상대 경로로 파일에 접근
-            Path path = Paths.get(ENV_FILE_RELATIVE_PATH).toAbsolutePath();
-            List<String> lines = Files.readAllLines(path);
-            boolean keyExists = false;
+            UserResponse.EnvUpdateDTO responseDTO = webClient.post()
+                    .uri(buildURI(UPDATE_ENV_URI))
+                    .bodyValue(new UserRequest.EnvUpdateDTO(key, value))
+                    .retrieve()
+                    .bodyToMono(UserResponse.EnvUpdateDTO.class)
+                    .block();
 
-            // key가 이미 존재하는지 확인
-            for (int i = 0; i < lines.size(); i++) {
-                String line = lines.get(i);
-                if (line.startsWith(key + "=")) {
-                    lines.set(i, key + "=" + value);  // 기존 값 업데이트
-                    keyExists = true;
-                    break;
-                }
+            if (responseDTO == null || !responseDTO.success()) {
+                throw new CustomException(ExceptionCode.LOG_CONVERT_TO_FILE_FAIL);
             }
 
-            // key가 없으면 새로 추가
-            if (!keyExists) {
-                lines.add(key + "=" + value);
-            }
-
-            // 변경된 내용을 파일에 다시 씀
-            Files.write(path, lines, StandardOpenOption.TRUNCATE_EXISTING);
-        } catch (IOException e){
+        } catch (Exception e){
             log.info("API 키 업데이트 실패");
             throw new CustomException(ExceptionCode.LOG_CONVERT_TO_FILE_FAIL);
         }

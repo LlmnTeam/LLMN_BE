@@ -36,6 +36,7 @@ public class UserRequest {
             boolean receivingAlarm,
             @NotBlank(message = "모니터링할 클라우드 인스턴스를 선택해야 합니다.")
             String monitoringSshHost,
+            @NotBlank(message = "OpenAI API키를 입력해야 합니다.")
             String openAiKey) {}
 
     public record SshInfoDTO(
@@ -90,4 +91,6 @@ public class UserRequest {
     ){}
 
     public record UpdateMonitoringSshDTO(@NotBlank(message = "모니터링할 호스트(ip)를 입력해주세요.") String remoteHost){}
+
+    public record EnvUpdateDTO(String key, String value){}
 }

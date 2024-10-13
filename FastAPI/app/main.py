@@ -15,12 +15,16 @@ from queue import Queue
 from threading import Thread
 import asyncio
 from langchain.schema import LLMResult
+from dotenv import set_key, load_dotenv
 
 app = FastAPI()
 
 # logs 디렉토리 경로
 current_dir = os.path.dirname(os.path.abspath(__file__))
 logs_dir = os.path.join(current_dir, "..", "..", "logs")
+
+# 현재 디렉토리의 .env 파일 경로
+env_file_path = os.path.join(os.path.dirname(__file__), ".env")
 
 # CORS 설정
 app.add_middleware(
@@ -65,6 +69,10 @@ class  LogFilesRequest(BaseModel):
 
 class ValidateAPIRequest(BaseModel):
     apiKey: str
+
+class EnvUpdateRequest(BaseModel):
+    key: str
+    value: str
 
 # OpenAI API 스트리밍
 class StreamingHandler(BaseCallbackHandler):
@@ -708,3 +716,23 @@ async def validate_api_key(request: ValidateAPIRequest):
         return {"isValid": True}
     else:
         return {"isValid": False}
+        
+@app.post("/update-env")
+async def update_env(request: EnvUpdateRequest):
+    key, value = request.key, request.value
+
+    try:
+        # .env 파일 로드
+        load_dotenv(env_file_path)
+        
+        # .env 파일에 key-value 쌍 저장
+        set_key(env_file_path, key, f'"{value}"')
+
+        # 환경 설정을 다시 로드하여 업데이트 적용
+        global settings
+        settings = Settings()  # 이 줄을 통해 새로 업데이트된 .env 파일을 반영
+
+        return {"success": True}
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f".env 파일 업데이트 실패: {str(e)}")

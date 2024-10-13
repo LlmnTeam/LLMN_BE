@@ -68,6 +68,10 @@ public class LogService {
     public void processAndUpdateLogs() {
         // 1. Elasticsearch에서 로그 데이터를 검색
         SearchResponse<Map> searchResponse = searchFromElasticSearch();
+        if (searchResponse == null) {
+            log.warn("Elasticsearch 응답이 null입니다. 검색에 실패했습니다.");
+            return;  // 검색 실패 시 프로세스를 종료
+        }
 
         // 2. 검색 결과를 맵으로 변환
         List<Map<String, Object>> logMaps = convertResponseToMap(searchResponse);
@@ -303,7 +307,7 @@ public class LogService {
             return new SearchResponse.Builder<Map>().build();
         } catch (IOException e){
             log.info("<ElasticSearch> "+indexName + "에 대한 검색 실패");
-            return new SearchResponse.Builder<Map>().build();
+            return null;
         }
     }
 
