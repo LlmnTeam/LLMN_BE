@@ -32,7 +32,7 @@ public class SSHCommandExecutor {
     private final Jedis jedis;
 
     private static final int REDIS_PORT = 6379;
-    private static final String REDIS_HOST = "localhost";
+    private static final String REDIS_HOST = "redis";
     private static final int REDIS_TIMEOUT = 60000; // 1분
     private static final String REDIS_CHANNEL = "ssh-command-output"; // 고정된 Redis 채널 이름
     private static final String PROMPT_UBUNTU = "ubuntu@";
