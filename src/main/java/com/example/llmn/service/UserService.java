@@ -197,7 +197,7 @@ public class UserService {
 
     public UserResponse.VerifyEmailCodeDTO verifyCode(UserRequest.VerifyCodeDTO requestDTO, String codeType){
         // 레디스를 통해 해당 코드가 유효한지 확인
-        if(!redisService.validateData(REDIS_KEY_EMAIL_CODE, requestDTO.email(), requestDTO.code()))
+        if(!redisService.validateData(REDIS_KEY_EMAIL_CODE + codeType, requestDTO.email(), requestDTO.code()))
             return new UserResponse.VerifyEmailCodeDTO(false);
 
         if(codeType.equals(CODE_TYPE_RECOVERY))
@@ -267,7 +267,7 @@ public class UserService {
         user.updatePassword(passwordEncoder.encode(requestDTO.newPassword()));
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public UserResponse.FindDashboardDTO findDashboard(Long userId) {
         Long sshInfoId = userRepository.findMonitoringSshId(userId).orElseThrow(
                 () -> new CustomException(ExceptionCode.USER_NOT_FOUND)

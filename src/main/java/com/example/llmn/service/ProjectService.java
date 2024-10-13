@@ -227,7 +227,7 @@ public class ProjectService {
     public ProjectResponse.FindProjectLogListDTO findProjectLogList(Long projectId){
         // projectId를 사용하여 containerName을 가져옴
         String containerName = projectRepository.findContainerNameById(projectId).orElseThrow(
-                () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
+                () -> new CustomException(ExceptionCode.PROJECT_NOT_FOUND)
         );
 
         // 로그 파일 목록을 가져옴
