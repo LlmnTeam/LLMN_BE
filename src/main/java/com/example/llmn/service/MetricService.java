@@ -99,9 +99,6 @@ public class MetricService {
         Map<String, Double> topMetrics = collectTopMetrics(sshInfoId);
         Map<String, Double> networkMetrics = collectNetworkMetrics(sshInfoId, NOT_UPDATE_CACHE);
 
-        System.out.println("topMetrics => " + topMetrics.toString());
-        System.out.println("networkMetrics => " + networkMetrics.toString());
-
         // 지표 조회 실패 => null 반환
         if(topMetrics.isEmpty() || networkMetrics.isEmpty()){
             return null;
@@ -157,7 +154,6 @@ public class MetricService {
 
         // CPU와 메모리 사용량을 동시에 얻기 위해 top 명령어 실행
         String commandResponse = sshService.executeCommandOnce(COMMAND_TOP, sshInfoId);
-        System.out.println("commandResponse: " + commandResponse);
 
         // 명령어 응답 파싱
         String[] lines = commandResponse.split("\n");

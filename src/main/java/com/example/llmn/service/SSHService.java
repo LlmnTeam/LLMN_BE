@@ -35,7 +35,6 @@ public class SSHService {
         SSHCommandExecutor executor = getSshExecutor(sshInfoId);
 
         if(executor == null){
-            sshInfoRepository.updateIsWorking(sshInfoId, false);
             return EXECUTE_FAIL_BY_SESSION;
         }
 
@@ -47,7 +46,6 @@ public class SSHService {
         SSHCommandExecutor executor = getSshExecutor(sshInfoId);
 
         if(executor == null){
-            sshInfoRepository.updateIsWorking(sshInfoId, false);
             return BLANK_STRING;
         }
 

@@ -36,7 +36,8 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - /Users/lhh/ssh_data:/ssh
+      - ssh_data:/sshd
+      - log_data:/logs
     networks:
       - network
     depends_on:
@@ -54,3 +55,7 @@ services:
       - network
     depends_on:
       - spring
+
+volumes:
+  ssh_data:
+  log_data:
