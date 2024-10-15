@@ -69,6 +69,10 @@ public class UserRequest {
             @NotBlank(message = "코드를 입력해주세요.")
             String code){}
 
+    public record CheckNickDTO(
+            @NotBlank(message = "닉네임을 입력해주세요.")
+            String nickName){}
+
     public record VerifySshConnectDTO(
             @NotBlank(message = "클라우드 인스턴스의 유저명을 입력해주세요.")
             String remoteName,

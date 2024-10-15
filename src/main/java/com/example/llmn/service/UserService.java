@@ -182,6 +182,12 @@ public class UserService {
         return new UserResponse.CheckEmailExistDTO(isValid);
     }
 
+    @Transactional
+    public UserResponse.CheckNickNameDTO checkNickName(UserRequest.CheckNickDTO requestDTO){
+        boolean isDuplicate = userRepository.existsByNickname(requestDTO.nickName());
+        return new UserResponse.CheckNickNameDTO(isDuplicate);
+    }
+
     @Async
     public void sendCodeWithValidation(String email, String codeType, boolean isValid) {
         // TTL 체크
