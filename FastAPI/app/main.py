@@ -260,27 +260,27 @@ async def generate_log_summary(content: str):
     prompt = (
         "### Persona ###\n"
         "You are an expert system log analyst. Your task is to summarize and detect anomalies in the following system logs.\n"
-        "Make sure to be concise but provide enough detail for an administrator to understand key events and anomalies.\n"
-        "If there are fewer than three events or anomalies, only provide the relevant information. Do not force the list to reach three items.\n"
+        "Provide key insights for administrators to understand critical events and anomalies quickly. Focus only on essential information for problem-solving.\n"
         "\n"
         "### Writing Guidelines ###\n"
-        "Your responses should be in Korean and follow a structured format.\n"
-        "Use icons or emojis to enhance readability and highlight key sections.\n"
+        "Your responses should be in Korean.\n"
+        "Use icons or emojis (e.g., 📊 for summaries, 🚨 for anomalies, and 💡 for recommended actions) to visually separate each section and emphasize key information. Place icons before text to maintain consistency and help readers quickly identify key points.\n"
+        "If there are fewer than three key events or anomalies, only summarize the detected items. Avoid filling empty slots unnecessarily.\n"
+        "Include 'None' if there are no events or anomalies to report.\n"
         "Ensure that your response strictly adheres to the following format, and keep each section separate with two line breaks (`\\n\\n`).\n"
         "\n"
         "### Input Data ###\n"
         f"{content}\n"
         "\n"
-        "### General Summary ###\n"
-        "1. Summarize the key events from the log data.\n"
-        "2. The summary should include the main [ERROR], [WARN], and [INFO] events.\n"
-        "3. Format the response in the following structure.\n"
+        "### Response Structure ###\n"
+        "Your response should follow this exact structure and contain three separate sections, each divided by two line breaks:\n"
         "\n"
+        "### General Summary ###\n"
         "[📊 일반적인 요약]\n"
         "- 주요 이벤트\n"
-        "   1. [First major event]\n"
-        "   2. [Second major event]\n"
-        "   3. [Third major event]\n"
+        "   1. [Event 1]\n"
+        "   2. [Event 2]\n"
+        "   3. [Event 3]\n"
         "   ...(continue numbering as needed)\n"
         "- 발생 빈도:\n"
         "   - ❗ERROR: [number of ERRORs]\n"
@@ -288,30 +288,21 @@ async def generate_log_summary(content: str):
         "   - ℹ️ INFO: [number of INFOs]\n"
         "\n"
         "### Anomaly Detection ###\n"
-        "1. Identify any abnormal patterns, such as repetitive errors or unusual occurrences.\n"
-        "2. Format the response in the following structure with icons or emojis to improve readability:\n"
-        "\n"
         "[🚨 이상 탐지 요약]\n"
         "- 탐지된 비정상 패턴\n"
-        "   1. [First detected anomaly]\n"
-        "   2. [Second detected anomaly]\n"
-        "   3. [Third detected anomaly]\n"
+        "   1. [Anomaly 1]\n"
+        "   2. [Anomaly 2]\n"
+        "   3. [Anomaly 3]\n"
         "   ...(continue numbering as needed)\n"
         "- 권장 조치\n"
-        "   1. [💡 First recommended action]\n"
-        "   2. [💡 Second recommended action]\n"
-        "   3. [💡 Third recommended action]\n"
+        "   1. [💡 Action 1]\n"
+        "   2. [💡 Action 2]\n"
+        "   3. [💡 Action 3]\n"
         "   ...(continue numbering as needed)\n"
         "\n"
         "### Urgency Check ###\n"
-        "1. Based on the logs, determine whether immediate action is **critically** required for system performance issues that may cause severe downtime, loss of service, or significant operational disruptions.\n"
-        "2. Respond with `true` only if the system is at immediate risk of crashing or facing critical failure, otherwise respond with `false`.\n"
-        "\n"
-        "### Fixed Format ###\n"
-        "Ensure that the response follows this exact structure:\n"
-        "1. [General Summary Section]\n"
-        "2. [Anomaly Detection Section]\n"
-        "3. [Urgency Check: true/false]\n"
+        "Determine if immediate action is needed due to critical system risks like severe downtime or operational disruptions.\n"
+        "Respond on a separate line with `true` for immediate risk of failure, or `false` otherwise.\n"
     )
 
     chatmodel = ChatOpenAI(
@@ -324,9 +315,9 @@ async def generate_log_summary(content: str):
     prompt_template = PromptTemplate(input_variables=["prompt"], template="{prompt}")
     formatted_prompt = prompt_template.format(prompt=prompt)
 
-    # Chat 모델 호출하여 응답 받기
+    # OpenAI API 호출
     response = chatmodel.invoke(formatted_prompt)
-    response_text = response.content  # response content에서 텍스트 추출
+    response_text = response.content  
 
     # 요약과 이상 탐지 요약을 분리
     response_lines = response_text.strip().split('\n\n')
@@ -335,7 +326,7 @@ async def generate_log_summary(content: str):
 
     # 긴급 체크 부분 파싱
     is_urgent_line = response_lines[2].strip() if len(response_lines) > 2 else "false"
-    is_urgent = is_urgent_line.lower() == "true"  # 문자열을 boolean으로 변환
+    is_urgent = "true" in is_urgent_line.lower()
 
     return general_summary, anomaly_summary, is_urgent
 
