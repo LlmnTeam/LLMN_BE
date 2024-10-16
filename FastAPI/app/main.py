@@ -16,6 +16,7 @@ from threading import Thread
 import asyncio
 from langchain.schema import LLMResult
 from dotenv import set_key, load_dotenv
+import tiktoken
 
 app = FastAPI()
 
@@ -49,6 +50,9 @@ r = redis.Redis(host='redis', port=6379, db=0, decode_responses=True)
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Tiktoken 설정 
+encoding = tiktoken.get_encoding("gpt-4o-mini")
 
 # DTO
 class LogRequest(BaseModel):
@@ -137,17 +141,16 @@ class ConversationManager:
         self.user_id = user_id
         self.key = f"conversation:{self.user_id}"
         self.summary_key = f"summary:{self.user_id}"
-        self.max_conversation_length = 400  # 대화 요약을 수행할 기준 길이
-        self.keep_recent_messages = 50  # 요약 후 유지할 최근 대화 수
+        self.max_token_length = 70000  # 최대 토큰 수
+        self.keep_recent_messages = 15  # 요약 후 유지할 최근 대화 수
 
     # 대화 히스토리에 사용자 입력과 시스템 응답을 추가
     def add_to_history(self, user_input: str, system_response: str):
         r.rpush(self.key, f"User: {user_input}", f"System: {system_response}")
         r.expire(self.key, 1800)  
 
-        # 대화 길이 체크 및 요약 수행
-        total_length = r.llen(self.key)
-        if total_length > self.max_conversation_length * 2:  # 사용자와 시스템 메시지 각각 포함
+        # 대화 토큰 수 체크
+        if self.calculate_total_tokens() > self.max_token_length:
             self.summarize_conversation()
 
     # 최근 n개의 대화 히스토리(질문/응답) 가져오기
@@ -157,24 +160,37 @@ class ConversationManager:
     # 대화 히스토리 포맷팅 
     def format_conversation(self):
         conversation = []
+
         # 요약이 존재하면 추가
         summary = r.get(self.summary_key)
         if summary:
-            conversation.append("이전 대화 요약:\n" + summary)
+            conversation.append("Previous Conversation Summary:\n" + summary)
 
         # 최근 대화 메시지 추가
         recent_messages = self.get_recent_conversation()
         conversation.extend(recent_messages)
         return "\n".join(conversation)
     
+    @staticmethod
+    def count_tokens(text: str) -> int:
+        return len(encoding.encode(text))
+
+    def calculate_total_tokens(self):
+        total_tokens = 0
+        messages = r.lrange(self.key, 0, -1)
+
+        for message in messages:
+            total_tokens += ConversationManager.count_tokens(message)
+        return total_tokens
+    
     # 대화 요약 생성
     def summarize_conversation(self):
-        # 요약 대상 메시지 계산
         total_length = r.llen(self.key)
         num_messages_to_summarize = total_length - self.keep_recent_messages * 2  # 사용자와 시스템 메시지 각각 포함
 
         if num_messages_to_summarize <= 0:
-            return  # 요약할 메시지가 없으면 종료
+            logger.info("요약할 메시지가 없습니다. 요약 수행이 생략됩니다.")
+            return  
 
         # 요약 대상 메시지 가져오기
         messages_to_summarize = r.lrange(self.key, 0, num_messages_to_summarize - 1)
@@ -182,9 +198,9 @@ class ConversationManager:
 
         # 요약 생성 프롬프트 구성
         summarization_prompt = (
-            "다음 대화 내용을 요약해 주세요. 핵심 내용과 중요한 사항을 포함하여 간결하게 요약해 주세요.\n\n"
+            "Please summarize the following conversation. Focus on key points, issues, and resolutions.\n\n"
             f"{conversation_text}\n"
-            "요약:"
+            "Summary:"
         )
 
         # LLM을 사용하여 요약 생성
@@ -201,6 +217,7 @@ class ConversationManager:
 
             # 요약 결과 Redis에 저장
             r.set(self.summary_key, summary_text)
+            logger.info(f"대화 요약 성공: {num_messages_to_summarize}개의 메시지 요약됨.")
 
             # 요약된 메시지 히스토리에서 제거
             r.ltrim(self.key, num_messages_to_summarize, -1)
@@ -660,7 +677,6 @@ def combine_logs_and_question(log_files_request: LogFilesRequest, conversation_m
             "Your responses should be in Korean.\n"
         )
 
-        # 로그 파일 내용도 첫 번째 질문에만 포함
         prompt += f"\n### Log Files ###\n{''.join(log_message_builder)}\n"
 
     # 대화 히스토리 및 질문 추가
