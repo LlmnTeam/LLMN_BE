@@ -52,7 +52,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Tiktoken 설정 
-encoding = tiktoken.get_encoding("gpt-4o-mini")
+encoding = tiktoken.get_encoding('cl100k_base')
 
 # DTO
 class LogRequest(BaseModel):
