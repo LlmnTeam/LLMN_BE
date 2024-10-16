@@ -1,4 +1,3 @@
-version: '3.8'
 networks:
   network:
     driver: bridge
@@ -52,7 +51,7 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - /var/lib/llmn_logs:/logs
+      - /var/lib/llmn_logs:/project/logs
     networks:
       - network
     depends_on:

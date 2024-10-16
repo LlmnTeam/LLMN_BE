@@ -26,7 +26,6 @@ public class DockerService {
     private final SSHService sshService;
     private final RedisService redisService;
     private final ProjectRepository projectRepository;
-    private final SshInfoRepository sshInfoRepository;
     private final ObjectMapper objectMapper;
 
     private static final String RESOURCE_KEY = "resource";

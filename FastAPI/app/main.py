@@ -20,7 +20,7 @@ from dotenv import set_key, load_dotenv
 app = FastAPI()
 
 # logs 디렉토리 경로
-logs_dir = os.getenv("LOGS_DIR", "/logs")
+logs_dir = os.getenv("LOGS_DIR", "/project/logs")
 
 # 현재 디렉토리의 .env 파일 경로
 env_file_path = os.path.join(os.path.dirname(__file__), ".env")
@@ -136,20 +136,76 @@ class ConversationManager:
     def __init__(self, user_id: str):
         self.user_id = user_id
         self.key = f"conversation:{self.user_id}"
+        self.summary_key = f"summary:{self.user_id}"
+        self.max_conversation_length = 400  # 대화 요약을 수행할 기준 길이
+        self.keep_recent_messages = 50  # 요약 후 유지할 최근 대화 수
 
     # 대화 히스토리에 사용자 입력과 시스템 응답을 추가
     def add_to_history(self, user_input: str, system_response: str):
         r.rpush(self.key, f"User: {user_input}", f"System: {system_response}")
-        r.expire(self.key, 1800)  # TTL은 30분
+        r.expire(self.key, 1800)  
+
+        # 대화 길이 체크 및 요약 수행
+        total_length = r.llen(self.key)
+        if total_length > self.max_conversation_length * 2:  # 사용자와 시스템 메시지 각각 포함
+            self.summarize_conversation()
 
     # 최근 n개의 대화 히스토리(질문/응답) 가져오기
-    def get_recent_conversation(self, n=5):
-        return r.lrange(self.key, -n*2, -1)  
+    def get_recent_conversation(self):
+        return r.lrange(self.key, 0, -1)
 
     # 대화 히스토리 포맷팅 
-    def format_conversation(self, n=5):
-        conversation = self.get_recent_conversation(n)
-        return "\n".join(conversation)  
+    def format_conversation(self):
+        conversation = []
+        # 요약이 존재하면 추가
+        summary = r.get(self.summary_key)
+        if summary:
+            conversation.append("이전 대화 요약:\n" + summary)
+
+        # 최근 대화 메시지 추가
+        recent_messages = self.get_recent_conversation()
+        conversation.extend(recent_messages)
+        return "\n".join(conversation)
+    
+    # 대화 요약 생성
+    def summarize_conversation(self):
+        # 요약 대상 메시지 계산
+        total_length = r.llen(self.key)
+        num_messages_to_summarize = total_length - self.keep_recent_messages * 2  # 사용자와 시스템 메시지 각각 포함
+
+        if num_messages_to_summarize <= 0:
+            return  # 요약할 메시지가 없으면 종료
+
+        # 요약 대상 메시지 가져오기
+        messages_to_summarize = r.lrange(self.key, 0, num_messages_to_summarize - 1)
+        conversation_text = "\n".join(messages_to_summarize)
+
+        # 요약 생성 프롬프트 구성
+        summarization_prompt = (
+            "다음 대화 내용을 요약해 주세요. 핵심 내용과 중요한 사항을 포함하여 간결하게 요약해 주세요.\n\n"
+            f"{conversation_text}\n"
+            "요약:"
+        )
+
+        # LLM을 사용하여 요약 생성
+        summarizer = ChatOpenAI(
+            model="gpt-4o-mini",
+            temperature=0.3,
+            max_tokens=750,
+            openai_api_key=settings.OPENAI_API_KEY
+        )
+
+        try:
+            summary_response = summarizer.invoke(summarization_prompt)
+            summary_text = summary_response.strip()
+
+            # 요약 결과 Redis에 저장
+            r.set(self.summary_key, summary_text)
+
+            # 요약된 메시지 히스토리에서 제거
+            r.ltrim(self.key, num_messages_to_summarize, -1)
+        except Exception as e:
+            logger.error(f"요약 중 오류 발생: {str(e)}")
 
 ######################################################################################################
 
@@ -610,7 +666,7 @@ def combine_logs_and_question(log_files_request: LogFilesRequest, conversation_m
     # 대화 히스토리 및 질문 추가
     prompt += (
         "\n### Conversation History ###\n"
-        f"{conversation_manager.format_conversation()}\n"  # 이전 대화 히스토리 추가
+        f"{conversation_manager.format_conversation()}\n"  
         "\n"
         "### User Question ###\n"
         f"{log_files_request.question}\n"
