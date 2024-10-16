@@ -44,7 +44,7 @@ class Settings(BaseSettings):
 settings = Settings()
 
 # 레디스 설정
-r = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
+r = redis.Redis(host='redis', port=6379, db=0, decode_responses=True)
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
@@ -695,17 +695,6 @@ async def process_logs_and_question(request: LogFilesRequest):
         conversation_manager.add_to_history(request.question, complete_response)
 
     return StreamingResponse(stream_response(), media_type='text/event-stream')
-
-# .env 파일을 다시 로드하여 새 API 키 적용
-@app.post("/reload-api-key")
-async def reload_api_key():
-    try:
-        global settings
-        settings = Settings()  
-        return {"success": True}
-    
-    except Exception as e:
-        return {"success": False}
     
 @app.post("/validate-api-key")
 async def validate_api_key(request: ValidateAPIRequest):
@@ -729,7 +718,7 @@ async def update_env(request: EnvUpdateRequest):
 
         # 환경 설정을 다시 로드하여 업데이트 적용
         global settings
-        settings = Settings()  # 이 줄을 통해 새로 업데이트된 .env 파일을 반영
+        settings = Settings()  
 
         return {"success": True}
     

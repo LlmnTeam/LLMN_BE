@@ -173,7 +173,6 @@ public class UserService {
 
         // OpenAI API 키 저장
         updateFastAPIEnvFile(OPEN_API_KEY, requestDTO.openAiKey());
-        requestApiKeyLoad();
     }
 
     @Transactional(readOnly = true)
@@ -416,7 +415,6 @@ public class UserService {
 
     public void updateApiKey(String apiKey){
         updateFastAPIEnvFile(OPEN_API_KEY, apiKey);
-        requestApiKeyLoad();
     }
 
     private Map<String, String> createToken(User user){
@@ -648,18 +646,6 @@ public class UserService {
         } catch (Exception e){
             log.info("API 키 업데이트 실패");
             throw new CustomException(ExceptionCode.LOG_CONVERT_TO_FILE_FAIL);
-        }
-    }
-
-    private void requestApiKeyLoad(){
-        UserResponse.RequestApiKeyLoadDTO responseDTO = webClient.post()
-                .uri(buildURI(REQUEST_RELOAD_KEY_URI))
-                .retrieve()
-                .bodyToMono(UserResponse.RequestApiKeyLoadDTO.class)
-                .block();
-
-        if(!Objects.requireNonNull(responseDTO).success()){
-            log.info("FastAPI에 API키가 정상 로드 되지 않음");
         }
     }
 

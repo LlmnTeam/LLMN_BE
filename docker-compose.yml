@@ -36,8 +36,8 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - ssh_data:/sshd
-      - log_data:/logs
+      - /var/lib/ssh_data:/sshd
+      - /var/lib/llmn_logs:/logs
     networks:
       - network
     depends_on:
@@ -52,12 +52,8 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - log_data:/logs
+      - /var/lib/llmn_logs:/logs
     networks:
       - network
     depends_on:
       - spring
-
-volumes:
-  ssh_data:
-  log_data:
