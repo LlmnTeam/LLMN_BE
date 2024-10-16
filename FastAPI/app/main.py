@@ -567,28 +567,33 @@ async def generate_recommend(content: str):
     prompt = (
         "### Persona ###\n"
         "You are an expert system performance analyst. Your task is to provide concise, actionable recommendations based on application logs and performance data from the past 6 hours.\n"
-        "Your responses should be in Korean and focus on key performance issues and suggestions for immediate action.\n"
-        "Use short, clear recommendations that directly address the most urgent and critical system problems.\n"
-        "The format should be simple and easy to understand. Each recommendation should begin with a dash (-).\n"
+        "Focus on key performance issues and suggest immediate actions.\n"
         "### Writing Guidelines ###\n"
-        "Your responses should be in Korean and follow a structured format.\n"
+        "Your responses should be in Korean.\n"
+        "Use icons to clearly organize recommendations and emphasize the type of action (e.g., 🔧 for maintenance actions, 🚀 for optimization actions, ⚠️ for urgent actions).\n"
+        "Provide a list of brief, clear recommendations, starting each item with a dash (-). Include multiple items under each type if needed, and avoid empty slots.\n"
+        "List only the most critical actions needed and avoid unnecessary details.\n"
         "\n"
         "### Input Data ###\n"
         f"{content}\n"
         "\n"
         "### Recommendations ###\n"
-        "Format the response as a list of brief recommendations based on the input data:\n"
+        "Format the response as a list of brief, clear recommendations based on the input data:\n"
         "\n"
-        "- [First recommendation]\n"
-        "- [Second recommendation]\n"
-        "- [Third recommendation]\n"
-        "   ...(continue numbering as needed)\n"
+        "- ⚠️ [Immediate action for critical issue 1]\n"
+        "- ⚠️ [Immediate action for critical issue 2]\n"
+        "- 🔧 [Maintenance action recommendation 1]\n"
+        "- 🔧 [Maintenance action recommendation 2]\n"
+        "- 🚀 [Optimization action recommendation 1]\n"
+        "- 🚀 [Optimization action recommendation 2]\n"
+        "   ...(continue listing as needed for each type)\n"
+        "\n"
     )
 
     chatmodel = ChatOpenAI(
         model="gpt-4o-mini",
         temperature=0.3,
-        max_tokens=1200,
+        max_tokens=750,
         openai_api_key=settings.OPENAI_API_KEY
     )
     
@@ -603,29 +608,31 @@ async def generate_recommend(content: str):
 async def generate_hourly_summary(content: str):    
     prompt = (
         "### Persona ###\n"
-        "You are an expert system log and performance analyst. Your task is to analyze the following logs and provide concise, one-line summaries highlighting critical issues or performance problems.\n"
-        "Only include the most important information that requires immediate attention. Ignore minor issues or events that do not significantly impact system performance.\n"
-        "Your responses should be in Korean"
-        "The summaries should focus on important errors, performance issues, or warnings that require immediate attention. Each summary should include the time of the event, the criticality level, a brief description of the problem, and a recommended action if necessary.\n"
-        "Each summary should be formatted as follows:\n"
-        "[Criticality] [Event Time]: [Issue Description]. [Recommended Action]\n"
-        "Use appropriate emojis for criticality: ❗ for Critical, ⚠️ for Warning, ℹ️ for Info.\n"
-        "Ensure that the summaries are short, actionable, and easy to understand.\n"
+        "You are an expert system log and performance analyst. Analyze the logs and provide concise, one-line summaries focusing on critical issues or performance problems from the past hour.\n"
+        "Only include urgent information that requires immediate attention. Ignore minor issues that do not significantly impact system performance.\n"
+        "### Writing Guidelines ###\n"
+        "Your responses should be in Korean.\n"
+        "Focus on critical errors, performance issues, or warnings that require immediate action. Each summary should include the event time, criticality level, a brief issue description, and a recommended action (if needed).\n"
+        "Use the following icons to indicate priority: ❗ for Critical, ⚠️ for Warning, ℹ️ for Info. Structure each summary as:\n"
+        "   - [Criticality] [Event Time]: [Issue Description]. [Recommended Action]\n"
         "\n"
         "### Log and Performance Data ###\n"
         f"{content}\n"
         "\n"
         "### One-Line Summaries ###\n"
-        "1. [First summary]\n"
-        "2. [Second summary]\n"
-        "3. [Third summary]\n"
-        "..."
+        "Summarize the following logs, listing only critical items:\n"
+        "\n"
+        "1. ❗ [Event Time]: [Critical Issue Description]. [Immediate Action]\n"
+        "2. ⚠️ [Event Time]: [Warning Description]. [Suggested Action]\n"
+        "3. ℹ️ [Event Time]: [Informational Description]. [Recommended Action]\n"
+        "   ...(continue as needed for all high-priority issues)\n"
+        "\n"
     )
 
     chatmodel = ChatOpenAI(
         model="gpt-4o-mini",
         temperature=0.3,
-        max_tokens=1200,
+        max_tokens=750,
         openai_api_key=settings.OPENAI_API_KEY
     )
     
