@@ -223,6 +223,10 @@ class ConversationManager:
             r.ltrim(self.key, num_messages_to_summarize, -1)
         except Exception as e:
             logger.error(f"요약 중 오류 발생: {str(e)}")
+    
+    def clear_conversation(self):
+        r.delete(self.key)
+        r.delete(self.summary_key)
 
 ######################################################################################################
 
@@ -658,6 +662,10 @@ def read_log_file(file_path: str):
 
 def combine_logs_and_question(log_files_request: LogFilesRequest, conversation_manager: ConversationManager) -> str:
     log_message_builder = []
+
+    # 첫 번째 질문일 경우 대화 히스토리와 요약 삭제
+    if log_files_request.isFirstQuestion:
+        conversation_manager.clear_conversation()
 
     # 첫 번째 질문일 경우에만 로그 파일의 내용을 추가
     if log_files_request.isFirstQuestion:
