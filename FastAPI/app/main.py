@@ -20,8 +20,7 @@ from dotenv import set_key, load_dotenv
 app = FastAPI()
 
 # logs 디렉토리 경로
-current_dir = os.path.dirname(os.path.abspath(__file__))
-logs_dir = os.path.join(current_dir, "..", "..", "logs")
+logs_dir = os.getenv("LOGS_DIR", "/logs")
 
 # 현재 디렉토리의 .env 파일 경로
 env_file_path = os.path.join(os.path.dirname(__file__), ".env")
