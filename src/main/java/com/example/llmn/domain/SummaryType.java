@@ -7,8 +7,7 @@ import lombok.Getter;
 @Getter
 public enum SummaryType {
 
-    GENERAL("일반요약"),
-    ANOMALY("비정상"),
+    LOG("로그"),
     PERFORMANCE("성능"),
     HOURLY("시간별"),
     DAILY("일일"),

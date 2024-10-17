@@ -269,15 +269,14 @@ async def generate_log_summary(content: str):
         "Include 'None' if there are no events or anomalies to report.\n"
         "Ensure that all numerical values (e.g., total occurrences) are calculated precisely based on the input data provided. Do not assume or estimate values; use the actual data for calculations.\n"
         "Ensure all results and conclusions are directly based on the provided data patterns and metrics."
-        "Ensure that your response strictly adheres to the following format, and keep each section separate with two line breaks (`\\n\\n`).\n"
         "\n"
         "### Input Data ###\n"
         f"{content}\n"
         "\n"
         "### Response Structure ###\n"
-        "Your response should follow this exact structure and contain three separate sections, each divided by two line breaks:\n"
+        "Format the response in the following structure:\n"
         "\n"
-        "### General Summary ###\n"
+        "### Log Summary ###\n"
         "📊 [일반적인 요약]\n"
         "- 주요 이벤트\n"
         "   1. [Event 1]\n"
@@ -289,7 +288,6 @@ async def generate_log_summary(content: str):
         "   - ⚠️ WARN: [number of WARNs]\n"
         "   - ℹ️ INFO: [number of INFOs]\n"
         "\n"
-        "### Anomaly Detection ###\n"
         "🚨 [이상 탐지 요약]\n"
         "- 탐지된 비정상 패턴\n"
         "   1. [Abnormal Pattern 1]: [Impact]\n"
@@ -302,9 +300,9 @@ async def generate_log_summary(content: str):
         "   3. [Actionable Recommendation 3]\n"
         "   ...(continue numbering as needed)\n"
         "\n"
-        "### Urgency Check ###\n"
-        "Determine if immediate action is needed due to critical system risks like severe downtime or operational disruptions.\n"
-        "Respond on a separate line with `true` for immediate risk of failure, or `false` otherwise.\n"
+        "🔍 [긴급 여부 체크]\n"
+        "- Immediate Risk: Respond with `true` if immediate action is needed for critical system risks like severe downtime or operational disruptions; otherwise, `false`.\n"
+        "- [true/false]"
     )
 
     chatmodel = ChatOpenAI(
@@ -321,16 +319,15 @@ async def generate_log_summary(content: str):
     response = chatmodel.invoke(formatted_prompt)
     response_text = response.content  
 
-    # 요약과 이상 탐지 요약을 분리
-    response_lines = response_text.strip().split('\n\n')
-    general_summary = response_lines[0].strip() if len(response_lines) > 0 else ""
-    anomaly_summary = response_lines[1].strip() if len(response_lines) > 1 else ""
-
-    # 긴급 체크 부분 파싱
-    is_urgent_line = response_lines[2].strip() if len(response_lines) > 2 else "false"
+    # 각 섹션을 한 줄로 분리
+    response_lines = response_text.strip().split('\n')
+    
+    # 요약 섹션 추출
+    log_summary = "\n".join(response_lines[:-1])  # 마지막 줄을 제외하고 추출
+    is_urgent_line = response_lines[-1].strip()
     is_urgent = "true" in is_urgent_line.lower()
 
-    return general_summary, anomaly_summary, is_urgent
+    return log_summary, is_urgent
 
 async def generate_performance_summary(content: str):    
     prompt = (
@@ -705,12 +702,11 @@ def combine_logs_and_question(log_files_request: LogFilesRequest, conversation_m
 
 @app.post("/process/logSummary")
 async def process_log_summary(request: LogRequest):
-    general_summary, anomaly_summary, is_urgent = await generate_log_summary(request.content)
+    log_summary, is_urgent = await generate_log_summary(request.content)
     
     # 결과를 JSON으로 반환
     return {
-        "generalSummary": general_summary,
-        "anomalySummary": anomaly_summary,
+        "logSummary": log_summary,
         "isUrgent": is_urgent
     }
 

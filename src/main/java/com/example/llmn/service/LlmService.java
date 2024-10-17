@@ -2,8 +2,6 @@ package com.example.llmn.service;
 
 import com.example.llmn.controller.DTO.LogDTO;
 import com.example.llmn.controller.DTO.MetricResponse;
-import com.example.llmn.core.errors.CustomException;
-import com.example.llmn.core.errors.ExceptionCode;
 import com.example.llmn.domain.*;
 import com.example.llmn.repository.ProjectRepository;
 import com.example.llmn.repository.SummaryRepository;
@@ -17,11 +15,9 @@ import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
-import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 @Service
@@ -84,31 +80,22 @@ public class LlmService {
                         return;
                     }
 
-                    project.updateIsUrgent(summaryDTO.isUrgent());
-
                     // 긴급 알람 업데이트
-                    String emergencyAlarmContent = project.getProjectName() + LOG_EMERGENCY_ALARM_SUFFIX;
-                    alarmService.generateAlarm(project.getUser().getId(), emergencyAlarmContent, AlarmType.EMERGENCY);
+                    if(summaryDTO.isUrgent()) {
+                        project.updateIsUrgent(true);
+                        String emergencyAlarmContent = project.getProjectName() + LOG_EMERGENCY_ALARM_SUFFIX;
+                        alarmService.generateAlarm(project.getUser().getId(), emergencyAlarmContent, AlarmType.EMERGENCY);
+                    }
 
-                    // 일반 요약 저장
-                    Summary generalSummary = Summary.builder()
+                    // 로그 요약 저장
+                    Summary logSummary = Summary.builder()
                             .user(project.getUser())
                             .project(project)
-                            .content(summaryDTO.generalSummary())
-                            .summaryType(SummaryType.GENERAL)
+                            .content(summaryDTO.logSummary())
+                            .summaryType(SummaryType.LOG)
                             .build();
 
-                    summaryRepository.save(generalSummary);
-
-                    // 비정상 패턴 요약 저장
-                    Summary anomalySummary = Summary.builder()
-                            .user(project.getUser())
-                            .project(project)
-                            .content(summaryDTO.anomalySummary())
-                            .summaryType(SummaryType.ANOMALY)
-                            .build();
-
-                    summaryRepository.save(anomalySummary);
+                    summaryRepository.save(logSummary);
 
                     // 업데이트 알람 생성
                     String updateAlarmContent = project.getProjectName() + LOG_UPDATE_ALARM_SUFFIX;
@@ -306,7 +293,7 @@ public class LlmService {
         // 성능 요약 리스트와 어플리케이션 요약 리스트
         LocalDateTime startOfHour = LocalDateTime.now().withMinute(0).minusSeconds(0);
         List<Summary> performanceSummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.PERFORMANCE), userId, startOfHour);
-        List<Summary> logSummaries = summaryRepository.findByTypeWithinDateWithProject(List.of(SummaryType.GENERAL, SummaryType.ANOMALY), userId, startOfHour);
+        List<Summary> logSummaries = summaryRepository.findByTypeWithinDateWithProject(List.of(SummaryType.LOG, SummaryType.ANOMALY), userId, startOfHour);
 
         // 성능 요약 추가
         appendSummary(requestContentBuilder, PERFORMANCE_SUMMARY_HEADER, performanceSummaries);
@@ -328,7 +315,7 @@ public class LlmService {
         // 성능 요약 리스트와 어플리케이션 요약 리스트
         LocalDateTime startOfDay = LocalDateTime.now().with(LocalTime.MIN);
         List<Summary> performanceSummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.PERFORMANCE), userId, startOfDay);
-        List<Summary> logSummaries = summaryRepository.findByTypeWithinDateWithProject(List.of(SummaryType.GENERAL, SummaryType.ANOMALY), userId, startOfDay);
+        List<Summary> logSummaries = summaryRepository.findByTypeWithinDateWithProject(List.of(SummaryType.LOG, SummaryType.ANOMALY), userId, startOfDay);
 
         // 성능 요약 추가
         appendSummary(requestContentBuilder, PERFORMANCE_SUMMARY_HEADER, performanceSummaries);
@@ -368,7 +355,7 @@ public class LlmService {
         // 6시간 전의 요약들을 인풋으로
         LocalDateTime startOfTime = LocalDateTime.now().minusHours(6);
         List<Summary> performanceSummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.PERFORMANCE), userId, startOfTime);
-        List<Summary> logSummaries = summaryRepository.findByTypeWithinDateWithProject(List.of(SummaryType.GENERAL, SummaryType.ANOMALY), userId, startOfTime);
+        List<Summary> logSummaries = summaryRepository.findByTypeWithinDateWithProject(List.of(SummaryType.LOG, SummaryType.ANOMALY), userId, startOfTime);
 
         // 성능 요약 추가
         appendSummary(requestContentBuilder, PERFORMANCE_SUMMARY_HEADER, performanceSummaries);

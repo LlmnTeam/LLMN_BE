@@ -4,7 +4,7 @@ public class LogDTO {
 
     public record SummaryRequestDTO(String content){}
 
-    public record SummaryResponseDTO(String generalSummary, String anomalySummary, boolean isUrgent){}
+    public record SummaryResponseDTO(String logSummary, boolean isUrgent){}
 
     public record PerformanceSummaryResponseDTO(String performanceSummary){}
 
