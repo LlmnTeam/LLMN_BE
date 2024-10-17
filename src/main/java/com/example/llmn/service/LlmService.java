@@ -293,7 +293,7 @@ public class LlmService {
         // 성능 요약 리스트와 어플리케이션 요약 리스트
         LocalDateTime startOfHour = LocalDateTime.now().withMinute(0).minusSeconds(0);
         List<Summary> performanceSummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.PERFORMANCE), userId, startOfHour);
-        List<Summary> logSummaries = summaryRepository.findByTypeWithinDateWithProject(List.of(SummaryType.LOG, SummaryType.ANOMALY), userId, startOfHour);
+        List<Summary> logSummaries = summaryRepository.findByTypeWithinDateWithProject(List.of(SummaryType.LOG), userId, startOfHour);
 
         // 성능 요약 추가
         appendSummary(requestContentBuilder, PERFORMANCE_SUMMARY_HEADER, performanceSummaries);
@@ -315,7 +315,7 @@ public class LlmService {
         // 성능 요약 리스트와 어플리케이션 요약 리스트
         LocalDateTime startOfDay = LocalDateTime.now().with(LocalTime.MIN);
         List<Summary> performanceSummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.PERFORMANCE), userId, startOfDay);
-        List<Summary> logSummaries = summaryRepository.findByTypeWithinDateWithProject(List.of(SummaryType.LOG, SummaryType.ANOMALY), userId, startOfDay);
+        List<Summary> logSummaries = summaryRepository.findByTypeWithinDateWithProject(List.of(SummaryType.LOG), userId, startOfDay);
 
         // 성능 요약 추가
         appendSummary(requestContentBuilder, PERFORMANCE_SUMMARY_HEADER, performanceSummaries);
@@ -355,7 +355,7 @@ public class LlmService {
         // 6시간 전의 요약들을 인풋으로
         LocalDateTime startOfTime = LocalDateTime.now().minusHours(6);
         List<Summary> performanceSummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.PERFORMANCE), userId, startOfTime);
-        List<Summary> logSummaries = summaryRepository.findByTypeWithinDateWithProject(List.of(SummaryType.LOG, SummaryType.ANOMALY), userId, startOfTime);
+        List<Summary> logSummaries = summaryRepository.findByTypeWithinDateWithProject(List.of(SummaryType.LOG), userId, startOfTime);
 
         // 성능 요약 추가
         appendSummary(requestContentBuilder, PERFORMANCE_SUMMARY_HEADER, performanceSummaries);
