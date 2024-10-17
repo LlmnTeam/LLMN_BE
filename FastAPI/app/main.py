@@ -267,6 +267,8 @@ async def generate_log_summary(content: str):
         "Use icons or emojis (e.g., 📊 for summaries, ❗ for errors, ⚠️ for warnings, ℹ️ for info, 🚨 for anomalies, 🔍 for analysis required, 💡 for recommended actions, and 🔔 for critical alerts) to clearly separate sections and highlight key points.\n"
         "Only list detected items. If fewer than three events or anomalies are detected, list only those present and avoid empty slots.\n"
         "Include 'None' if there are no events or anomalies to report.\n"
+        "Ensure that all numerical values (e.g., total occurrences) are calculated precisely based on the input data provided. Do not assume or estimate values; use the actual data for calculations.\n"
+        "Ensure all results and conclusions are directly based on the provided data patterns and metrics."
         "Ensure that your response strictly adheres to the following format, and keep each section separate with two line breaks (`\\n\\n`).\n"
         "\n"
         "### Input Data ###\n"
@@ -308,7 +310,7 @@ async def generate_log_summary(content: str):
     chatmodel = ChatOpenAI(
         model="gpt-4o-mini",
         temperature=0.3,
-        max_tokens=1200,
+        max_tokens=750,
         openai_api_key=settings.OPENAI_API_KEY
     )
     
@@ -341,6 +343,8 @@ async def generate_performance_summary(content: str):
         "For abnormal patterns, focus on unusual spikes, sustained high usage, or significant deviations from typical values.\n"
         "Use icons or emojis (e.g., 📈 for summaries, 💻 for CPU, 💽 for memory, ⬇️ for network receive, ⬆️ for network send, ⚠️ for anomalies, and 🔧 for recommended actions) to clearly separate sections and highlight key points.\n"
         "Only list detected items. If fewer than three events or anomalies are detected, list only those present and avoid empty slots.\n"
+        "Ensure that all numerical values (e.g., averages, maximums) are calculated precisely based on the input data provided. Do not assume or estimate values; use the actual data for calculations.\n"
+        "Ensure all results and conclusions are directly based on the provided data patterns and metrics."
         "\n"
         "### Input Data ###\n"
         f"{content}\n"
@@ -378,7 +382,7 @@ async def generate_performance_summary(content: str):
     chatmodel = ChatOpenAI(
         model="gpt-4o-mini",
         temperature=0.3,
-        max_tokens=1200,
+        max_tokens=500,
         openai_api_key=settings.OPENAI_API_KEY
     )
     
@@ -399,6 +403,8 @@ async def generate_daily_summary(content: str):
         "Your responses should be in Korean.\n"
         "Use icons (e.g., 🔍 for the report, ❗ for errors, ⚠️ for warnings, 📊 for performance overview, 🔥 for high utilization, 💻 for CPU, 💽 for memory, ⬇️ for network receive, ⬆️ for network send, 🚨 for anomalies, and 🔧 for recommended actions) to clearly separate sections and highlight key points.\n"
         "Only list detected items. If fewer than three events or anomalies are detected, list only those present and avoid empty slots.\n"
+        "Ensure that all numerical values (e.g., total occurrences, averages, maximums) are calculated precisely based on the input data provided. Do not assume or estimate values; use the actual data for calculations.\n"
+        "Ensure all results and conclusions are directly based on the provided data patterns and metrics."
         "\n"
         "### Input Data ###\n"
         f"{content}\n"
@@ -468,6 +474,8 @@ async def generate_trend_summary(content: str):
         "Your responses should be in Korean.\n"
         "Use icons to organize sections (e.g., 📊 for report title, ❗ for errors, ⚠️ for warnings, 📈 for increasing trends, 📉 for decreasing trends, 💻 for CPU, 💽 for memory, ⬇️ for network receive, ⬆️ for network send, 🚨 for abnormal patterns, 🔍 for insights, 🔮 for predictions, and 🔧 for recommended actions).\n"
         "Only list detected items. If fewer than three events or anomalies are detected, list only those present and avoid empty slots.\n"
+        "Ensure that all numerical values (e.g., total occurrences, averages, maximums, trends) are calculated precisely based on the input data provided. Do not assume or estimate values; use the actual data for calculations.\n"
+        "Ensure all results and conclusions are directly based on the provided data patterns and metrics."
         "### Input Data ###\n"
         f"{content}\n"
         "\n"
@@ -573,6 +581,7 @@ async def generate_recommend(content: str):
         "Use icons to clearly organize recommendations and emphasize the type of action (e.g., 🔧 for maintenance actions, 🚀 for optimization actions, ⚠️ for urgent actions).\n"
         "Provide a list of brief, clear recommendations, starting each item with a dash (-). Include multiple items under each type if needed, and avoid empty slots.\n"
         "List only the most critical actions needed and avoid unnecessary details.\n"
+        "Ensure all results and conclusions are directly based on the provided data patterns and metrics."
         "\n"
         "### Input Data ###\n"
         f"{content}\n"
@@ -613,8 +622,8 @@ async def generate_hourly_summary(content: str):
         "### Writing Guidelines ###\n"
         "Your responses should be in Korean.\n"
         "Focus on critical errors, performance issues, or warnings that require immediate action. Each summary should include the event time, criticality level, a brief issue description, and a recommended action (if needed).\n"
-        "Use the following icons to indicate priority: ❗ for Critical, ⚠️ for Warning, ℹ️ for Info. Structure each summary as:\n"
-        "   - [Criticality] [Event Time]: [Issue Description]. [Recommended Action]\n"
+        "Use the following icons to indicate priority: ❗ for Critical, ⚠️ for Warning, ℹ️ for Info. Structure each summary as:\n  - [Criticality] [Event Time]: [Issue Description]. [Recommended Action]\n"
+        "Ensure all results and conclusions are directly based on the provided data patterns and metrics."
         "\n"
         "### Log and Performance Data ###\n"
         f"{content}\n"
