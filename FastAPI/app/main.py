@@ -273,10 +273,9 @@ async def generate_log_summary(content: str):
         "### Input Data ###\n"
         f"{content}\n"
         "\n"
-        "### Response Structure ###\n"
+        "### Log Summary ###\n"
         "Format the response in the following structure:\n"
         "\n"
-        "### Log Summary ###\n"
         "📊 [일반적인 요약]\n"
         "- 주요 이벤트\n"
         "   1. [Event 1]\n"
@@ -318,14 +317,18 @@ async def generate_log_summary(content: str):
     # OpenAI API 호출
     response = chatmodel.invoke(formatted_prompt)
     response_text = response.content  
-
-    # 각 섹션을 한 줄로 분리
-    response_lines = response_text.strip().split('\n')
     
-    # 요약 섹션 추출
-    log_summary = "\n".join(response_lines[:-1])  # 마지막 줄을 제외하고 추출
-    is_urgent_line = response_lines[-1].strip()
-    is_urgent = "true" in is_urgent_line.lower()
+    # "🔍 [긴급 여부 체크]" 줄이 시작되는 인덱스 찾기
+    urgency_start_index = response_text.find("🔍 [긴급 여부 체크]")
+    
+    # log_summary와 is_urgent를 분리
+    if urgency_start_index != -1:
+        log_summary = response_text[:urgency_start_index].strip()  
+        is_urgent_line = response_text[urgency_start_index:].split('\n')[-1].strip()  
+        is_urgent = "true" in is_urgent_line.lower()
+    else:
+        log_summary = response_text.strip()  # 전체를 요약으로 보고 처리
+        is_urgent = False  # 기본값
 
     return log_summary, is_urgent
 
