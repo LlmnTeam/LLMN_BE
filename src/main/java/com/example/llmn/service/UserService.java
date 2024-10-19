@@ -324,13 +324,23 @@ public class UserService {
 
     @Transactional(readOnly = true)
     public UserResponse.FindCloudInfoDTO findCloudInfo(Long userId){
+        User user = userRepository.findById(userId).orElseThrow(
+                () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
+        );
+
         List<SshInfo> sshInfos = sshInfoRepository.findByUserId(userId);
 
         List<UserResponse.CloudInfoDTO> cloudInfoDTOS = sshInfos.stream()
                 .map(sshInfo -> new UserResponse.CloudInfoDTO(sshInfo.getRemoteName(), sshInfo.getRemoteHost()))
                 .toList();
 
-        return new UserResponse.FindCloudInfoDTO(cloudInfoDTOS);
+        UserResponse.CloudInfoDTO selectedCloudDTO = sshInfos.stream()
+                .filter(sshInfo -> sshInfo.getId().equals(user.getMonitoringSshId()))
+                .map(sshInfo -> new UserResponse.CloudInfoDTO(sshInfo.getRemoteName(), sshInfo.getRemoteHost()))
+                .findFirst()
+                .get();
+
+        return new UserResponse.FindCloudInfoDTO(cloudInfoDTOS, selectedCloudDTO);
     }
 
     @Transactional

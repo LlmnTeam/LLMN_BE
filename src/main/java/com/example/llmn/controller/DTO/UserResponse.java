@@ -35,7 +35,7 @@ public class UserResponse {
             String remoteKeyPath
     ){}
 
-    public record FindCloudInfoDTO(List<CloudInfoDTO> clouds){}
+    public record FindCloudInfoDTO(List<CloudInfoDTO> clouds, CloudInfoDTO selectedCloud){}
 
     public record CloudInfoDTO(String remoteName, String remoteHost){}
 
