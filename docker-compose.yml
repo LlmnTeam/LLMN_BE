@@ -35,7 +35,7 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - /var/lib/ssh_data:/sshd
+      - /var/lib/ssh_data:/ssh
       - /var/lib/llmn_logs:/logs
     networks:
       - network

@@ -134,15 +134,19 @@ public class MetricService {
             String time = metric.getCreatedDate().format(formatterForHourAndMin);
 
             // 1. CPU 데이터
-            cpuMetricDTOS.add(new MetricResponse.CpuMetricDTO(time, metric.getCpuUsage()));
+            double cpuUsage = Math.round(metric.getCpuUsage() * 1000.0) / 1000.0;
+            cpuMetricDTOS.add(new MetricResponse.CpuMetricDTO(time, cpuUsage));
 
             // 2. 메모리 사용량 (%로 변환)
-            double memoryUsage = metric.getTotalMemory() > 0 ? (metric.getUsedMemory() / metric.getTotalMemory() * 100) : 0.0;
+            double memoryUsage = metric.getTotalMemory() > 0 ?
+                    Math.round((metric.getUsedMemory() / metric.getTotalMemory() * 100) * 1000.0) / 1000.0 : 0.0;
             memoryMetricDTOS.add(new MetricResponse.MemoryMetricDTO(time, memoryUsage));
 
             // 3. 네트워크 수신/송신
-            networkInMetricDTOS.add(new MetricResponse.NetworkInMetricDTO(time, metric.getTotalBytesReceived()));
-            networkOutMetricDTOS.add(new MetricResponse.NetworkOutMetricDTO(time, metric.getTotalBytesSent()));
+            double networkReceived = Math.round(metric.getTotalBytesReceived() * 1000.0) / 1000.0;
+            double networkSent = Math.round(metric.getTotalBytesSent() * 1000.0) / 1000.0;
+            networkInMetricDTOS.add(new MetricResponse.NetworkInMetricDTO(time, networkReceived));
+            networkOutMetricDTOS.add(new MetricResponse.NetworkOutMetricDTO(time, networkSent));
         });
 
         return new MetricResponse.FindMetricHistoryDTO(cpuMetricDTOS, memoryMetricDTOS, networkInMetricDTOS, networkOutMetricDTOS);
