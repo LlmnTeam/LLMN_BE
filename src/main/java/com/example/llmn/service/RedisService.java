@@ -90,6 +90,11 @@ public class RedisService {
         return storedData.equals(value);
     }
 
+    public boolean validateValue(String type, String id, String value) {
+        String storedValue = redisTemplate.opsForValue().get(buildKey(type, id));
+        return storedValue != null && storedValue.equals(value);
+    }
+
     // 데이터 삭제
     public void removeData(String type, String id) { redisTemplate.delete(buildKey(type, id)); }
 

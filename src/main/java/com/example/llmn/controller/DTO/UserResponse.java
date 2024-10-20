@@ -50,4 +50,6 @@ public class UserResponse {
     public record CheckAccountExistDTO(boolean isValid) {}
 
     public record EnvUpdateDTO(boolean success){}
+
+    public record ValidateAccessTokenDTO(String nickName){}
 }

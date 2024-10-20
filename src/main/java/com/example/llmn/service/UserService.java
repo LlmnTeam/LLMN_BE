@@ -29,6 +29,7 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -425,6 +426,23 @@ public class UserService {
 
     public void updateApiKey(String apiKey){
         updateFastAPIEnvFile(OPEN_API_KEY, apiKey);
+    }
+
+    @Transactional(readOnly = true)
+    public UserResponse.ValidateAccessTokenDTO validateAccessToken(@CookieValue String accessToken){
+        // 잘못된 토큰 형식인지 체크
+        if(!JWTProvider.validateToken(accessToken)) {
+            throw new CustomException(ExceptionCode.TOKEN_WRONG);
+        }
+
+        Long userIdFromToken = JWTProvider.getUserIdFromToken(accessToken);
+        if(!redisService.validateValue(REDIS_KEY_ACCESS_TOKEN, String.valueOf(userIdFromToken), accessToken)){
+            throw new CustomException(ExceptionCode.ACCESS_TOKEN_WRONG);
+        }
+
+        String nickName = userRepository.findNickName(userIdFromToken).orElse(null);
+
+        return new UserResponse.ValidateAccessTokenDTO(nickName);
     }
 
     private Map<String, String> createToken(User user){

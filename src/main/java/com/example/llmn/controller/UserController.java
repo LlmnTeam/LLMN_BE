@@ -141,4 +141,10 @@ public class UserController {
         userService.withdrawMember(userDetails.getUser().getId());
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, null));
     }
+
+    @PostMapping("/validate/accessToken")
+    public ResponseEntity<?> validateAccessToken(@CookieValue String accessToken){
+        UserResponse.ValidateAccessTokenDTO responseDTO = userService.validateAccessToken(accessToken);
+        return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
+    }
 }
