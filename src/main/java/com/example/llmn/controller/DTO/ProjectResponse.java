@@ -47,7 +47,8 @@ public class ProjectResponse {
     public record FindProjectSummaryDTO(
             String name,
             String description,
-            List<SummaryDTO> summaries){}
+            List<SummaryDTO> summaries,
+            boolean isLastPage){}
 
     public record SummaryDTO(
             Long id,

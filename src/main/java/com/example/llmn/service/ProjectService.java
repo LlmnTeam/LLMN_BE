@@ -12,6 +12,7 @@ import com.example.llmn.repository.UserRepository;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -201,15 +202,15 @@ public class ProjectService {
     }
 
     @Transactional(readOnly = true)
-    public ProjectResponse.FindProjectSummaryDTO findProjectSummary(Long projectId, Pageable pageable){
-        // 존재하지 않으면 에러
+    public ProjectResponse.FindProjectSummaryDTO findProjectSummary(Long projectId, Pageable pageable) {
+        // 프로젝트가 존재하지 않으면 에러 발생
         Project project = projectRepository.findById(projectId).orElseThrow(
                 () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
         );
 
         // 최신순으로 페이지네이션
-        List<Summary> summaries = summaryRepository.findByProjectId(projectId, pageable).getContent();
-        List<ProjectResponse.SummaryDTO> summaryDTOS = summaries.stream()
+        Page<Summary> summaryPage = summaryRepository.findByProjectId(projectId, pageable);
+        List<ProjectResponse.SummaryDTO> summaryDTOS = summaryPage.getContent().stream()
                 .map(summary -> new ProjectResponse.SummaryDTO(
                         summary.getId(),
                         formatLocalDateTime(summary.getCreatedDate()),
@@ -217,10 +218,14 @@ public class ProjectService {
                         summary.isChecked()))
                 .toList();
 
+        boolean isLastPage = summaryPage.isLast();
+
         return new ProjectResponse.FindProjectSummaryDTO(
                 project.getProjectName(),
                 project.getDescription(),
-                summaryDTOS);
+                summaryDTOS,
+                isLastPage // 마지막 페이지 여부 반환
+        );
     }
 
     @Transactional(readOnly = true)
