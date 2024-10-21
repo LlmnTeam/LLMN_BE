@@ -39,8 +39,8 @@ public class ProjectService {
     private static final String DOCKER_RESOURCE_KEY_CPU = "CPU";
     private static final String DOCKER_RESOURCE_KEY_MEMORY = "Memory";
     private static final String NOT_ACCESSIBLE_VALUE = "N/A";
-    private static final String NOT_EXIST_SUMMARY = "로그 요약본이 존재하지 않습니다.";
-    private static final String NOT_EXIST_LOG = "로그가 존재하지 않습니다";
+    private static final String NOT_EXIST_SUMMARY = "";
+    private static final String NOT_EXIST_LOG = "";
     private static final String SORT_BY_DATE = "createdDate";
     private static final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH");
 
