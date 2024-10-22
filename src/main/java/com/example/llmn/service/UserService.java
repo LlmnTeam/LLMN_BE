@@ -374,7 +374,8 @@ public class UserService {
                         sshInfo.getId(),
                         sshInfo.getRemoteName(),
                         sshInfo.getRemoteHost(),
-                        sshInfo.getRemoteKeyPath()))
+                        sshInfo.getRemoteKeyPath(),
+                        sshInfo.isWorking()))
                 .toList();
 
         return new UserResponse.FindConfigurationInfoDTO(

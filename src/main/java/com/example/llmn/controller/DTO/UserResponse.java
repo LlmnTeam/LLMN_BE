@@ -32,7 +32,8 @@ public class UserResponse {
             Long id,
             String remoteName,
             String remoteHost,
-            String remoteKeyPath
+            String remoteKeyPath,
+            boolean isWorking
     ){}
 
     public record FindCloudInfoDTO(List<CloudInfoDTO> clouds, CloudInfoDTO selectedCloud){}
