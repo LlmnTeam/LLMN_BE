@@ -44,8 +44,8 @@ public class ProjectController {
 
     // 수정 시 사용할 API
     @GetMapping("/project/{projectId}/info")
-    public ResponseEntity<?> findProjectInfoById(@PathVariable Long projectId) {
-        ProjectResponse.FindProjectInfoByIdDTO responseDTO = projectService.findProjectInfoById(projectId);
+    public ResponseEntity<?> findProjectInfoById(@PathVariable Long projectId, @AuthenticationPrincipal CustomUserDetails userDetails) {
+        ProjectResponse.FindProjectInfoByIdDTO responseDTO = projectService.findProjectInfoById(projectId, userDetails.getUser().getId());
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 

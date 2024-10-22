@@ -97,16 +97,28 @@ public class ProjectService {
 
     // 수정 시 사용할 API
     @Transactional(readOnly = true)
-    public ProjectResponse.FindProjectInfoByIdDTO findProjectInfoById(Long projectId){
+    public ProjectResponse.FindProjectInfoByIdDTO findProjectInfoById(Long projectId, Long userId){
         // 존재하지 않으면 에러
         Project project = projectRepository.findById(projectId).orElseThrow(
                 () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
         );
 
+        // 수정 시 선택할 수 있는 컨테이너들
+        List<ProjectResponse.ContainerDTO> containerDTOS = new ArrayList<>();
+        List<SshInfo> sshInfos = sshInfoRepository.findByUserId(userId);
+        for(SshInfo sshInfo : sshInfos){
+            List<String> runningContainers = dockerService.findRunningContainerList(sshInfo.getId());
+            containerDTOS.addAll(runningContainers.stream()
+                    .map(ProjectResponse.ContainerDTO::new)
+                    .toList()
+            );
+        }
+
         return new ProjectResponse.FindProjectInfoByIdDTO(
                 project.getProjectName(),
                 project.getContainerName(),
-                project.getDescription());
+                project.getDescription(),
+                containerDTOS);
     }
 
     @Transactional
