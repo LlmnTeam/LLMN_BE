@@ -336,7 +336,7 @@ public class ProjectService {
 
     private LocalDateTime extractDateTimeFromFile(String file) {
         // 파일 이름에서 "log-" 뒤부터 ".txt" 앞까지의 부분 추출
-        String dateTimePart = file.substring(file.indexOf("log-") + 4, file.lastIndexOf(".txt"));
+        String dateTimePart = file.substring(file.indexOf("log-") + 4, file.lastIndexOf("-"));
         return LocalDateTime.parse(dateTimePart, formatter);
     }
 
