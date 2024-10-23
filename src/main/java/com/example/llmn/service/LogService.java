@@ -11,6 +11,8 @@ import com.example.llmn.core.config.ElasticsearchConfig;
 import com.example.llmn.core.errors.CustomException;
 import com.example.llmn.core.errors.ExceptionCode;
 import com.example.llmn.core.utils.LogDataParser;
+import com.example.llmn.domain.SshInfo;
+import com.example.llmn.repository.SshInfoRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -41,9 +43,7 @@ import java.util.stream.Stream;
 public class LogService {
 
     private final ElasticsearchConfig elasticsearchConfig;
-
-    @Value("${elasticsearch.host}")
-    private String ELASTIC_SEARCH_HOST;
+    private final SshInfoRepository sshInfoRepository;
 
     private static final String LOGS_DIRECTORY = "logs";
     private static final String LOG_LEVEL_INFO = "INFO";
@@ -66,32 +66,36 @@ public class LogService {
 
     @Scheduled(fixedRate = 60000)  // 1분마다 실행
     public void processAndUpdateLogs() {
-        // 1. Elasticsearch에서 로그 데이터를 검색
-        SearchResponse<Map> searchResponse = searchFromElasticSearch();
-        if (searchResponse == null) {
-            log.warn("Elasticsearch 응답이 null입니다. 검색에 실패했습니다.");
-            return;  // 검색 실패 시 프로세스를 종료
+        List<SshInfo> sshInfos = sshInfoRepository.findAll();
+
+        for(SshInfo sshInfo : sshInfos) {
+            // 1. Elasticsearch에서 로그 데이터를 검색
+            SearchResponse<Map> searchResponse = searchFromElasticSearch(sshInfo.getRemoteHost());
+            if (searchResponse == null) {
+                log.warn("Elasticsearch 응답이 null입니다. 검색에 실패했습니다.");
+                return;  // 검색 실패 시 프로세스를 종료
+            }
+
+            // 2. 검색 결과를 맵으로 변환
+            List<Map<String, Object>> logMaps = convertResponseToMap(searchResponse);
+            log.info("로그 데이터 변환 완료. 총 {}개의 로그가 변환됨.", logMaps.size());
+
+            // 2. map의 필드 업데이트 (원하는 형태로)
+            List<Map<String, Object>> updatedLogMaps = updateLogFields(logMaps);
+
+            // 3. 필드 업데이트 한 데이터를 Elasticsearch에도 반영
+            updateToElasticSearch(updatedLogMaps, sshInfo.getRemoteHost());
+
+            // 4. .txt 파일로도 로그 저장
+            saveLogsToFile(updatedLogMaps, sshInfo.getId());
         }
-
-        // 2. 검색 결과를 맵으로 변환
-        List<Map<String, Object>> logMaps = convertResponseToMap(searchResponse);
-        log.info("로그 데이터 변환 완료. 총 {}개의 로그가 변환됨.", logMaps.size());
-
-        // 2. map의 필드 업데이트 (원하는 형태로)
-        List<Map<String, Object>> updatedLogMaps = updateLogFields(logMaps);
-
-        // 3. 필드 업데이트 한 데이터를 Elasticsearch에도 반영
-        updateToElasticSearch(updatedLogMaps);
-
-        // 4. .txt 파일로도 로그 저장
-        saveLogsToFile(updatedLogMaps);
 
         log.info("업데이트 완료");
     }
 
-    public List<LogDataDTO> searchLogList(Instant startTime, Instant endTime, String logLevel, String containerName) {
+    public List<LogDataDTO> searchLogList(Instant startTime, Instant endTime, String logLevel, String containerName, String elasticSearchHost) {
         try {
-            ElasticsearchClient client = elasticsearchConfig.createElasticsearchClient(ELASTIC_SEARCH_HOST);
+            ElasticsearchClient client = elasticsearchConfig.createElasticsearchClient(elasticSearchHost);
 
             // Elasticsearch 쿼리 생성
             SearchRequest.Builder searchBuilder = new SearchRequest.Builder()
@@ -139,9 +143,9 @@ public class LogService {
         }
     }
 
-    public String searchLogInStr(Instant startTime, Instant endTime, String containerName) {
+    public String searchLogInStr(Instant startTime, Instant endTime, String containerName, String elasticSearchHost) {
         try {
-            ElasticsearchClient client = elasticsearchConfig.createElasticsearchClient(ELASTIC_SEARCH_HOST);
+            ElasticsearchClient client = elasticsearchConfig.createElasticsearchClient(elasticSearchHost);
 
             // Elasticsearch 쿼리 생성
             SearchRequest.Builder searchBuilder = new SearchRequest.Builder()
@@ -283,12 +287,12 @@ public class LogService {
         return rawMessage != null ? rawMessage : "";
     }
 
-    private SearchResponse<Map> searchFromElasticSearch() {
+    private SearchResponse<Map> searchFromElasticSearch(String elasticSearchHost) {
         // 오늘 날짜의 인덱스 이름을 생성하여 사용
         String indexName = getTodayIndexName();
 
         try {
-            ElasticsearchClient client = elasticsearchConfig.createElasticsearchClient(ELASTIC_SEARCH_HOST);
+            ElasticsearchClient client = elasticsearchConfig.createElasticsearchClient(elasticSearchHost);
 
             // is_processed가 false인 데이터 검색
             SearchRequest searchRequest = new SearchRequest.Builder()
@@ -303,7 +307,7 @@ public class LogService {
             return client.search(searchRequest, Map.class);
         } catch (ElasticsearchException e) {
             // 인덱스가 없을 경우 생성
-            createIndexIfNotExists(indexName);
+            createIndexIfNotExists(indexName, elasticSearchHost);
             return new SearchResponse.Builder<Map>().build();
         } catch (IOException e){
             log.info("<ElasticSearch> "+indexName + "에 대한 검색 실패");
@@ -348,11 +352,11 @@ public class LogService {
                 .collect(Collectors.toList());
     }
 
-    private void updateToElasticSearch(List<Map<String, Object>> updatedLogMaps) {
+    private void updateToElasticSearch(List<Map<String, Object>> updatedLogMaps, String elasticSearchHost) {
         String indexName = getTodayIndexName();
 
         try {
-            ElasticsearchClient client = elasticsearchConfig.createElasticsearchClient(ELASTIC_SEARCH_HOST);
+            ElasticsearchClient client = elasticsearchConfig.createElasticsearchClient(elasticSearchHost);
 
             for (Map<String, Object> logMap : updatedLogMaps) {
                 String id = (String) logMap.remove(LOG_KEY_ID);
@@ -386,9 +390,9 @@ public class LogService {
         return "docker-logs-" + today.format(formatter);
     }
 
-    private void deleteOldLogs(Instant lastCollectedTime) {
+    private void deleteOldLogs(Instant lastCollectedTime, String elasticSearchHost) {
         try {
-            ElasticsearchClient client = elasticsearchConfig.createElasticsearchClient(ELASTIC_SEARCH_HOST);
+            ElasticsearchClient client = elasticsearchConfig.createElasticsearchClient(elasticSearchHost);
 
             // Elasticsearch에서 lastCollectedTime 이전의 로그 삭제
             DeleteByQueryRequest deleteRequest = DeleteByQueryRequest.of(d -> d
@@ -406,7 +410,7 @@ public class LogService {
         }
     }
 
-    private void saveLogsToFile(List<Map<String, Object>> logs) {
+    private void saveLogsToFile(List<Map<String, Object>> logs, Long sshId) {
         if (logs.isEmpty()) {
             return;
         }
@@ -424,7 +428,7 @@ public class LogService {
         String timestampForText = new SimpleDateFormat("yyyy-MM-dd_HH:mm").format(now);
 
         logsByContainerName.forEach((containerName, logMaps) -> {
-            String fileTitle = String.format("logs/%s-log-%s.txt", containerName, timestampForTitle);
+            String fileTitle = String.format("logs/%s-log-%s-%d.txt", containerName, timestampForTitle, sshId);
             writeBufferAsFile(fileTitle, logMaps, timestampForText);
         });
     }
@@ -471,9 +475,9 @@ public class LogService {
                 message.toString());
     }
 
-    private void createIndexIfNotExists(String indexName)  {
+    private void createIndexIfNotExists(String indexName, String elasticSearchHost)  {
         try {
-            ElasticsearchClient client = elasticsearchConfig.createElasticsearchClient(ELASTIC_SEARCH_HOST);
+            ElasticsearchClient client = elasticsearchConfig.createElasticsearchClient(elasticSearchHost);
 
             CreateIndexRequest createIndexRequest = new CreateIndexRequest.Builder()
                     .index(indexName)
