@@ -1,5 +1,5 @@
 # main.py
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, status, Request, Depends
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from pydantic_settings import BaseSettings
@@ -17,6 +17,7 @@ import asyncio
 from langchain.schema import LLMResult
 from dotenv import set_key, load_dotenv
 import tiktoken
+from jose import JWTError, jwt
 
 app = FastAPI()
 
@@ -54,6 +55,10 @@ logger = logging.getLogger(__name__)
 # Tiktoken 설정 
 encoding = tiktoken.get_encoding('cl100k_base')
 
+# JWT
+SECRET_KEY = "MySecretKey" 
+ALGORITHM = "HS512"         
+
 # DTO
 class LogRequest(BaseModel):
     content: str
@@ -65,7 +70,6 @@ class LogFile(BaseModel):
     name: str
 
 class  LogFilesRequest(BaseModel):
-    userId: int
     logFiles: list[LogFile]
     question: str
     isFirstQuestion: bool  # 첫 번째 질문 여부를 나타내는 변수
@@ -705,6 +709,29 @@ def combine_logs_and_question(log_files_request: LogFilesRequest, conversation_m
 
     return prompt
 
+def get_user_id_from_token(request: Request):
+    auth_header = request.headers.get("Authorization")
+    if auth_header is None or not auth_header.startswith("Bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or missing authorization header",
+        )
+    token = auth_header[len("Bearer "):]
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id: int = payload.get("id")
+        if user_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="User ID not found in token",
+            )
+        return user_id
+    except JWTError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token is invalid or expired",
+        ) from e
+
 #################################################################################################
 
 @app.post("/process/logSummary")
@@ -758,8 +785,11 @@ async def process_hourly_summary(request: LogRequest):
     }
 
 @app.post("/logs/question")
-async def process_logs_and_question(request: LogFilesRequest):
-    conversation_manager = ConversationManager(request.userId)
+async def process_logs_and_question(
+    request: LogFilesRequest,
+    user_id: int = Depends(get_user_id_from_token)
+):
+    conversation_manager = ConversationManager(user_id)
 
     # 로그와 질문을 포함한 최종 질문 생성
     final_question = combine_logs_and_question(request, conversation_manager)
