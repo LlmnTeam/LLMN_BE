@@ -784,7 +784,7 @@ async def process_hourly_summary(request: LogRequest):
         "hourlySummary": hourly_summary
     }
 
-@app.post("/logs/question")
+@app.post("/api/logs/question")
 async def process_logs_and_question(
     request: LogFilesRequest,
     user_id: int = Depends(get_user_id_from_token)
