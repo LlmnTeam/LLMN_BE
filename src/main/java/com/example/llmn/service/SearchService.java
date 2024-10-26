@@ -104,7 +104,7 @@ public class SearchService {
         }
 
         // 파일 이름에서 날짜와 시간을 추출하는 정규식
-        String regex = ".*-log-(\\d{4}-\\d{2}-\\d{2})_(\\d{2})\\.txt";
+        String regex = ".*-log-(\\d{4}-\\d{2}-\\d{2})_(\\d{2})-\\d+\\.txt";
         Pattern pattern = Pattern.compile(regex);
         Matcher matcher = pattern.matcher(logFileName);
 
@@ -113,7 +113,7 @@ public class SearchService {
             String hourPart = matcher.group(2); // HH
             String dateTimeString = datePart + " " + hourPart;
 
-            // '2024-09-13 20' 형태
+            // '2024-10-24 21' 형태
             DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH");
 
             return LocalDateTime.parse(dateTimeString, formatter);
