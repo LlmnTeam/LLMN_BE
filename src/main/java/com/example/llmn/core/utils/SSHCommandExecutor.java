@@ -150,7 +150,7 @@ public class SSHCommandExecutor {
         return resultBuilder.toString();
     }
 
-    public void close()  {
+    public void close() {
         if (shellChannel != null) {
             shellChannel.close(false);
         }
@@ -160,8 +160,11 @@ public class SSHCommandExecutor {
         if (client != null) {
             client.stop();
         }
+        if (jedis != null) {
+            jedis.close();
+        }
 
-        log.info("SSH 세션 및 Shell 채널 종료.");
+        log.info("SSH 세션 및 Shell 채널, Redis 연결 종료.");
     }
 
     // SSH 세션이 연결되어 있는지 확인
