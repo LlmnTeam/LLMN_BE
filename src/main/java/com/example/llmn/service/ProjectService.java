@@ -4,6 +4,7 @@ import com.example.llmn.controller.DTO.ProjectRequest;
 import com.example.llmn.controller.DTO.ProjectResponse;
 import com.example.llmn.core.errors.CustomException;
 import com.example.llmn.core.errors.ExceptionCode;
+import com.example.llmn.core.utils.SSHCommandExecutor;
 import com.example.llmn.domain.*;
 import com.example.llmn.repository.ProjectRepository;
 import com.example.llmn.repository.SshInfoRepository;
@@ -306,6 +307,27 @@ public class ProjectService {
         );
 
         return sshService.executeCommandInShell(command, isFirstExecution, monitoringSshId);
+    }
+
+    @Transactional
+    public void stopCommend(Long userId){
+        Long monitoringSshId = userRepository.findMonitoringSshId(userId).orElseThrow(
+                () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
+        );
+
+        sshService.closeSession(monitoringSshId);
+    }
+
+    @Transactional
+    public void executeSigInt(Long userId){
+        Long monitoringSshId = userRepository.findMonitoringSshId(userId).orElseThrow(
+                () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
+        );
+
+        SSHCommandExecutor executor = sshService.getSshExecutor(monitoringSshId, false);
+        if (executor != null) {
+            executor.sendSigint();
+        }
     }
 
     private String formatLocalDateTime(LocalDateTime localDateTime) {

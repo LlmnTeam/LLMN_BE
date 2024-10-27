@@ -4,6 +4,7 @@ import com.example.llmn.controller.DTO.ProjectRequest;
 import com.example.llmn.controller.DTO.ProjectResponse;
 import com.example.llmn.core.security.CustomUserDetails;
 import com.example.llmn.core.utils.ApiUtils;
+import com.example.llmn.core.utils.SSHCommandExecutor;
 import com.example.llmn.service.DockerService;
 import com.example.llmn.service.ProjectService;
 import com.example.llmn.service.SSHService;
@@ -132,8 +133,14 @@ public class ProjectController {
     }
 
     @PostMapping("/command/terminate")
-    public ResponseEntity<?> terminateCommand(@RequestParam Long sshInfoId) {
-        sshService.closeSession(sshInfoId);
-        return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, "세션 종료 완료"));
+    public ResponseEntity<?> terminateCommand(@AuthenticationPrincipal CustomUserDetails userDetails) {
+        projectService.stopCommend(userDetails.getUser().getId());
+        return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, null));
+    }
+
+    @PostMapping("/command/interrupt")
+    public ResponseEntity<?> interruptCommand(@AuthenticationPrincipal CustomUserDetails userDetails) {
+       projectService.executeSigInt(userDetails.getUser().getId());
+        return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, null));
     }
 }

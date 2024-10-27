@@ -79,6 +79,7 @@ public class SSHService {
     // SSH 세션 종료
     public void closeSession(Long sshInfoId) {
         SSHCommandExecutor executor = executorSession.get(sshInfoId);
+
         if (executor != null) {
             executor.close();
             executorSession.remove(sshInfoId);
@@ -86,7 +87,7 @@ public class SSHService {
         }
     }
 
-    private synchronized SSHCommandExecutor getSshExecutor(Long sshInfoId, boolean isFirstExecution) {
+    public synchronized SSHCommandExecutor getSshExecutor(Long sshInfoId, boolean isFirstExecution) {
         // 세션이 열려있으면 그대로 반환
         SSHCommandExecutor executor = executorSession.get(sshInfoId);
         if(!isFirstExecution && executor != null && executor.isConnected()){
