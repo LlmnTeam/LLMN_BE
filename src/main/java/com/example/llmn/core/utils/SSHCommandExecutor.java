@@ -172,6 +172,15 @@ public class SSHCommandExecutor {
         return client != null && client.isOpen() && session != null && session.isOpen();
     }
 
+    public void sendSigint() {
+        try {
+            pipedIn.write(3); // ASCII 0x03을 전송하여 SIGINT 신호 보내기
+            pipedIn.flush();
+        } catch (IOException e) {
+            log.error("SIGINT 신호 전송 실패: " + e.getMessage());
+        }
+    }
+
     private void clearOutputStream() throws IOException {
         if (pipedOut.available() > 0) {
             byte[] buffer = new byte[4096];
