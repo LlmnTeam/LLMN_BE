@@ -169,7 +169,7 @@ public class SSHCommandExecutor {
 
     // SSH 세션이 연결되어 있는지 확인
     public boolean isConnected() {
-        return session != null && session.isOpen();
+        return client != null && client.isOpen() && session != null && session.isOpen();
     }
 
     private void clearOutputStream() throws IOException {

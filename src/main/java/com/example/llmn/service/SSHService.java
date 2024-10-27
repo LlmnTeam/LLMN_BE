@@ -89,7 +89,7 @@ public class SSHService {
         // 세션이 열려있으면 그대로 반환
         SSHCommandExecutor executor = executorSession.get(sshInfoId);
         if(executor != null && executor.isConnected()){
-            return executorSession.get(sshInfoId);
+            return executor;
         }
 
         // SSH 정보 가져오기
