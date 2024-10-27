@@ -31,8 +31,8 @@ public class SSHService {
     private static final String BLANK_STRING = "";
 
     @Transactional
-    public synchronized String executeCommandInShell(String command, Long sshInfoId) {
-        SSHCommandExecutor executor = getSshExecutor(sshInfoId);
+    public String executeCommandInShell(String command, boolean isFirstExecution, Long sshInfoId) {
+        SSHCommandExecutor executor = getSshExecutor(sshInfoId, isFirstExecution);
 
         if(executor == null){
             return EXECUTE_FAIL_BY_SESSION;
@@ -43,7 +43,7 @@ public class SSHService {
 
     @Transactional
     public String executeCommandOnce(String command, Long sshInfoId) {
-        SSHCommandExecutor executor = getSshExecutor(sshInfoId);
+        SSHCommandExecutor executor = getSshExecutor(sshInfoId, false);
 
         if(executor == null){
             return BLANK_STRING;
@@ -85,10 +85,10 @@ public class SSHService {
         }
     }
 
-    private synchronized SSHCommandExecutor getSshExecutor(Long sshInfoId) {
+    private synchronized SSHCommandExecutor getSshExecutor(Long sshInfoId, boolean isFirstExecution) {
         // 세션이 열려있으면 그대로 반환
         SSHCommandExecutor executor = executorSession.get(sshInfoId);
-        if(executor != null && executor.isConnected()){
+        if(!isFirstExecution && executor != null && executor.isConnected()){
             return executor;
         }
 

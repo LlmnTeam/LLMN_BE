@@ -126,7 +126,7 @@ public class ProjectController {
 
     @PostMapping("/command/home")
     public ResponseEntity<?> executeCommandInHome(@RequestBody ProjectRequest.ExecuteCommandDTO requestDTO, @AuthenticationPrincipal CustomUserDetails userDetails) {
-        String response = projectService.executeCommandInHome(requestDTO.command(), userDetails.getUser().getId());
+        String response = projectService.executeCommandInHome(requestDTO.command(), requestDTO.isFirstExecution(), userDetails.getUser().getId());
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, response));
     }
 }

@@ -300,12 +300,12 @@ public class ProjectService {
     }
 
     @Transactional
-    public String executeCommandInHome(String command, Long userId){
+    public String executeCommandInHome(String command, boolean isFirstExecution, Long userId){
         Long monitoringSshId = userRepository.findMonitoringSshId(userId).orElseThrow(
                 () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
         );
 
-        return sshService.executeCommandInShell(command, monitoringSshId);
+        return sshService.executeCommandInShell(command, isFirstExecution, monitoringSshId);
     }
 
     private String formatLocalDateTime(LocalDateTime localDateTime) {
