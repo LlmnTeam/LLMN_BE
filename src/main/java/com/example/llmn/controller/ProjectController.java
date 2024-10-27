@@ -25,6 +25,7 @@ import java.util.List;
 public class ProjectController {
 
     private final ProjectService projectService;
+    private final SSHService sshService;
     private final DockerService dockerService;
     private static final String SORT_BY_DATE = "createdDate";
     private static final boolean USING_CACHE = true;
@@ -128,5 +129,11 @@ public class ProjectController {
     public ResponseEntity<?> executeCommandInHome(@RequestBody ProjectRequest.ExecuteCommandDTO requestDTO, @AuthenticationPrincipal CustomUserDetails userDetails) {
         String response = projectService.executeCommandInHome(requestDTO.command(), requestDTO.isFirstExecution(), userDetails.getUser().getId());
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, response));
+    }
+
+    @PostMapping("/command/terminate")
+    public ResponseEntity<?> terminateCommand(@RequestParam Long sshInfoId) {
+        sshService.closeSession(sshInfoId);
+        return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, "세션 종료 완료"));
     }
 }

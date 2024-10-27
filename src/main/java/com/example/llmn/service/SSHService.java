@@ -79,9 +79,10 @@ public class SSHService {
     // SSH 세션 종료
     public void closeSession(Long sshInfoId) {
         SSHCommandExecutor executor = executorSession.get(sshInfoId);
-
         if (executor != null) {
             executor.close();
+            executorSession.remove(sshInfoId);
+            log.info("세션 종료 완료. SSH 정보 ID: " + sshInfoId);
         }
     }
 
