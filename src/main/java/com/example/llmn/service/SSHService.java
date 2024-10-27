@@ -31,7 +31,7 @@ public class SSHService {
     private static final String BLANK_STRING = "";
 
     @Transactional
-    public String executeCommandInShell(String command, Long sshInfoId) {
+    public synchronized String executeCommandInShell(String command, Long sshInfoId) {
         SSHCommandExecutor executor = getSshExecutor(sshInfoId);
 
         if(executor == null){
