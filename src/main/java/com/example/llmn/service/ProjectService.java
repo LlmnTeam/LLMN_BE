@@ -309,27 +309,6 @@ public class ProjectService {
         return sshService.executeCommandInShell(command, isFirstExecution, monitoringSshId);
     }
 
-    @Transactional
-    public void stopCommend(Long userId){
-        Long monitoringSshId = userRepository.findMonitoringSshId(userId).orElseThrow(
-                () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
-        );
-
-        sshService.closeSession(monitoringSshId);
-    }
-
-    @Transactional
-    public void executeSigInt(Long userId){
-        Long monitoringSshId = userRepository.findMonitoringSshId(userId).orElseThrow(
-                () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
-        );
-
-        SSHCommandExecutor executor = sshService.getSshExecutor(monitoringSshId, false);
-        if (executor != null) {
-            executor.sendSigint();
-        }
-    }
-
     private String formatLocalDateTime(LocalDateTime localDateTime) {
         if(localDateTime == null){
             return null;

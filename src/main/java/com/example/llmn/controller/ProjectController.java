@@ -15,6 +15,7 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.parameters.P;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 
@@ -126,6 +127,12 @@ public class ProjectController {
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, null));
     }
 
+    @PostMapping("/command/init")
+    public ResponseEntity<?> initCommend(@AuthenticationPrincipal CustomUserDetails userDetails){
+        sshService.initCommend(userDetails.getUser().getId());
+        return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, null));
+    }
+
     @PostMapping("/command/home")
     public ResponseEntity<?> executeCommandInHome(@RequestBody ProjectRequest.ExecuteCommandDTO requestDTO, @AuthenticationPrincipal CustomUserDetails userDetails) {
         String response = projectService.executeCommandInHome(requestDTO.command(), requestDTO.isFirstExecution(), userDetails.getUser().getId());
@@ -134,13 +141,13 @@ public class ProjectController {
 
     @PostMapping("/command/terminate")
     public ResponseEntity<?> terminateCommand(@AuthenticationPrincipal CustomUserDetails userDetails) {
-        projectService.stopCommend(userDetails.getUser().getId());
+        sshService.stopCommend(userDetails.getUser().getId());
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, null));
     }
 
     @PostMapping("/command/interrupt")
     public ResponseEntity<?> interruptCommand(@AuthenticationPrincipal CustomUserDetails userDetails) {
-       projectService.executeSigInt(userDetails.getUser().getId());
+        sshService.executeSigInt(userDetails.getUser().getId());
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, null));
     }
 }

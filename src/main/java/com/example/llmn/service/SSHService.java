@@ -6,6 +6,7 @@ import com.example.llmn.core.errors.ExceptionCode;
 import com.example.llmn.core.utils.SSHCommandExecutor;
 import com.example.llmn.domain.SshInfo;
 import com.example.llmn.repository.SshInfoRepository;
+import com.example.llmn.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -22,6 +23,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class SSHService {
 
     private final RedisService redisService;
+    private final UserRepository userRepository;
     private final SshInfoRepository sshInfoRepository;
     private final Map<Long, SSHCommandExecutor> executorSession = new ConcurrentHashMap<>();
     private static final String REDIS_SSH_KEY = "SSH";
@@ -29,6 +31,20 @@ public class SSHService {
     private static final String DELIMITER = "-";
     private static final String EXECUTE_FAIL_BY_SESSION = "세션이 연결되지 않아 명령어 실행을 실패하였습니다.";
     private static final String BLANK_STRING = "";
+
+    @Transactional
+    public void initCommend(Long userId){
+        Long monitoringSshId = userRepository.findMonitoringSshId(userId).orElseThrow(
+                () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
+        );
+
+        SSHCommandExecutor executor = getSshExecutor(monitoringSshId, true);
+        if(executor == null){
+            return;
+        }
+
+        executor.flushInitialMessage();
+    }
 
     @Transactional
     public String executeCommandInShell(String command, boolean isFirstExecution, Long sshInfoId) {
@@ -52,6 +68,31 @@ public class SSHService {
         return executor.executeCommandOnce(command);
     }
 
+    @Transactional
+    public void stopCommend(Long userId){
+        Long monitoringSshId = userRepository.findMonitoringSshId(userId).orElseThrow(
+                () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
+        );
+
+        SSHCommandExecutor executor = executorSession.get(monitoringSshId);
+        if (executor != null) {
+            executor.close();
+            executorSession.remove(monitoringSshId);
+        }
+    }
+
+    @Transactional
+    public void executeSigInt(Long userId){
+        Long monitoringSshId = userRepository.findMonitoringSshId(userId).orElseThrow(
+                () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
+        );
+
+        SSHCommandExecutor executor = getSshExecutor(monitoringSshId, false);
+        if (executor != null && executor.isConnected()) {
+            executor.sendSigint();
+        }
+    }
+
     @Scheduled(cron = "0 32 12 * * *") // 매일 12시 32분
     public void checkSshConnection(){
         List<SshInfo> sshInfos = sshInfoRepository.findAll();
@@ -73,17 +114,6 @@ public class SSHService {
             return response.contains("load average");
         } catch (Exception e) {
             return false;
-        }
-    }
-
-    // SSH 세션 종료
-    public void closeSession(Long sshInfoId) {
-        SSHCommandExecutor executor = executorSession.get(sshInfoId);
-
-        if (executor != null) {
-            executor.close();
-            executorSession.remove(sshInfoId);
-            log.info("세션 종료 완료. SSH 정보 ID: " + sshInfoId);
         }
     }
 

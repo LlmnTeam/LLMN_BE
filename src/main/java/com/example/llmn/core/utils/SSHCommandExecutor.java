@@ -9,7 +9,7 @@ import org.apache.sshd.client.channel.ClientChannelEvent;
 import org.apache.sshd.client.future.ConnectFuture;
 import org.apache.sshd.client.session.ClientSession;
 import org.apache.sshd.common.channel.PtyChannelConfiguration;
-import org.springframework.web.socket.WebSocketSession;
+import org.apache.sshd.common.channel.PtyMode;
 import redis.clients.jedis.Jedis;
 
 import java.io.*;
@@ -17,9 +17,7 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.security.KeyPair;
-import java.util.Collections;
-import java.util.EnumSet;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 @Slf4j
@@ -73,6 +71,10 @@ public class SSHCommandExecutor {
         ptyConfig.setPtyWidth(640);     // 실제 창 너비 설정
         ptyConfig.setPtyHeight(480);    // 실제 창 높이 설정
 
+        Map<PtyMode, Integer> terminalModes = new HashMap<>();
+        terminalModes.put(PtyMode.ECHO, 0);
+        ptyConfig.setPtyModes(terminalModes);
+
         // 7. ShellChannel 객체 생성
         shellChannel = session.createShellChannel(ptyConfig, Collections.emptyMap());
 
@@ -85,9 +87,6 @@ public class SSHCommandExecutor {
         } else {
             throw new CustomException(ExceptionCode.SHELL_CONNECT_FAIL);
         }
-
-        // 9. 리눅스 인사 메시지 삭제
-        flushInitialMessage();
     }
 
     // 각 스레드가 동시에 동일한 SSH 세션에 접근하여 명령어를 실행하고, 동일한 pipedIn과 pipedOut 스트림에 동시 접근할 수 있는 문제 방지를 위해 syschronizrd 사용
@@ -198,6 +197,7 @@ public class SSHCommandExecutor {
 
             if (bytesRead != -1) {
                 String output = new String(buffer, 0, bytesRead, StandardCharsets.UTF_8);
+                System.out.println(output);
                 resultBuilder.append(output);
 
                 // Redis에 읽고 있는 데이터 전송
@@ -206,22 +206,24 @@ public class SSHCommandExecutor {
         }
     }
 
-    private void flushInitialMessage() {
-        StringBuilder resultBuilder = new StringBuilder();
-        byte[] buffer = new byte[4096];
-
+    public void flushInitialMessage() {
         try {
-            while (checkIfCommandCompleted(resultBuilder.toString())) {
-                while (pipedOut.available() > 0) {
-                    int bytesRead = pipedOut.read(buffer);
+            StringBuilder resultBuilder = new StringBuilder();
+            byte[] buffer = new byte[4096];
+            boolean commandCompleted = false;
 
-                    if (bytesRead != -1) {
-                        resultBuilder.append(new String(buffer, 0, bytesRead, StandardCharsets.UTF_8));
-                    }
+            while (!commandCompleted) {
+                readAvailableOutput(resultBuilder, buffer);
+
+                commandCompleted = checkIfCommandCompleted(resultBuilder.toString());
+                if (!commandCompleted) {
+                    Thread.sleep(100); // CPU 자원 낭비 방지
                 }
             }
         } catch (IOException e){
-            log.info("리눅스 초기 메시지 flush 작업 실패!");
+            log.info("<SSHD> ShellChannel에서 명령어 실행 실패 : " + e);
+        } catch (InterruptedException e) {
+            log.info("<SSHD> 명령어 실행 중 쓰레드에 문제 발생 : " + e);
         }
     }
 
