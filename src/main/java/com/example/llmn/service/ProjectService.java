@@ -17,6 +17,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -307,6 +308,13 @@ public class ProjectService {
         );
 
         return sshService.executeCommandInShell(command, isFirstExecution, monitoringSshId);
+    }
+
+    @Transactional
+    @Scheduled(cron = "0 0 0,12 * * *")
+    public void initEmergency() {
+        List<Project> projects = projectRepository.findAll();
+        projects.forEach(project -> project.updateIsUrgent(false));
     }
 
     private String formatLocalDateTime(LocalDateTime localDateTime) {
