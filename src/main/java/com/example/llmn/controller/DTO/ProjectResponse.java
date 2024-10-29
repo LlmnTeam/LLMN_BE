@@ -49,7 +49,8 @@ public class ProjectResponse {
             String name,
             String description,
             List<SummaryDTO> summaries,
-            boolean isLastPage){}
+            boolean isLastPage,
+            int pageNum){}
 
     public record SummaryDTO(
             Long id,

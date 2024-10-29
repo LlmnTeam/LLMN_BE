@@ -232,13 +232,12 @@ public class ProjectService {
                         summary.isChecked()))
                 .toList();
 
-        boolean isLastPage = summaryPage.isLast();
-
         return new ProjectResponse.FindProjectSummaryDTO(
                 project.getProjectName(),
                 project.getDescription(),
                 summaryDTOS,
-                isLastPage // 마지막 페이지 여부 반환
+                summaryPage.isLast(),
+                summaryPage.getTotalPages()
         );
     }
 
