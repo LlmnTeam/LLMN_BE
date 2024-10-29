@@ -82,7 +82,7 @@ async def generate_log_summary(content: str):
     chatmodel = ChatOpenAI(
         model="gpt-4o-mini",
         temperature=0.3,
-        max_tokens=750,
+        max_tokens=1200,
         openai_api_key=app_settings.OPENAI_API_KEY
     )
     
