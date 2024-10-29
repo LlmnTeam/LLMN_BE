@@ -231,9 +231,9 @@ public class UserService {
         Path path = Paths.get(UPLOAD_DIR + File.separator + fileName);
 
         // 경로에 해당 파일이 이미 존재하는지 확인
-        if (Files.exists(path)) {
-            throw new CustomException(ExceptionCode.ALREADY_EXIST_FILE);
-        }
+        //if (Files.exists(path)) {
+        //    throw new CustomException(ExceptionCode.ALREADY_EXIST_FILE);
+        //}
 
         try {
             Files.write(path, file.getBytes());
