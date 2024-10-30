@@ -79,8 +79,8 @@ public class AlarmService {
     @Scheduled(cron = "0 5 0 * * *")
     public void deleteReadAlarm(){
         // 일주일이 지난 이미 읽은 알람들
-        LocalDateTime previousWeekDate = LocalDateTime.now().minusWeeks(1);
-        List<Alarm> readAlarm = alarmRepository.findReadBeforeDate(previousWeekDate);
+        LocalDateTime previousDate = LocalDateTime.now().minusDays(3);
+        List<Alarm> readAlarm = alarmRepository.findReadBeforeDate(previousDate);
 
         alarmRepository.deleteAll(readAlarm);
     }
