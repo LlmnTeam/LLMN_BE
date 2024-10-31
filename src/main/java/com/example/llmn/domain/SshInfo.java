@@ -41,10 +41,11 @@ public class SshInfo extends TimeStamp{
         this.isWorking = true;
     }
 
-    public void updateSshInfo(String remoteHost, String remoteName, String remoteKeyPath){
+    public void updateSshInfo(String remoteHost, String remoteName, String remoteKeyPath, boolean isWorking){
         this.remoteHost = remoteHost;
         this.remoteName = remoteName;
         this.remoteKeyPath = remoteKeyPath;
+        this.isWorking = isWorking;
     }
 
     public void updateIsWorking(boolean isWorking){

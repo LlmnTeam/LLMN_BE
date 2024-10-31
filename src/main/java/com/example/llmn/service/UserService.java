@@ -1,6 +1,5 @@
 package com.example.llmn.service;
 
-import com.example.llmn.controller.DTO.LogDTO;
 import com.example.llmn.controller.DTO.MetricResponse;
 import com.example.llmn.controller.DTO.UserRequest;
 import com.example.llmn.controller.DTO.UserResponse;
@@ -42,7 +41,6 @@ import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
 import java.security.SecureRandom;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -609,19 +607,18 @@ public class UserService {
                     .findFirst();
 
             if (matchingDTO.isPresent()) {
-                updateSshInfoIfChanged(sshInfo, matchingDTO.get());
+                updateSshInfo(sshInfo, matchingDTO.get());
             } else {
                 sshInfoRepository.delete(sshInfo);
             }
         }
     }
 
-    private void updateSshInfoIfChanged(SshInfo sshInfo, UserRequest.SshInfoDTO sshInfoDTO) {
-        if (!sshInfo.getRemoteHost().equals(sshInfoDTO.remoteHost()) ||
-                !sshInfo.getRemoteName().equals(sshInfoDTO.remoteName()) ||
-                !sshInfo.getRemoteKeyPath().equals(sshInfoDTO.remoteKeyPath())) {
-            sshInfo.updateSshInfo(sshInfoDTO.remoteHost(), sshInfoDTO.remoteName(), sshInfoDTO.remoteKeyPath());
-        }
+    private void updateSshInfo(SshInfo sshInfo, UserRequest.SshInfoDTO sshInfoDTO) {
+        sshInfo.updateSshInfo(sshInfoDTO.remoteHost(),
+                sshInfoDTO.remoteName(),
+                sshInfoDTO.remoteKeyPath(),
+                true);
     }
 
     // monitoringSshHost를 가진 SshInfo 객체 찾기
