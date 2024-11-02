@@ -211,9 +211,7 @@ public class UserService {
     }
 
     public UserResponse.VerifySshConnectDTO verifySshConnect(UserRequest.VerifySshConnectDTO requestDTO){
-        System.out.println("request=" + requestDTO.toString());
         boolean isValid = sshService.checkConnectionValid(requestDTO.remoteHost(), requestDTO.remoteName(), requestDTO.remoteKeyPath());
-        System.out.println("isValid=" + isValid);
         return new UserResponse.VerifySshConnectDTO(isValid);
     }
 

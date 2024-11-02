@@ -86,7 +86,8 @@ docker compose up -d
 ```
 
 #### □ 모니터링 서비스 설치 </br>
-> Requirements: Docker, Docker Compose </br>
+> Requirements: Docker, Docker Compose, OpenAI Key </br>
+> (OpenAI 키가 있어야 정상적으로 서비스를 이용할 수 있습니다)
 ```bash
 git clone https://github.com/pnucse-capstone-2024/Capstone-2024-team-44.git
 cd Capstone-2024-team-44
@@ -95,9 +96,63 @@ docker compose up -d
 ```
 </br>
 
+
 ### 4. 소개 및 시연 영상
-> 프로젝트에 대한 소개와 시연 영상을 넣으세요.
+#### □ 소개 </br>
+|로그인|회원가입(3단계 중 2단계, 클라우드 등록)|
+|:--:|:--:|
+|<img width="500" alt="로그인" src="./images/로그인.png">|<img width="500" alt="회원가입" src="./images/회원가입.png">|
+
+|대시보드|검색|
+|:--:|:--:|
+|<img width="500" alt="대시보드" src="./images/대시보드.png">|<img width="500" alt="검색" src="./images/검색.png">|
+
+|프로젝트 목록|프로젝트 상세조회|
+|:--:|:--:|
+|<img width="500" alt="프로젝트 목록" src="./images/프로젝트.png">|<img width="500" alt="프로젝트 상세조회" src="./images/로그 개요.png">|
+
+|로그 조회|로그 요약|
+|:--:|:--:|
+|<img width="500" alt="로그 조회" src="./images/로그 조회.png">|<img width="500" alt="로그 요약" src="./images/로그 요약.png">|
+
+|질문하기|원격 SSH 명령|
+|:--:|:--:|
+|<img width="500" alt="질문하기" src="./images/질문.png">|<img width="500" alt="원격 SSH 명령" src="./images/커맨드.png">|
+
+|인사이트(성능요약, 일일요약) |인사이트(주간 요약, 추천)|
+|:--:|:--:|
+|<img width="500" alt="인사이트 1" src="./images/인사이트 1.png">|<img width="500" alt="인사이트 2" src="./images/인사이트 2.png">|
+
+#### □ 시연 영상 </br>
+- **회원가입 (정보 입력 => 모니터링 할 클라우드의 SSH 정보 검증 및 추가 => OpenAI 키 검증 및 추가)**
+
+https://github.com/user-attachments/assets/b7565570-59dd-4459-b86e-dc59c5bd0f54
+
 </br>
+
+- **로그인 => 로그 요약, 인사이트 => 검색** 
+
+https://github.com/user-attachments/assets/9c2ae38d-41b0-4252-9841-b8a054e96235
+
+</br>
+
+- ** **클라우드에 SSH 원격으로 명령 내리기**
+
+https://github.com/user-attachments/assets/1df00660-5230-4598-88d3-076efc01772e
+
+</br>
+
+- ** **특정 로그에 대해 챗봇에 질문하기**
+
+https://github.com/user-attachments/assets/b23fdeee-924a-478a-9b58-0596aaa2e955
+
+</br>
+
+#### □ 발표 영상 </br>
+<a href="https://www.youtube.com/watch?v=EM1icrt529k&list=PLFUP9jG-TDp-CVdTbHvql-WoADl4gNkKj&index=43">
+  <img src="./images/with_play_button.png" alt="프로젝트 소개 영상" width="500"/>
+</a>
+</br></br>
 
 ### 5. 팀 소개
 
@@ -106,3 +161,4 @@ docker compose up -d
 | 이한홍  | yg04076@pusan.ac.kr | <ul><li>REST API 및 DB 설계</li><li>Figma를 활용한 UI/UX 설계 및 디자인</li><li>Filebeat, Logstash, ElasticSearch을 연동한 로그 수집 파이프라인을 구축 및 Spring Boot와 통합</li><li>Apache SSHD로 클라이언트와 클라우드 서버 간 SSH 연결 기능 구현</li><li>SSE 기술로 LLM의 응답을 실시간 스트리밍 형식으로 제공하는 기능 구현</li><li>로그인, 회원관리, 프로젝트 관리, 성능 모니터링, 로그 분석 및 알림 API 개발</li><li>LangChain과 OpenAI API 연동, 프롬프트 작성 및 로그 분석 API 개발</li><li>서비스 배포</li><li>착수, 중간, 최종 보고서, 포스터 작성</li></ul> |
 | 이종일  | leejongil1046@gmail.com | <ul><li>React, NextJS, TS, TailWind CSS를 이용한 웹 페이지 구현</li><li>UI/UX 개선을 통한 반응형 웹 페이지 구현</li><li>SSR 도입으로 실시간 데이터 처리 구현</li></ul> |
 | 박재홍  | qkrwoghd2000@pusan.ac.kr | <ul><li>로그 분석을 위한 LLM 프롬프팅 작성에 기여</li><li>시연회 준비 및 발표 자료 제작</li></ul> |
+
