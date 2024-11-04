@@ -18,4 +18,8 @@ public interface MetricRepository extends JpaRepository<Metric, Long> {
     @Modifying
     @Query("DELETE FROM Metric m WHERE m.sshInfo.user = :userId")
     void deleteByUserId(Long userId);
+
+    @Modifying
+    @Query("DELETE FROM Metric m WHERE m.sshInfo.id = :sshId")
+    void deleteBySShInfoId(Long sshId);
 }

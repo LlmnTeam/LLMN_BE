@@ -609,6 +609,7 @@ public class UserService {
             if (matchingDTO.isPresent()) {
                 updateSshInfo(sshInfo, matchingDTO.get());
             } else {
+                metricRepository.deleteBySShInfoId(sshInfo.getId());
                 sshInfoRepository.delete(sshInfo);
             }
         }
