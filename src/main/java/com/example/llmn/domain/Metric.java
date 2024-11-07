@@ -21,22 +21,22 @@ public class Metric extends TimeStamp {
     private SshInfo sshInfo;
 
     @Column
-    private double cpuUsage;
+    private Double cpuUsage;
 
     @Column
-    private double totalMemory;
+    private Double totalMemory;
 
     @Column
-    private double usedMemory;
+    private Double usedMemory;
 
     @Column
-    private double totalBytesReceived;
+    private Double totalBytesReceived;
 
     @Column
-    private double totalBytesSent;
+    private Double totalBytesSent;
 
     @Builder
-    public Metric(SshInfo sshInfo, double cpuUsage, double totalMemory, double usedMemory, double totalBytesReceived, double totalBytesSent) {
+    public Metric(SshInfo sshInfo, Double cpuUsage, Double totalMemory, Double usedMemory, Double totalBytesReceived, Double totalBytesSent) {
         this.sshInfo = sshInfo;
         this.cpuUsage = cpuUsage;
         this.totalMemory = totalMemory;

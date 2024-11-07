@@ -134,17 +134,17 @@ public class MetricService {
             String time = metric.getCreatedDate().format(formatterForHourAndMin);
 
             // 1. CPU 데이터
-            double cpuUsage = Math.round(metric.getCpuUsage() * 1000.0) / 1000.0;
+            Double cpuUsage = Math.round(metric.getCpuUsage() * 1000.0) / 1000.0;
             cpuMetricDTOS.add(new MetricResponse.CpuMetricDTO(time, cpuUsage));
 
             // 2. 메모리 사용량 (%로 변환)
-            double memoryUsage = metric.getTotalMemory() > 0 ?
+            Double memoryUsage = metric.getTotalMemory() > 0 ?
                     Math.round((metric.getUsedMemory() / metric.getTotalMemory() * 100) * 1000.0) / 1000.0 : 0.0;
             memoryMetricDTOS.add(new MetricResponse.MemoryMetricDTO(time, memoryUsage));
 
             // 3. 네트워크 수신/송신
-            double networkReceived = Math.round(metric.getTotalBytesReceived() * 1000.0) / 1000.0;
-            double networkSent = Math.round(metric.getTotalBytesSent() * 1000.0) / 1000.0;
+            Double networkReceived = Math.round(metric.getTotalBytesReceived() * 1000.0) / 1000.0;
+            Double networkSent = Math.round(metric.getTotalBytesSent() * 1000.0) / 1000.0;
             networkInMetricDTOS.add(new MetricResponse.NetworkInMetricDTO(time, networkReceived));
             networkOutMetricDTOS.add(new MetricResponse.NetworkOutMetricDTO(time, networkSent));
         });
@@ -168,9 +168,9 @@ public class MetricService {
             // CPU 사용량 라인 처리 (%Cpu(s): 0.0 us, 6.2 sy, 0.0 ni, 93.8 id, 0.0 wa, 0.0 hi, 0.0 si, 0.0 st)
             Matcher cpuMatcher = CPU_PATTERN.matcher(line);
             if (cpuMatcher.matches()) {
-                double usUsage = Double.parseDouble(cpuMatcher.group(1));
-                double syUsage = Double.parseDouble(cpuMatcher.group(2));
-                double cpuUsage = usUsage + syUsage;
+                Double usUsage = Double.parseDouble(cpuMatcher.group(1));
+                Double syUsage = Double.parseDouble(cpuMatcher.group(2));
+                Double cpuUsage = usUsage + syUsage;
                 metricsMap.put(METRIC_MAP_CPU_USAGE, cpuUsage);
                 continue;
             }
@@ -178,8 +178,8 @@ public class MetricService {
             // 메모리 사용량 라인 처리 (MiB Mem : 949.2 total, 141.4 free, 325.1 used, 482.8 buff/cache)
             Matcher memMatcher = MEM_PATTERN.matcher(line);
             if (memMatcher.matches()) {
-                double memTotal = Double.parseDouble(memMatcher.group(1));
-                double memUsed = Double.parseDouble(memMatcher.group(3));
+                Double memTotal = Double.parseDouble(memMatcher.group(1));
+                Double memUsed = Double.parseDouble(memMatcher.group(3));
                 metricsMap.put(METRIC_MAP_TOTAL_MEMORY, memTotal);
                 metricsMap.put(METRIC_MAP_USED_MEMORY, memUsed);
             }
@@ -198,12 +198,12 @@ public class MetricService {
         }
 
         // Redis에서 이전 네트워크 사용량 조회 (없으면 0.0 반환)
-        double previousReceived = redisService.getDataInDouble(REDIS_KEY_NETWORK_REC);
-        double previousTransmitted = redisService.getDataInDouble(REDIS_KEY_NETWORK_TRANS);
+        Double previousReceived = redisService.getDataInDouble(REDIS_KEY_NETWORK_REC);
+        Double previousTransmitted = redisService.getDataInDouble(REDIS_KEY_NETWORK_TRANS);
 
         // 네트워크 사용량 차이 계산
-        double receivedDiff = currentNetworkMetric.getOrDefault(METRIC_MAP_NETWORK_REC, 0.0) - previousReceived;
-        double transmittedDiff = currentNetworkMetric.getOrDefault(METRIC_MAP_NETWORK_SENT, 0.0) - previousTransmitted;
+        Double receivedDiff = currentNetworkMetric.getOrDefault(METRIC_MAP_NETWORK_REC, 0.0) - previousReceived;
+        Double transmittedDiff = currentNetworkMetric.getOrDefault(METRIC_MAP_NETWORK_SENT, 0.0) - previousTransmitted;
 
         Map<String, Double> metricsMap = new HashMap<>();
         metricsMap.put(METRIC_MAP_NETWORK_REC, receivedDiff);
@@ -223,17 +223,17 @@ public class MetricService {
         LocalDateTime todayStart = LocalDateTime.now().withHour(0).withMinute(0).withSecond(0).withNano(0);
         List<Metric> metrics = metricRepository.findALlWithinDate(todayStart, sshInfoId);
 
-        double dailyReceived = metrics.stream()
+        Double dailyReceived = metrics.stream()
                 .mapToDouble(Metric::getTotalBytesReceived)
                 .sum();
 
-        double dailySent = metrics.stream()
+        Double dailySent = metrics.stream()
                 .mapToDouble(Metric::getTotalBytesSent)
                 .sum();
 
         Map<String, Long> dailyTraffic = new HashMap<>();
-        dailyTraffic.put(METRIC_MAP_DAILY_NET_REC, (long) dailyReceived);
-        dailyTraffic.put(METRIC_MAP_DAILY_NET_SENT, (long) dailySent);
+        dailyTraffic.put(METRIC_MAP_DAILY_NET_REC, dailyReceived.longValue());
+        dailyTraffic.put(METRIC_MAP_DAILY_NET_SENT, dailySent.longValue());
 
         return dailyTraffic;
     }
@@ -261,8 +261,8 @@ public class MetricService {
                         long transmittedBytes = Long.parseLong(parts[9]);  // 송신된 바이트
 
                         // 바이트를 MB로 변환
-                        double receivedMB = receivedBytes / (1024.0 * 1024.0);
-                        double transmittedMB = transmittedBytes / (1024.0 * 1024.0);
+                        Double receivedMB = receivedBytes / (1024.0 * 1024.0);
+                        Double transmittedMB = transmittedBytes / (1024.0 * 1024.0);
 
                         networkUsageMap.put(METRIC_MAP_NETWORK_REC, receivedMB);
                         networkUsageMap.put(METRIC_MAP_NETWORK_SENT, transmittedMB);
