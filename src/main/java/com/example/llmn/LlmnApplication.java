@@ -10,10 +10,10 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @EnableJpaAuditing
 @EnableScheduling
 @EnableAsync
-public class LlmOpsApplication {
+public class LlmnApplication {
 
 	public static void main(String[] args) {
-		SpringApplication.run(LlmOpsApplication.class, args);
+		SpringApplication.run(LlmnApplication.class, args);
 	}
 
 }

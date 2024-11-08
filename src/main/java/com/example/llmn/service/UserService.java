@@ -134,41 +134,11 @@ public class UserService {
         }
 
         // 유저 엔티티 저장
-        User user = User.builder()
-                .nickName(requestDTO.nickName())
-                .email(requestDTO.email())
-                .password(passwordEncoder.encode(requestDTO.password()))
-                .receivingAlarm(requestDTO.receivingAlarm())
-                .build();
+        User user = saveUser(requestDTO);
 
-        userRepository.save(user);
-
-        // SSH 엔티티 저장
-        List<SshInfo> sshInfos = new ArrayList<>();
-
-        requestDTO.sshInfos().forEach(sshInfoDTO -> {
-            SshInfo sshInfo = SshInfo.builder()
-                    .user(user)
-                    .remoteName(sshInfoDTO.remoteName())
-                    .remoteHost(sshInfoDTO.remoteHost())
-                    .remoteKeyPath(sshInfoDTO.remoteKeyPath())
-                    .build();
-
-            sshInfoRepository.save(sshInfo);
-            sshInfos.add(sshInfo);
-        });
-
-        // 모니터링 하기로 한 SshInfo Host를 바탕으로 SshInfo 객체 찾기
-        Optional<SshInfo> monitoringSshInfo = sshInfos.stream()
-                .filter(sshInfo -> sshInfo.getRemoteHost().equals(requestDTO.monitoringSshHost()))
-                .findFirst();
-
-        // 찾아서 없다면 요청이 잘못 들어옴
-        if(monitoringSshInfo.isEmpty()){
-            throw new CustomException(ExceptionCode.MONITORING_SSH_NOT_SELECT);
-        }
-
-        user.updateMonitoringSshInfoId(monitoringSshInfo.get().getId());
+        // SSH 엔티티 저장 및 모니터링 SSH 정보 설정
+        List<SshInfo> sshInfos = saveSshInfos(requestDTO.sshInfos(), user);
+        setMonitoringSshInfo(requestDTO.monitoringSshHost(), sshInfos, user);
 
         // OpenAI API 키 저장
         updateFastAPIEnvFile(OPEN_API_KEY, requestDTO.openAiKey());
@@ -679,5 +649,47 @@ public class UserService {
     private URI buildURI(String uri) {
         UriComponentsBuilder uriBuilder = UriComponentsBuilder.fromHttpUrl(uri);
         return uriBuilder.build().encode().toUri();
+    }
+
+    private List<SshInfo> saveSshInfos(List<UserRequest.SshInfoDTO> requestSshInfos, User user) {
+        List<SshInfo> sshInfos = new ArrayList<>();
+
+        requestSshInfos.forEach(sshInfoDTO -> {
+            SshInfo sshInfo = SshInfo.builder()
+                    .user(user)
+                    .remoteName(sshInfoDTO.remoteName())
+                    .remoteHost(sshInfoDTO.remoteHost())
+                    .remoteKeyPath(sshInfoDTO.remoteKeyPath())
+                    .build();
+
+            sshInfoRepository.save(sshInfo);
+            sshInfos.add(sshInfo);
+        });
+
+        return sshInfos;
+    }
+
+    private User saveUser(UserRequest.JoinDTO joinRequestDTO) {
+        User user = User.builder()
+                .nickName(joinRequestDTO.nickName())
+                .email(joinRequestDTO.email())
+                .password(passwordEncoder.encode(joinRequestDTO.password()))
+                .receivingAlarm(joinRequestDTO.receivingAlarm())
+                .build();
+
+        userRepository.save(user);
+        return user;
+    }
+
+    private void setMonitoringSshInfo(String monitoringSshHost, List<SshInfo> sshInfos, User user) {
+        Optional<SshInfo> monitoringSshInfo = sshInfos.stream()
+                .filter(sshInfo -> sshInfo.getRemoteHost().equals(monitoringSshHost))
+                .findFirst();
+
+        if (monitoringSshInfo.isEmpty()) {
+            throw new CustomException(ExceptionCode.MONITORING_SSH_NOT_SELECT);
+        }
+
+        user.updateMonitoringSshInfoId(monitoringSshInfo.get().getId());
     }
 }
