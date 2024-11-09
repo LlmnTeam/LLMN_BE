@@ -99,11 +99,6 @@ public class MetricService {
         Map<String, Double> topMetrics = collectTopMetrics(sshInfoId);
         Map<String, Double> networkMetrics = collectNetworkMetrics(sshInfoId, NOT_UPDATE_CACHE);
 
-        // 지표 조회 실패 => null 반환
-        if(topMetrics.isEmpty() || networkMetrics.isEmpty()){
-            return null;
-        }
-
         MetricResponse.FindCurrentMetricDTO metricDTO = new MetricResponse.FindCurrentMetricDTO(
                 topMetrics.getOrDefault(METRIC_MAP_CPU_USAGE, 0.0),
                 topMetrics.getOrDefault(METRIC_MAP_TOTAL_MEMORY, 0.0),
@@ -313,6 +308,7 @@ public class MetricService {
 
     private void cacheMetricDTO(Long sshInfoId, MetricResponse.FindCurrentMetricDTO metricDTO) {
         String value = convertMetricDtoToString(metricDTO);
+
         if (!value.isBlank()) {
             redisService.storeValue(METRIC_KEY, sshInfoId.toString(), value, METRIC_EXP);
         }
