@@ -194,19 +194,15 @@ public class UserService {
         // 로그 파일 디렉토리가 없으면 생성
         createDirIfNotExist();
 
-        // 파일 경로 구하기
+        // 파일 업로드 경로 구하기
         String fileName = file.getOriginalFilename();
         Path path = Paths.get(UPLOAD_DIR + File.separator + fileName);
 
-        // 경로에 해당 파일이 이미 존재하는지 확인
-        //if (Files.exists(path)) {
-        //    throw new CustomException(ExceptionCode.ALREADY_EXIST_FILE);
-        //}
-
+        // 파일 업로드
         try {
             Files.write(path, file.getBytes());
         } catch (IOException e) {
-            log.info("업로드 파일 저장 실패");
+            log.error("업로드 파일 저장 실패");
             throw new CustomException(ExceptionCode.SAVE_FILE_FAIL);
         }
 
@@ -233,11 +229,10 @@ public class UserService {
         // CODE_TO_EMAIL 키 삭제
         redisService.removeData(CODE_TO_EMAIL_KEY_PREFIX, requestDTO.code());
 
+        // 새로운 비밀번호로 업데이트
         User user = userRepository.findByEmail(email).orElseThrow(
                 () -> new CustomException(ExceptionCode.USER_EMAIL_NOT_FOUND)
         );
-
-        // 새로운 비밀번호로 업데이트
         user.updatePassword(passwordEncoder.encode(requestDTO.newPassword()));
     }
 
@@ -247,44 +242,28 @@ public class UserService {
                 () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
         );
 
+        // 1. 원격 클라우드 호스트 정보
         String remoteHost = sshInfoRepository.findHostById(sshInfoId).orElseThrow(
                 () -> new CustomException(ExceptionCode.SSH_NOT_FOUND)
         );
 
-        // 현재 지표
+        // 2. 현재 지표
         MetricResponse.FindCurrentMetricDTO currentMetric = metricService.findCurrentMetric(sshInfoId);
 
-        String cpuUsage = Optional.ofNullable(currentMetric)
-                .map(metric -> String.format("%.2f%%", metric.cpuUsage()))
-                .orElse(NOT_AVAILABLE);
-
-        String memoryUsage = Optional.ofNullable(currentMetric)
-                .filter(metric -> metric.totalMemory() > 0)
-                .map(metric -> String.format("%.2f%%", (metric.usedMemory() / metric.totalMemory()) * 100))
-                .orElse(NOT_AVAILABLE);
-
-        String networkReceived = Optional.ofNullable(currentMetric)
-                .map(metric -> String.format("%.2f MB", metric.networkReceived()))
-                .orElse(NOT_AVAILABLE);
-
-        String networkSent = Optional.ofNullable(currentMetric)
-                .map(metric -> String.format("%.2f MB", metric.networkSent()))
-                .orElse(NOT_AVAILABLE);
-
-        // 과거 지표
+        // 3. 과거 지표
         MetricResponse.FindMetricHistoryDTO metricHistory = metricService.findMetricHistory(24, sshInfoId);
 
-        // 시간별 요약
-        String summary = getLatestHourlySummary()
+        // 4. 시간별 요약
+        String hourlySummary = getLatestHourlySummary()
                 .orElse("요약된 내용이 존재하지 않습니다.");
 
         return new UserResponse.FindDashboardDTO(
                 remoteHost,
-                cpuUsage,
-                memoryUsage,
-                networkReceived,
-                networkSent,
-                summary,
+                formatCpuUsage(currentMetric),
+                formatMemoryUsage(currentMetric),
+                formatNetworkReceived(currentMetric),
+                formatNetworkSent(currentMetric),
+                hourlySummary,
                 metricHistory.cpuMetrics(),
                 metricHistory.memoryMetrics(),
                 metricHistory.networkInMetrics(),
@@ -691,5 +670,30 @@ public class UserService {
         }
 
         user.updateMonitoringSshInfoId(monitoringSshInfo.get().getId());
+    }
+
+    private String formatCpuUsage(MetricResponse.FindCurrentMetricDTO currentMetric) {
+        return Optional.ofNullable(currentMetric)
+                .map(metric -> String.format("%.2f%%", metric.cpuUsage()))
+                .orElse(NOT_AVAILABLE);
+    }
+
+    private String formatMemoryUsage(MetricResponse.FindCurrentMetricDTO currentMetric) {
+        return Optional.ofNullable(currentMetric)
+                .filter(metric -> metric.totalMemory() > 0)
+                .map(metric -> String.format("%.2f%%", (metric.usedMemory() / metric.totalMemory()) * 100))
+                .orElse(NOT_AVAILABLE);
+    }
+
+    private String formatNetworkReceived(MetricResponse.FindCurrentMetricDTO currentMetric) {
+        return Optional.ofNullable(currentMetric)
+                .map(metric -> String.format("%.2f MB", metric.networkReceived()))
+                .orElse(NOT_AVAILABLE);
+    }
+
+    private String formatNetworkSent(MetricResponse.FindCurrentMetricDTO currentMetric) {
+        return Optional.ofNullable(currentMetric)
+                .map(metric -> String.format("%.2f MB", metric.networkSent()))
+                .orElse(NOT_AVAILABLE);
     }
 }
