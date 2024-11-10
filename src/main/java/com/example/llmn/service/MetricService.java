@@ -116,10 +116,10 @@ public class MetricService {
     @Transactional(readOnly = true)
     public MetricResponse.FindMetricHistoryDTO findMetricHistory(int minusHour, Long sshInfoId){
         // minusHour 내 지표들을 모두 가져옴
-        LocalDateTime now = LocalDateTime.now().withMinute(0).withSecond(0).withNano(0);
-        List<Metric> metrics = metricRepository.findALlWithinDate(now.minusHours(minusHour), sshInfoId);
+        LocalDateTime startTime = LocalDateTime.now().withMinute(0).withSecond(0).withNano(0).minusHours(minusHour);
+        List<Metric> metrics = metricRepository.findMetricsAfter(startTime, sshInfoId);
 
-        // CPU, 메모리, 네트워크 수신/송신 데이터 추출 및 변환
+        // CPU, 메모리, 네트워크 수신/송신 지표를 담을 리스트
         List<MetricResponse.CpuMetricDTO> cpuMetricDTOS = new ArrayList<>();
         List<MetricResponse.MemoryMetricDTO> memoryMetricDTOS = new ArrayList<>();
         List<MetricResponse.NetworkInMetricDTO> networkInMetricDTOS = new ArrayList<>();
@@ -127,21 +127,10 @@ public class MetricService {
 
         metrics.forEach(metric -> {
             String time = metric.getCreatedDate().format(formatterForHourAndMin);
-
-            // 1. CPU 데이터
-            double cpuUsage = Math.round(metric.getCpuUsage() * 1000.0) / 1000.0;
-            cpuMetricDTOS.add(new MetricResponse.CpuMetricDTO(time, cpuUsage));
-
-            // 2. 메모리 사용량 (%로 변환)
-            double memoryUsage = metric.getTotalMemory() > 0 ?
-                    Math.round((metric.getUsedMemory() / metric.getTotalMemory() * 100) * 1000.0) / 1000.0 : 0.0;
-            memoryMetricDTOS.add(new MetricResponse.MemoryMetricDTO(time, memoryUsage));
-
-            // 3. 네트워크 수신/송신
-            double networkReceived = Math.round(metric.getTotalBytesReceived() * 1000.0) / 1000.0;
-            double networkSent = Math.round(metric.getTotalBytesSent() * 1000.0) / 1000.0;
-            networkInMetricDTOS.add(new MetricResponse.NetworkInMetricDTO(time, networkReceived));
-            networkOutMetricDTOS.add(new MetricResponse.NetworkOutMetricDTO(time, networkSent));
+            cpuMetricDTOS.add(createCpuMetricDTO(metric, time));
+            memoryMetricDTOS.add(createMemoryMetricDTO(metric, time));
+            networkInMetricDTOS.add(createNetworkInMetricDTO(metric, time));
+            networkOutMetricDTOS.add(createNetworkOutMetricDTO(metric, time));
         });
 
         return new MetricResponse.FindMetricHistoryDTO(cpuMetricDTOS, memoryMetricDTOS, networkInMetricDTOS, networkOutMetricDTOS);
@@ -164,7 +153,7 @@ public class MetricService {
     }
 
     private Map<String, Double> collectNetworkMetrics(Long sshInfoId, boolean updateCache) {
-        // 현재 네트워크 사용량 조회
+        // 1st 현재 네트워크 사용량 조회
         Map<String, Double> currentNetworkMetric = collectCurrentNetworkMetrics(sshInfoId);
 
         // 조회 실패 시 빈 맵 반환
@@ -172,11 +161,11 @@ public class MetricService {
             return Collections.emptyMap();
         }
 
-        // Redis에서 이전 네트워크 사용량 조회 (없으면 0.0 반환)
+        // 2nd Redis에서 이전 네트워크 사용량 조회 (없으면 0.0 반환)
         Double previousReceived = redisService.getDataInDouble(REDIS_KEY_NETWORK_REC);
         Double previousTransmitted = redisService.getDataInDouble(REDIS_KEY_NETWORK_TRANS);
 
-        // 네트워크 사용량 차이 계산
+        // 3rd 네트워크 사용량 차이 계산
         Double receivedDiff = currentNetworkMetric.getOrDefault(METRIC_MAP_NETWORK_REC, 0.0) - previousReceived;
         Double transmittedDiff = currentNetworkMetric.getOrDefault(METRIC_MAP_NETWORK_SENT, 0.0) - previousTransmitted;
 
@@ -196,7 +185,7 @@ public class MetricService {
     private Map<String, Long> getTodayNetworkTraffic(Long sshInfoId) {
         // minusHour 내 지표들을 모두 가져옴
         LocalDateTime todayStart = LocalDateTime.now().withHour(0).withMinute(0).withSecond(0).withNano(0);
-        List<Metric> metrics = metricRepository.findALlWithinDate(todayStart, sshInfoId);
+        List<Metric> metrics = metricRepository.findMetricsAfter(todayStart, sshInfoId);
 
         Double dailyReceived = metrics.stream()
                 .mapToDouble(Metric::getTotalBytesReceived)
@@ -317,5 +306,26 @@ public class MetricService {
             metricsMap.put(METRIC_MAP_TOTAL_MEMORY, memTotal);
             metricsMap.put(METRIC_MAP_USED_MEMORY, memUsed);
         }
+    }
+
+    private MetricResponse.CpuMetricDTO createCpuMetricDTO(Metric metric, String time) {
+        double cpuUsage = Math.round(metric.getCpuUsage() * 1000.0) / 1000.0;
+        return new MetricResponse.CpuMetricDTO(time, cpuUsage);
+    }
+
+    private MetricResponse.MemoryMetricDTO createMemoryMetricDTO(Metric metric, String time) {
+        double memoryUsage = metric.getTotalMemory() > 0 ?
+                Math.round((metric.getUsedMemory() / metric.getTotalMemory() * 100) * 1000.0) / 1000.0 : 0.0;
+        return new MetricResponse.MemoryMetricDTO(time, memoryUsage);
+    }
+
+    private MetricResponse.NetworkInMetricDTO createNetworkInMetricDTO(Metric metric, String time) {
+        double networkReceived = Math.round(metric.getTotalBytesReceived() * 1000.0) / 1000.0;
+        return new MetricResponse.NetworkInMetricDTO(time, networkReceived);
+    }
+
+    private MetricResponse.NetworkOutMetricDTO createNetworkOutMetricDTO(Metric metric, String time) {
+        double networkSent = Math.round(metric.getTotalBytesSent() * 1000.0) / 1000.0;
+        return new MetricResponse.NetworkOutMetricDTO(time, networkSent);
     }
 }

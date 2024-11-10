@@ -13,7 +13,7 @@ import java.util.List;
 @Repository
 public interface MetricRepository extends JpaRepository<Metric, Long> {
     @Query("SELECT m FROM Metric m WHERE m.createdDate >= :date AND m.sshInfo.id = :sshInfoId")
-    List<Metric> findALlWithinDate(@Param("date") LocalDateTime date, @Param("sshInfoId") Long sshInfoId);
+    List<Metric> findMetricsAfter(@Param("date") LocalDateTime date, @Param("sshInfoId") Long sshInfoId);
 
     @Modifying
     @Query("DELETE FROM Metric m WHERE m.sshInfo.user = :userId")
