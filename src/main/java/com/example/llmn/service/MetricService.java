@@ -51,6 +51,7 @@ public class MetricService {
     private static final DateTimeFormatter formatterForHourAndMin = DateTimeFormatter.ofPattern("HH:mm"); // 시간 형식 "HH:mm"
     private static final Pattern CPU_PATTERN = Pattern.compile("%Cpu\\(s\\):\\s+([\\d.]+)\\s+us,\\s+([\\d.]+)\\s+sy,.*");
     private static final Pattern MEM_PATTERN = Pattern.compile("MiB Mem :\\s+([\\d.]+)\\s+total,\\s+([\\d.]+)\\s+free,\\s+([\\d.]+)\\s+used,.*");
+    private static final Pattern NETWORK_PATTERN = Pattern.compile("^(eth|ens|enp|wlan)\\S*:"); // 주요 네트워크 인터페이스 패턴
 
     @Scheduled(cron = "0 0/10 * * * *")
     @Transactional
@@ -163,57 +164,33 @@ public class MetricService {
     private Map<String, Long> getTodayNetworkTraffic(Long sshInfoId) {
         // minusHour 내 지표들을 모두 가져옴
         LocalDateTime todayStart = LocalDateTime.now().withHour(0).withMinute(0).withSecond(0).withNano(0);
-        List<Metric> metrics = metricRepository.findMetricsAfter(todayStart, sshInfoId);
+        List<Metric> networkMetrics = metricRepository.findMetricsAfter(todayStart, sshInfoId);
 
-        Double dailyReceived = metrics.stream()
+        double dailyReceived = networkMetrics.stream()
                 .mapToDouble(Metric::getTotalBytesReceived)
                 .sum();
 
-        Double dailySent = metrics.stream()
+        double dailySent = networkMetrics.stream()
                 .mapToDouble(Metric::getTotalBytesSent)
                 .sum();
 
         Map<String, Long> dailyTraffic = new HashMap<>();
-        dailyTraffic.put(METRIC_MAP_DAILY_NET_REC, dailyReceived.longValue());
-        dailyTraffic.put(METRIC_MAP_DAILY_NET_SENT, dailySent.longValue());
+        dailyTraffic.put(METRIC_MAP_DAILY_NET_REC, (long) dailyReceived);
+        dailyTraffic.put(METRIC_MAP_DAILY_NET_SENT, (long) dailySent);
 
         return dailyTraffic;
     }
 
-    // 조회 실패 => 비어있는 맵 반환
     private Map<String, Double> collectCurrentNetworkMetrics(Long sshInfoId) {
+        // 1st 네트워크를 조회하는 명령어를 실행
         String commandResponse = sshService.executeCommandOnce(COMMAND_NETWORK_USAGE, sshInfoId);
-
-        Map<String, Double> networkUsageMap = new HashMap<>();
-
-        // 주요 네트워크 인터페이스 패턴을 정규식으로 정의
-        Pattern pattern = Pattern.compile("^(eth|ens|enp|wlan)\\S*:");
-
         String[] lines = commandResponse.split("\\n");
+
+        // 2nd 명령어 결과 파싱
+        Map<String, Double> networkUsageMap = new HashMap<>();
         for (String line : lines) {
-            String trimmedLine = line.trim();
-
-            // 패턴에 매칭되는 인터페이스인지 확인
-            Matcher matcher = pattern.matcher(trimmedLine);
-            if (matcher.find()) {
-                String[] parts = trimmedLine.split("\\s+");
-                if (parts.length >= 10) {
-                    try {
-                        long receivedBytes = Long.parseLong(parts[1]);  // 수신된 바이트
-                        long transmittedBytes = Long.parseLong(parts[9]);  // 송신된 바이트
-
-                        // 바이트를 MB로 변환
-                        Double receivedMB = receivedBytes / (1024.0 * 1024.0);
-                        Double transmittedMB = transmittedBytes / (1024.0 * 1024.0);
-
-                        networkUsageMap.put(METRIC_MAP_NETWORK_REC, receivedMB);
-                        networkUsageMap.put(METRIC_MAP_NETWORK_SENT, transmittedMB);
-                        break;  // 최초로 찾은 유효한 인터페이스만 처리 후 종료
-                    } catch (NumberFormatException e) {
-                        log.error("네트워크 사용량 파싱 중 오류 발생: " + line + ", 오류 메시지: " + e.getMessage());
-                    }
-                }
-            }
+            parseNetworkUsage(line.trim(), networkUsageMap);
+            if (!networkUsageMap.isEmpty()) break; // 최초로 찾은 유효한 인터페이스만 처리
         }
 
         if (networkUsageMap.isEmpty()) {
@@ -331,5 +308,27 @@ public class MetricService {
                 .totalBytesReceived(networkMetrics.get(METRIC_MAP_NETWORK_REC))
                 .totalBytesSent(networkMetrics.get(METRIC_MAP_NETWORK_SENT))
                 .build());
+    }
+
+    private void parseNetworkUsage(String line, Map<String, Double> networkUsageMap) {
+        Matcher matcher = NETWORK_PATTERN.matcher(line);
+        if (matcher.find()) {
+            String[] parts = line.split("\\s+");
+            if (parts.length >= 10) {
+                try {
+                    long receivedBytes = Long.parseLong(parts[1]);  // 수신된 바이트
+                    long transmittedBytes = Long.parseLong(parts[9]);  // 송신된 바이트
+
+                    // 바이트를 MB로 변환
+                    Double receivedMB = receivedBytes / (1024.0 * 1024.0);
+                    Double transmittedMB = transmittedBytes / (1024.0 * 1024.0);
+
+                    networkUsageMap.put(METRIC_MAP_NETWORK_REC, receivedMB);
+                    networkUsageMap.put(METRIC_MAP_NETWORK_SENT, transmittedMB);
+                } catch (NumberFormatException e) {
+                    log.error("네트워크 사용량 파싱 중 오류 발생: " + line + ", 오류 메시지: " + e.getMessage());
+                }
+            }
+        }
     }
 }
