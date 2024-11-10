@@ -58,8 +58,8 @@ public class MetricService {
     public void collectMetrics() {
         List<Long> userIds = userRepository.findIds();
 
+        // 사용자가 monitoringSshId를 설정했다면, 설정한 SSH 정보를 사용하여 지표를 수집
         for (Long userId : userIds) {
-            // 사용자가 monitoringSshId를 설정했다면, 설정한 SSH 정보를 사용하여 지표를 수집
             List<SshInfo> sshInfos = sshInfoRepository.findByUserId(userId);
             userRepository.findMonitoringSshId(userId).ifPresent(monitoringSshId ->
                     sshInfos.forEach(sshInfo -> processMetrics(sshInfo, monitoringSshId))
@@ -124,8 +124,8 @@ public class MetricService {
 
         for (String line : lines) {
             line = line.trim();
-            parseAndStoreCpuUsage(metricsMap, line);
-            parseAndStoreMemoryUsage(metricsMap, line);
+            parseCpuUsageInLine(metricsMap, line);
+            parseMemoryUsageInLine(metricsMap, line);
         }
 
         return metricsMap;
@@ -216,8 +216,8 @@ public class MetricService {
         try {
             return objectMapper.readValue(value, MetricResponse.FindCurrentMetricDTO.class);
         } catch (JsonProcessingException e) {;
-            log.info("ObjectMapper 파싱 과정에서 에러 발생");
-            return null; // 변환에 실패한 경우 null 반환
+            log.error("ObjectMapper 파싱 과정에서 에러 발생");
+            return null;
         }
     }
 
@@ -225,7 +225,7 @@ public class MetricService {
         try {
             return objectMapper.writeValueAsString(metricDTO);
         } catch (JsonProcessingException e) {
-            log.info("ObjectMapper 파싱 과정에서 에러 발생");
+            log.error("ObjectMapper 파싱 과정에서 에러 발생");
             return "";
         }
     }
@@ -243,7 +243,7 @@ public class MetricService {
         redisService.storeValue(REDIS_KEY_NETWORK_TRANS, String.valueOf(currentNetworkMetric.get(METRIC_MAP_NETWORK_SENT)));
     }
 
-    private void parseAndStoreCpuUsage(Map<String, Double> metricsMap, String line) {
+    private void parseCpuUsageInLine(Map<String, Double> metricsMap, String line) {
         Matcher cpuMatcher = CPU_PATTERN.matcher(line);
         if (cpuMatcher.matches()) {
             Double usUsage = Double.parseDouble(cpuMatcher.group(1));
@@ -253,7 +253,7 @@ public class MetricService {
         }
     }
 
-    private void parseAndStoreMemoryUsage(Map<String, Double> metricsMap, String line) {
+    private void parseMemoryUsageInLine(Map<String, Double> metricsMap, String line) {
         Matcher memMatcher = MEM_PATTERN.matcher(line);
         if (memMatcher.matches()) {
             Double memTotal = Double.parseDouble(memMatcher.group(1));
