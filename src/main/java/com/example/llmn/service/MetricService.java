@@ -57,34 +57,12 @@ public class MetricService {
     public void collectMetrics() {
         List<Long> userIds = userRepository.findIds();
 
-        for(Long userId : userIds){
+        for (Long userId : userIds) {
+            // 사용자가 monitoringSshId를 설정했다면, 설정한 SSH 정보를 사용하여 지표를 수집
             List<SshInfo> sshInfos = sshInfoRepository.findByUserId(userId);
-            Long monitoringSshId = userRepository.findMonitoringSshId(userId).get();
-
-            for(SshInfo sshInfo : sshInfos){
-                // CPU, Memory 지표
-                Map<String, Double> topMetrics = collectCpuAndMemoryMetrics(sshInfo.getId());
-
-                // 네트워크 지표 => 모니터링 하는 인스턴스의 경우 캐싱
-                boolean updateCache = sshInfo.getId().equals(monitoringSshId);
-                Map<String, Double> networkMetrics = collectNetworkMetrics(sshInfo.getId(), updateCache);
-
-                // 지표 조회 실패 시 다음 반복으로 넘어감
-                if(topMetrics.isEmpty() || networkMetrics.isEmpty()){
-                    continue;
-                }
-
-                Metric metric = Metric.builder()
-                        .sshInfo(sshInfo)
-                        .cpuUsage(topMetrics.get(METRIC_MAP_CPU_USAGE))
-                        .totalMemory(topMetrics.get(METRIC_MAP_TOTAL_MEMORY))
-                        .usedMemory(topMetrics.get(METRIC_MAP_USED_MEMORY))
-                        .totalBytesReceived(networkMetrics.get(METRIC_MAP_NETWORK_REC)) // 10분 간격의 네트워크 트래픽
-                        .totalBytesSent(networkMetrics.get(METRIC_MAP_NETWORK_SENT))
-                        .build();
-
-                metricRepository.save(metric);
-            }
+            userRepository.findMonitoringSshId(userId).ifPresent(monitoringSshId ->
+                    sshInfos.forEach(sshInfo -> processMetrics(sshInfo, monitoringSshId))
+            );
         }
     }
 
@@ -327,5 +305,31 @@ public class MetricService {
     private MetricResponse.NetworkOutMetricDTO createNetworkOutMetricDTO(Metric metric, String time) {
         double networkSent = Math.round(metric.getTotalBytesSent() * 1000.0) / 1000.0;
         return new MetricResponse.NetworkOutMetricDTO(time, networkSent);
+    }
+
+    private void processMetrics(SshInfo sshInfo, Long monitoringSshId) {
+        // 모니터링할 클라우드의 경우 캐시를 업데이트
+        boolean updateCache = sshInfo.getId().equals(monitoringSshId);
+
+        Optional<Metric> collectedMetrics = collectMetricsData(sshInfo, updateCache);
+        collectedMetrics.ifPresent(metricRepository::save);
+    }
+
+    private Optional<Metric> collectMetricsData(SshInfo sshInfo, boolean updateCache) {
+        Map<String, Double> topMetrics = collectCpuAndMemoryMetrics(sshInfo.getId());
+        Map<String, Double> networkMetrics = collectNetworkMetrics(sshInfo.getId(), updateCache);
+
+        if (topMetrics.isEmpty() || networkMetrics.isEmpty()) {
+            return Optional.empty();
+        }
+
+        return Optional.of(Metric.builder()
+                .sshInfo(sshInfo)
+                .cpuUsage(topMetrics.get(METRIC_MAP_CPU_USAGE))
+                .totalMemory(topMetrics.get(METRIC_MAP_TOTAL_MEMORY))
+                .usedMemory(topMetrics.get(METRIC_MAP_USED_MEMORY))
+                .totalBytesReceived(networkMetrics.get(METRIC_MAP_NETWORK_REC))
+                .totalBytesSent(networkMetrics.get(METRIC_MAP_NETWORK_SENT))
+                .build());
     }
 }
