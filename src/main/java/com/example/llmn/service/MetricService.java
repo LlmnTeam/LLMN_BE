@@ -48,6 +48,8 @@ public class MetricService {
     private static final String METRIC_MAP_DAILY_NET_SENT ="dailySent";
     private static final String COMMAND_TOP = "top -b -n1 | grep \"Cpu(s)\\|Mem\"";
     private static final String COMMAND_NETWORK_USAGE = "cat /proc/net/dev";
+    private static final double DEFAULT_METRIC_VALUE = 0.0;
+    private static final double BYTES_TO_MB_DIVISOR = 1024.0 * 1024.0;
     private static final DateTimeFormatter formatterForHourAndMin = DateTimeFormatter.ofPattern("HH:mm"); // 시간 형식 "HH:mm"
     private static final Pattern CPU_PATTERN = Pattern.compile("%Cpu\\(s\\):\\s+([\\d.]+)\\s+us,\\s+([\\d.]+)\\s+sy,.*");
     private static final Pattern MEM_PATTERN = Pattern.compile("MiB Mem :\\s+([\\d.]+)\\s+total,\\s+([\\d.]+)\\s+free,\\s+([\\d.]+)\\s+used,.*");
@@ -79,11 +81,11 @@ public class MetricService {
         Map<String, Double> networkMetrics = collectNetworkMetrics(sshInfoId, NOT_UPDATE_CACHE);
         
         MetricResponse.FindCurrentMetricDTO metricDTO = new MetricResponse.FindCurrentMetricDTO(
-                cpuAndMemoryMetrics.getOrDefault(METRIC_MAP_CPU_USAGE, 0.0),
-                cpuAndMemoryMetrics.getOrDefault(METRIC_MAP_TOTAL_MEMORY, 0.0),
-                cpuAndMemoryMetrics.getOrDefault(METRIC_MAP_USED_MEMORY, 0.0),
-                networkMetrics.getOrDefault(METRIC_MAP_NETWORK_REC, 0.0),
-                networkMetrics.getOrDefault(METRIC_MAP_NETWORK_SENT, 0.0)
+                cpuAndMemoryMetrics.getOrDefault(METRIC_MAP_CPU_USAGE, DEFAULT_METRIC_VALUE),
+                cpuAndMemoryMetrics.getOrDefault(METRIC_MAP_TOTAL_MEMORY, DEFAULT_METRIC_VALUE),
+                cpuAndMemoryMetrics.getOrDefault(METRIC_MAP_USED_MEMORY, DEFAULT_METRIC_VALUE),
+                networkMetrics.getOrDefault(METRIC_MAP_NETWORK_REC, DEFAULT_METRIC_VALUE),
+                networkMetrics.getOrDefault(METRIC_MAP_NETWORK_SENT, DEFAULT_METRIC_VALUE)
         );
 
         // 3. 새로운 Metric 저장
@@ -145,8 +147,8 @@ public class MetricService {
         Double previousTransmitted = redisService.getDataInDouble(REDIS_KEY_NETWORK_TRANS);
 
         // 3rd 네트워크 사용량 차이 계산
-        Double receivedDiff = currentNetworkMetric.getOrDefault(METRIC_MAP_NETWORK_REC, 0.0) - previousReceived;
-        Double transmittedDiff = currentNetworkMetric.getOrDefault(METRIC_MAP_NETWORK_SENT, 0.0) - previousTransmitted;
+        Double receivedDiff = currentNetworkMetric.getOrDefault(METRIC_MAP_NETWORK_REC, DEFAULT_METRIC_VALUE) - previousReceived;
+        Double transmittedDiff = currentNetworkMetric.getOrDefault(METRIC_MAP_NETWORK_SENT, DEFAULT_METRIC_VALUE) - previousTransmitted;
 
         Map<String, Double> metricsMap = new HashMap<>();
         metricsMap.put(METRIC_MAP_NETWORK_REC, receivedDiff);
@@ -189,7 +191,7 @@ public class MetricService {
         // 2nd 명령어 결과 파싱
         Map<String, Double> networkUsageMap = new HashMap<>();
         for (String line : lines) {
-            parseNetworkUsage(line.trim(), networkUsageMap);
+            parseNetworkUsageInLine(line.trim(), networkUsageMap);
             if (!networkUsageMap.isEmpty()) break; // 최초로 찾은 유효한 인터페이스만 처리
         }
 
@@ -310,7 +312,7 @@ public class MetricService {
                 .build());
     }
 
-    private void parseNetworkUsage(String line, Map<String, Double> networkUsageMap) {
+    private void parseNetworkUsageInLine(String line, Map<String, Double> networkUsageMap) {
         Matcher matcher = NETWORK_PATTERN.matcher(line);
         if (matcher.find()) {
             String[] parts = line.split("\\s+");
@@ -320,8 +322,8 @@ public class MetricService {
                     long transmittedBytes = Long.parseLong(parts[9]);  // 송신된 바이트
 
                     // 바이트를 MB로 변환
-                    Double receivedMB = receivedBytes / (1024.0 * 1024.0);
-                    Double transmittedMB = transmittedBytes / (1024.0 * 1024.0);
+                    Double receivedMB = receivedBytes / BYTES_TO_MB_DIVISOR;
+                    Double transmittedMB = transmittedBytes / BYTES_TO_MB_DIVISOR;
 
                     networkUsageMap.put(METRIC_MAP_NETWORK_REC, receivedMB);
                     networkUsageMap.put(METRIC_MAP_NETWORK_SENT, transmittedMB);
