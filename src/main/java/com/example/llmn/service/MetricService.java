@@ -63,7 +63,7 @@ public class MetricService {
 
             for(SshInfo sshInfo : sshInfos){
                 // CPU, Memory 지표
-                Map<String, Double> topMetrics = collectTopMetrics(sshInfo.getId());
+                Map<String, Double> topMetrics = collectCpuAndMemoryMetrics(sshInfo.getId());
 
                 // 네트워크 지표 => 모니터링 하는 인스턴스의 경우 캐싱
                 boolean updateCache = sshInfo.getId().equals(monitoringSshId);
@@ -96,13 +96,13 @@ public class MetricService {
         }
 
         // 2. 캐시된 값이 없음 => 새로운 Metric 수집
-        Map<String, Double> topMetrics = collectTopMetrics(sshInfoId);
+        Map<String, Double> cpuAndMemoryMetrics = collectCpuAndMemoryMetrics(sshInfoId);
         Map<String, Double> networkMetrics = collectNetworkMetrics(sshInfoId, NOT_UPDATE_CACHE);
-
+        
         MetricResponse.FindCurrentMetricDTO metricDTO = new MetricResponse.FindCurrentMetricDTO(
-                topMetrics.getOrDefault(METRIC_MAP_CPU_USAGE, 0.0),
-                topMetrics.getOrDefault(METRIC_MAP_TOTAL_MEMORY, 0.0),
-                topMetrics.getOrDefault(METRIC_MAP_USED_MEMORY, 0.0),
+                cpuAndMemoryMetrics.getOrDefault(METRIC_MAP_CPU_USAGE, 0.0),
+                cpuAndMemoryMetrics.getOrDefault(METRIC_MAP_TOTAL_MEMORY, 0.0),
+                cpuAndMemoryMetrics.getOrDefault(METRIC_MAP_USED_MEMORY, 0.0),
                 networkMetrics.getOrDefault(METRIC_MAP_NETWORK_REC, 0.0),
                 networkMetrics.getOrDefault(METRIC_MAP_NETWORK_SENT, 0.0)
         );
@@ -147,37 +147,17 @@ public class MetricService {
         return new MetricResponse.FindMetricHistoryDTO(cpuMetricDTOS, memoryMetricDTOS, networkInMetricDTOS, networkOutMetricDTOS);
     }
 
-    // 만약 명령어 실패 => 비어있는 맵 반환
-    private Map<String, Double> collectTopMetrics(Long sshInfoId) {
+    private Map<String, Double> collectCpuAndMemoryMetrics(Long sshInfoId) {
         Map<String, Double> metricsMap = new HashMap<>();
 
         // CPU와 메모리 사용량을 동시에 얻기 위해 top 명령어 실행
         String commandResponse = sshService.executeCommandOnce(COMMAND_TOP, sshInfoId);
-
-        // 명령어 응답 파싱
         String[] lines = commandResponse.split("\n");
 
         for (String line : lines) {
             line = line.trim();
-
-            // CPU 사용량 라인 처리 (%Cpu(s): 0.0 us, 6.2 sy, 0.0 ni, 93.8 id, 0.0 wa, 0.0 hi, 0.0 si, 0.0 st)
-            Matcher cpuMatcher = CPU_PATTERN.matcher(line);
-            if (cpuMatcher.matches()) {
-                Double usUsage = Double.parseDouble(cpuMatcher.group(1));
-                Double syUsage = Double.parseDouble(cpuMatcher.group(2));
-                Double cpuUsage = usUsage + syUsage;
-                metricsMap.put(METRIC_MAP_CPU_USAGE, cpuUsage);
-                continue;
-            }
-
-            // 메모리 사용량 라인 처리 (MiB Mem : 949.2 total, 141.4 free, 325.1 used, 482.8 buff/cache)
-            Matcher memMatcher = MEM_PATTERN.matcher(line);
-            if (memMatcher.matches()) {
-                Double memTotal = Double.parseDouble(memMatcher.group(1));
-                Double memUsed = Double.parseDouble(memMatcher.group(3));
-                metricsMap.put(METRIC_MAP_TOTAL_MEMORY, memTotal);
-                metricsMap.put(METRIC_MAP_USED_MEMORY, memUsed);
-            }
+            parseAndStoreCpuUsage(metricsMap, line);
+            parseAndStoreMemoryUsage(metricsMap, line);
         }
 
         return metricsMap;
@@ -317,5 +297,25 @@ public class MetricService {
     private void updateNetworkCache(Map<String, Double> currentNetworkMetric) {
         redisService.storeValue(REDIS_KEY_NETWORK_REC, String.valueOf(currentNetworkMetric.get(METRIC_MAP_NETWORK_REC)));
         redisService.storeValue(REDIS_KEY_NETWORK_TRANS, String.valueOf(currentNetworkMetric.get(METRIC_MAP_NETWORK_SENT)));
+    }
+
+    private void parseAndStoreCpuUsage(Map<String, Double> metricsMap, String line) {
+        Matcher cpuMatcher = CPU_PATTERN.matcher(line);
+        if (cpuMatcher.matches()) {
+            Double usUsage = Double.parseDouble(cpuMatcher.group(1));
+            Double syUsage = Double.parseDouble(cpuMatcher.group(2));
+            Double cpuUsage = usUsage + syUsage;
+            metricsMap.put(METRIC_MAP_CPU_USAGE, cpuUsage);
+        }
+    }
+
+    private void parseAndStoreMemoryUsage(Map<String, Double> metricsMap, String line) {
+        Matcher memMatcher = MEM_PATTERN.matcher(line);
+        if (memMatcher.matches()) {
+            Double memTotal = Double.parseDouble(memMatcher.group(1));
+            Double memUsed = Double.parseDouble(memMatcher.group(3));
+            metricsMap.put(METRIC_MAP_TOTAL_MEMORY, memTotal);
+            metricsMap.put(METRIC_MAP_USED_MEMORY, memUsed);
+        }
     }
 }
