@@ -4,7 +4,6 @@ import com.example.llmn.controller.DTO.ProjectRequest;
 import com.example.llmn.controller.DTO.ProjectResponse;
 import com.example.llmn.core.errors.CustomException;
 import com.example.llmn.core.errors.ExceptionCode;
-import com.example.llmn.core.utils.SSHCommandExecutor;
 import com.example.llmn.domain.*;
 import com.example.llmn.repository.ProjectRepository;
 import com.example.llmn.repository.SshInfoRepository;
@@ -59,7 +58,6 @@ public class ProjectService {
 
         User user = entityManager.getReference(User.class, userId);
         SshInfo sshInfo = entityManager.getReference(SshInfo.class, requestDTO.sshInfoId());
-
         Project project = Project.builder()
                 .user(user)
                 .sshInfo(sshInfo)
@@ -146,30 +144,17 @@ public class ProjectService {
     public ProjectResponse.FindProjectListDTO findProjectList(Long userId, boolean isUsingCache) {
         List<Project> projects = projectRepository.findByUserIdWithSshInfo(userId);
 
-        // 컨테이너 리소스 조회
+        // 실행중인 컨테이너의 리소스 조회 => 맵으로 변환
         Map<String, Map<String, String>> containersResourceMap = dockerService.findContainersResourceUsage(projects, userId, isUsingCache);
 
-        // 실행중인 컨테이너 목록 (Map의 키가 컨테이너 이름인 것을 활용)
-        List<String> runningContainerNames = new ArrayList<>(containersResourceMap.keySet());
+        // 실행중인 컨테이너 목록 (리소스 맵의 키가 실행중인 컨테이너 이름인 것을 활용)
+        List<String> runningContainers = new ArrayList<>(containersResourceMap.keySet());
 
         List<ProjectResponse.ProjectDTO> projectDTOS = projects.stream()
                 .map(project -> {
-                    ContainerStatus containerStatus = project.getContainerStatus();
-
-                    // 연결된 상태라면 도커 상태 체크
-                    if (containerStatus != ContainerStatus.NOT_CONNECTED) {
-                        containerStatus = runningContainerNames.contains(project.getContainerName())
-                                ? ContainerStatus.WORKING
-                                : ContainerStatus.NOT_WORKING;
-                    }
-
-                    // CPU 및 메모리 사용량 값이 없을 경우 "N/A"로 처리
-                    String cpuUsage = Optional.ofNullable(containersResourceMap.get(project.getContainerName()))
-                            .map(resourceMap -> resourceMap.get(DOCKER_RESOURCE_KEY_CPU))
-                            .orElse(NOT_ACCESSIBLE_VALUE);
-                    String memoryUsage = Optional.ofNullable(containersResourceMap.get(project.getContainerName()))
-                            .map(resourceMap -> resourceMap.get(DOCKER_RESOURCE_KEY_MEMORY))
-                            .orElse(NOT_ACCESSIBLE_VALUE);
+                    ContainerStatus containerStatus = determineContainerStatus(runningContainers, project);
+                    String cpuUsage = getResourceUsageFromMap(containersResourceMap, project, DOCKER_RESOURCE_KEY_CPU);
+                    String memoryUsage = getResourceUsageFromMap(containersResourceMap, project, DOCKER_RESOURCE_KEY_MEMORY);
 
                     return new ProjectResponse.ProjectDTO(
                         project.getId(),
@@ -380,5 +365,21 @@ public class ProjectService {
 
         // 마지막 두 개의 로그를 추출하여 반환
         return logs[logs.length - 2].trim() + "\n\n" + logs[logs.length - 1].trim();
+    }
+
+    private ContainerStatus determineContainerStatus( List<String> runningContainerNames, Project project) {
+        // 연결된 상태라면, 실행중인 컨테이너 목록에 속해있는지 체크
+        if (project.getContainerStatus() != ContainerStatus.NOT_CONNECTED) {
+            return runningContainerNames.contains(project.getContainerName())
+                    ? ContainerStatus.WORKING
+                    : ContainerStatus.NOT_WORKING;
+        }
+        return ContainerStatus.NOT_CONNECTED;
+    }
+
+    private String getResourceUsageFromMap(Map<String, Map<String, String>> containersResourceMap, Project project, String resourceKey) {
+        return Optional.ofNullable(containersResourceMap.get(project.getContainerName()))
+                .map(resourceMap -> resourceMap.get(resourceKey))
+                .orElse(NOT_ACCESSIBLE_VALUE); // CPU 및 메모리 사용량 값이 없을 경우 "N/A"로 처리
     }
 }

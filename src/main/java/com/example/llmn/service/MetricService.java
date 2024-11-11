@@ -137,7 +137,7 @@ public class MetricService {
         // 1st 현재 네트워크 사용량 조회
         Map<String, Double> currentNetworkMetric = collectCurrentNetworkMetrics(sshInfoId);
 
-        // 조회 실패 시 빈 맵 반환
+        // 조회를 실패하면, 빈 맵 반환
         if(currentNetworkMetric.isEmpty()){
             return Collections.emptyMap();
         }
@@ -316,6 +316,7 @@ public class MetricService {
         Matcher matcher = NETWORK_PATTERN.matcher(line);
         if (matcher.find()) {
             String[] parts = line.split("\\s+");
+
             if (parts.length >= 10) {
                 try {
                     long receivedBytes = Long.parseLong(parts[1]);  // 수신된 바이트
