@@ -320,28 +320,28 @@ public class ProjectService {
     public String getLatestLogFile(List<String> files) {
         return files.stream()
                 .max((file1, file2) -> {
-                    LocalDateTime dateTime1 = extractDateTimeFromFile(file1);
-                    LocalDateTime dateTime2 = extractDateTimeFromFile(file2);
+                    LocalDateTime dateTime1 = parseDateTimeFromFileName(file1);
+                    LocalDateTime dateTime2 = parseDateTimeFromFileName(file2);
                     return dateTime1.compareTo(dateTime2);  // 최신 파일을 찾기 위해 비교
                 })
                 .orElse(null);
     }
 
-    private LocalDateTime extractDateTimeFromFile(String file) {
+    private LocalDateTime parseDateTimeFromFileName(String file) {
         // 파일 이름에서 "log-" 뒤부터 ".txt" 앞까지의 부분 추출
         String dateTimePart = file.substring(file.indexOf("log-") + 4, file.lastIndexOf("-"));
         return LocalDateTime.parse(dateTimePart, formatter);
     }
 
     private String getRecentLog(Project project){
-        List<String> logFileList = logService.findLogFileList();
+        List<String> logFileNames = logService.findLogFileList();
 
-        String latestLogFile = logFileList.stream()
+        String latestLogFile = logFileNames.stream()
                 .filter(logFile -> logFile.startsWith(project.getContainerName() + "-log"))
                 .max((file1, file2) -> { // 최신 파일을 찾기 위해 비교
-                    LocalDateTime dateTime1 = extractDateTimeFromFile(file1);
-                    LocalDateTime dateTime2 = extractDateTimeFromFile(file2);
-                    return dateTime1.compareTo(dateTime2);
+                    LocalDateTime fileDateTime1 = parseDateTimeFromFileName(file1);
+                    LocalDateTime fileDateTime2 = parseDateTimeFromFileName(file2);
+                    return fileDateTime1.compareTo(fileDateTime2);
                 })
                 .orElse(null);
 
@@ -349,12 +349,12 @@ public class ProjectService {
             return NOT_EXIST_LOG;
         }
 
-        String logContent = logService.readLogFile(latestLogFile);
+        String logFileContent = logService.readLogFile(latestLogFile);
 
-        return extractLastTwoLogs(logContent);
+        return parseLastTwoLogs(logFileContent);
     }
 
-    private String extractLastTwoLogs(String logContent) {
+    private String parseLastTwoLogs(String logContent) {
         // 날짜 패턴으로 로그를 분리
         String[] logs = logContent.split("(?=\\[\\d{4}-\\d{2}-\\d{2}_\\d{2}:\\d{2}\\])");
 

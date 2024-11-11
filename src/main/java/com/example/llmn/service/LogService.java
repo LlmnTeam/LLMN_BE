@@ -187,26 +187,23 @@ public class LogService {
     }
 
     public List<String> findLogFileList() {
-        // logs 디렉토리 경로
         Path logDirPath = Paths.get(LOGS_DIRECTORY);
 
-        // 로그 파일들이 저장된 디렉토리가 존재하는지 확인 => 없으면 빈 리스트 반환
-        if (!Files.exists(logDirPath) || !Files.isDirectory(logDirPath)) {
-            return new ArrayList<>();
+        // 1st 로그 파일들이 저장된 디렉토리가 존재하는지 확인
+        if (isLogDirectoryValid(logDirPath)) {
+            return Collections.emptyList();
         }
 
-        // 디렉토리 내의 모든 파일 목록을 가져오고, ".txt" 확장자를 가진 파일들만 필터링
-        try (Stream<Path> filePathStream = Files.list(logDirPath)) {
-            List<String> fileNames = filePathStream
+        // 2nd 디렉토리 내의 모든 파일 목록을 가져오고, ".txt" 확장자를 가진 파일들만 필터링
+        try (Stream<Path> fileListStream = Files.list(logDirPath)) {
+            return fileListStream
                     .filter(Files::isRegularFile) // 일반 파일만 가져옴
                     .filter(path -> path.toString().endsWith(".txt")) // .txt 파일만 가져옴
                     .map(path -> path.getFileName().toString())
                     .toList();
-
-            return fileNames;
         } catch (IOException e) {
-            log.info("로그 파일 목록을 가져오는 중 오류 발생했습니다.");
-            return new ArrayList<>();
+            log.error("로그 파일 목록을 가져오는 중 오류 발생했습니다.");
+            return Collections.emptyList();
         }
     }
 
@@ -214,15 +211,14 @@ public class LogService {
         // 로그 파일은 logs 디렉토리에 위치
         Path logFilePath = Paths.get(LOGS_DIRECTORY, fileName);
 
-        // 파일이 존재하는지 확인
+        // 1st 파일이 존재하는지 확인
         if (!Files.exists(logFilePath)) {
             throw new CustomException(ExceptionCode.LOG_FILE_NOT_FOUND);
         }
 
-        // 파일 내용을 읽어서 하나의 문자열로 변환
-        try {
-            List<String> lines = Files.readAllLines(logFilePath);  // 파일의 모든 줄을 읽음
-            return String.join("\n\n", lines);  // 줄 단위로 합쳐서 하나의 문자열로 반환 (각 줄을 \n으로 구분)
+        try { // 2nd 파일 내용을 읽어서, 하나의 문자열로 변환 (각 줄을 \n\n으로 구분)
+            List<String> lines = Files.readAllLines(logFilePath);
+            return String.join("\n\n", lines);
         } catch (IOException e) {
             throw new CustomException(ExceptionCode.LOG_FILE_READ_FAIL);
         }
@@ -532,5 +528,9 @@ public class LogService {
         // 파일 이름에서 "log-" 뒤부터 ".txt" 앞까지의 부분 추출
         String dateTimePart = file.substring(file.indexOf("log-") + 4, file.indexOf("-", file.indexOf("_")));
         return LocalDateTime.parse(dateTimePart, formatter);
+    }
+
+    private boolean isLogDirectoryValid(Path logDirPath) {
+        return Files.exists(logDirPath) && Files.isDirectory(logDirPath);
     }
 }
