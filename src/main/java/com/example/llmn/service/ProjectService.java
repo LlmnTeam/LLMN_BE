@@ -338,11 +338,7 @@ public class ProjectService {
 
         String latestLogFile = logFileNames.stream()
                 .filter(logFile -> logFile.startsWith(project.getContainerName() + "-log"))
-                .max((file1, file2) -> { // 최신 파일을 찾기 위해 비교
-                    LocalDateTime fileDateTime1 = parseDateTimeFromFileName(file1);
-                    LocalDateTime fileDateTime2 = parseDateTimeFromFileName(file2);
-                    return fileDateTime1.compareTo(fileDateTime2);
-                })
+                .max(this::compareLogFileDates) // 최신 파일 찾기
                 .orElse(null);
 
         if(latestLogFile == null){
@@ -350,8 +346,13 @@ public class ProjectService {
         }
 
         String logFileContent = logService.readLogFile(latestLogFile);
-
         return parseLastTwoLogs(logFileContent);
+    }
+
+    private int compareLogFileDates(String file1, String file2) {
+        LocalDateTime fileDateTime1 = parseDateTimeFromFileName(file1);
+        LocalDateTime fileDateTime2 = parseDateTimeFromFileName(file2);
+        return fileDateTime1.compareTo(fileDateTime2);
     }
 
     private String parseLastTwoLogs(String logContent) {
