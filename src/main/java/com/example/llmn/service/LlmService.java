@@ -66,41 +66,12 @@ public class LlmService {
     @Transactional
     @Scheduled(cron = "0 0 * * * *") // 매시 0분
     public void summaryProjectLog(){
-        // user랑 패치 조인해서 조회
+        // 모든 프로젝트에서 발생한 로그에 대해 요약 진행
         List<Project> projects = projectRepository.findAllWithUser().stream()
-                .filter(project -> !project.getContainerStatus().equals(ContainerStatus.NOT_CONNECTED))
+                .filter(Project::isConnected)
                 .toList();
 
-        projects.stream()
-                .filter(project -> !project.getContainerStatus().equals(ContainerStatus.NOT_CONNECTED))
-                .forEach(project -> {
-                    LogDTO.SummaryResponseDTO summaryDTO = fetchLogSummary(project.getContainerName());
-
-                    if(summaryDTO == null){
-                        return;
-                    }
-
-                    // 긴급 알람 업데이트
-                    if(summaryDTO.isUrgent()) {
-                        project.updateIsUrgent(true);
-                        String emergencyAlarmContent = project.getProjectName() + LOG_EMERGENCY_ALARM_SUFFIX;
-                        alarmService.generateAlarm(project.getUser().getId(), emergencyAlarmContent, AlarmType.EMERGENCY);
-                    }
-
-                    // 로그 요약 저장
-                    Summary logSummary = Summary.builder()
-                            .user(project.getUser())
-                            .project(project)
-                            .content(summaryDTO.logSummary())
-                            .summaryType(SummaryType.LOG)
-                            .build();
-
-                    summaryRepository.save(logSummary);
-
-                    // 업데이트 알람 생성
-                    String updateAlarmContent = project.getProjectName() + LOG_UPDATE_ALARM_SUFFIX;
-                    alarmService.generateAlarm(project.getUser().getId(), updateAlarmContent, AlarmType.UPDATE);
-                });
+        projects.forEach(this::processProjectLogSummary);
     }
 
     @Transactional
@@ -117,13 +88,10 @@ public class LlmService {
                     .content(performanceSummaryDTO.performanceSummary())
                     .summaryType(SummaryType.PERFORMANCE)
                     .build();
-
             summaryRepository.save(performanceSummary);
 
             // 업데이트 알람 생성
             alarmService.generateAlarm(user.getId(), PERFORMANCE_SUMMARY_ALARM, AlarmType.UPDATE);
-
-            System.out.println(performanceSummaryDTO.performanceSummary());
         }
     }
 
@@ -141,10 +109,7 @@ public class LlmService {
                     .content(hourlySummaryDTO.hourlySummary())
                     .summaryType(SummaryType.HOURLY)
                     .build();
-
             summaryRepository.save(hourlySummary);
-
-            System.out.println(hourlySummaryDTO.hourlySummary());
         }
     }
 
@@ -162,13 +127,10 @@ public class LlmService {
                     .content(dailySummaryDTO.dailySummary())
                     .summaryType(SummaryType.DAILY)
                     .build();
-
             summaryRepository.save(dailySummary);
 
             // 업데이트 알람 생성
             alarmService.generateAlarm(userId, DAILY_SUMMARY_ALARM, AlarmType.UPDATE);
-
-            System.out.println(dailySummaryDTO.dailySummary());
         }
     }
 
@@ -186,13 +148,10 @@ public class LlmService {
                     .content(trendSummaryDTO.trendSummary())
                     .summaryType(SummaryType.TEND)
                     .build();
-
             summaryRepository.save(trendSummary);
 
             // 업데이트 알람 생성
             alarmService.generateAlarm(userId, TREND_SUMMARY_ALARM, AlarmType.UPDATE);
-
-            System.out.println(trendSummaryDTO.trendSummary());
         }
     }
 
@@ -210,13 +169,10 @@ public class LlmService {
                     .content(recommendationDTO.recommend())
                     .summaryType(SummaryType.RECOMMENDATION)
                     .build();
-
             summaryRepository.save(recommend);
 
             // 업데이트 알람 생성
             alarmService.generateAlarm(userId, RECOMMENDATION_ALARM, AlarmType.UPDATE);
-
-            System.out.println(recommendationDTO.recommend());
         }
     }
 
@@ -414,8 +370,36 @@ public class LlmService {
         return uriBuilder.build().encode().toUri();
     }
 
-    public static String formatLocalDateTime(LocalDateTime localDateTime) {
+    public String formatLocalDateTime(LocalDateTime localDateTime) {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
         return localDateTime.format(formatter);
+    }
+
+    private void processProjectLogSummary(Project project) {
+        // 1st 로그를 요약해서 사져옴
+        LogDTO.SummaryResponseDTO summaryDTO = fetchLogSummary(project.getContainerName());
+        if(summaryDTO == null){
+            return;
+        }
+
+        // 2nd 로그 요약 저장
+        Summary logSummary = Summary.builder()
+                .user(project.getUser())
+                .project(project)
+                .content(summaryDTO.logSummary())
+                .summaryType(SummaryType.LOG)
+                .build();
+        summaryRepository.save(logSummary);
+
+        // 3rd 긴급 체크 여부 업데이트
+        if(summaryDTO.isUrgent()) {
+            project.updateIsUrgent(true);
+            String emergencyAlarmContent = project.getProjectName() + LOG_EMERGENCY_ALARM_SUFFIX;
+            alarmService.generateAlarm(project.getUser().getId(), emergencyAlarmContent, AlarmType.EMERGENCY);
+        }
+
+        // 4th 업데이트 알람 생성
+        String updateAlarmContent = project.getProjectName() + LOG_UPDATE_ALARM_SUFFIX;
+        alarmService.generateAlarm(project.getUser().getId(), updateAlarmContent, AlarmType.UPDATE);
     }
 }

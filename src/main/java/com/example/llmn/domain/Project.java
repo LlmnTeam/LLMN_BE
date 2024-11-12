@@ -61,4 +61,8 @@ public class Project extends TimeStamp{
     public void updateIsUrgent(boolean isUrgent){
         this.isUrgent = isUrgent;
     }
+
+    public boolean isConnected(){
+        return containerStatus.equals(ContainerStatus.NOT_CONNECTED);
+    }
 }
