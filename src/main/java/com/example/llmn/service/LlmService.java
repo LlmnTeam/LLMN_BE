@@ -83,13 +83,14 @@ public class LlmService {
         List<User> users = userRepository.findAll();
 
         for(User user : users) {
+            // 1st 요약 패치 요청
             Long monitoringSshInfoId = user.getMonitoringSshId();
             LogDTO.PerformanceSummaryResponseDTO performanceSummaryDTO = fetchMetricSummary(monitoringSshInfoId);
 
-            // 1st 요약 결과 저장
+            // 2nd 요약 결과 저장
             saveSummary(user, performanceSummaryDTO.performanceSummary(), SummaryType.PERFORMANCE);
 
-            // 2nd업데이트 알람 생성
+            // 3rd 업데이트 알람 생성
             alarmService.generateAlarm(user.getId(), PERFORMANCE_SUMMARY_ALARM, AlarmType.UPDATE);
         }
     }
@@ -209,43 +210,27 @@ public class LlmService {
     }
 
     private LogDTO.TrendSummaryResponseDTO fetchTrendSummary(Long userId){
-        StringBuilder requestContentBuilder = new StringBuilder();
-
         // 1주일 전까지의 일일 리포트를 인풋으로 사용
         LocalDateTime startOfDay = LocalDateTime.now().minusWeeks(1).with(LocalTime.MIN);
         List<Summary> dailySummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.DAILY), userId, startOfDay);
 
-        appendSummaryWithHeader(requestContentBuilder, WEEKLY_TREND_HEADER, dailySummaries);
+        StringBuilder summaryRequestBody = new StringBuilder();
+        appendSummaryWithHeader(summaryRequestBody, WEEKLY_TREND_HEADER, dailySummaries);
 
-        return webClient.post()
-                .uri(buildURI(TREND_SUMMERY_URI))
-                .bodyValue(new LogDTO.SummaryRequestDTO(requestContentBuilder.toString()))
-                .retrieve()
-                .bodyToMono(LogDTO.TrendSummaryResponseDTO.class)
-                .block();
+        return sendSummaryRequest(TREND_SUMMERY_URI, summaryRequestBody.toString(), LogDTO.TrendSummaryResponseDTO.class);
     }
 
     private LogDTO.RecommendationDTO fetchRecommendation(Long userId) {
-        StringBuilder requestContentBuilder = new StringBuilder();
-
         // 6시간 전의 요약들을 인풋으로
         LocalDateTime startOfTime = LocalDateTime.now().minusHours(6);
         List<Summary> performanceSummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.PERFORMANCE), userId, startOfTime);
         List<Summary> logSummaries = summaryRepository.findByTypeWithinDateWithProject(List.of(SummaryType.LOG), userId, startOfTime);
 
-        // 성능 요약 추가
-        appendSummaryWithHeader(requestContentBuilder, PERFORMANCE_SUMMARY_HEADER, performanceSummaries);
+        StringBuilder summaryRequestBody = new StringBuilder();
+        appendSummaryWithHeader(summaryRequestBody, PERFORMANCE_SUMMARY_HEADER, performanceSummaries);
+        appendLogSummary(summaryRequestBody, logSummaries);
 
-        // 일반 및 이상 로그 요약 추가
-        appendLogSummary(requestContentBuilder, logSummaries);
-
-        // LLM에 전달하기 위해 FastAPI에 요청
-        return webClient.post()
-                .uri(buildURI(RECOMMEND_URI))
-                .bodyValue(new LogDTO.SummaryRequestDTO(requestContentBuilder.toString()))
-                .retrieve()
-                .bodyToMono(LogDTO.RecommendationDTO.class)
-                .block();
+        return sendSummaryRequest(RECOMMEND_URI, summaryRequestBody.toString(), LogDTO.RecommendationDTO.class);
     }
 
     private void appendSummaryWithHeader(StringBuilder summaryRequestBody, String header, List<Summary> summaries) {
