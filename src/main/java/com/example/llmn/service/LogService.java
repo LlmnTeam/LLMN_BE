@@ -68,8 +68,8 @@ public class LogService {
         List<SshInfo> sshInfos = sshInfoRepository.findAll();
 
         for(SshInfo sshInfo : sshInfos) {
-            // 1. Elasticsearch에서 로그 데이터를 검색
-            SearchResponse<Map> searchResponse = searchFromElasticSearch(sshInfo.getRemoteHost());
+            // 1. Elasticsearch에서 아직 처리되지 않은 로그 데이터를 검색
+            SearchResponse<Map> searchResponse = searchUnprocessedLogs(sshInfo.getRemoteHost());
             if (searchResponse == null) {
                 log.warn("Elasticsearch 응답이 null입니다. 검색에 실패했습니다.");
                 return;
@@ -94,7 +94,7 @@ public class LogService {
             ElasticsearchClient client = elasticsearchConfig.createElasticsearchClient(elasticSearchHost);
 
             // Elasticsearch 쿼리 생성 후 실행
-            SearchRequest searchRequest = buildSearchRequestQuery(startTime, endTime, logLevel, containerName);
+            SearchRequest searchRequest = buildSearchRequest(startTime, endTime, logLevel, containerName);
             SearchResponse<Map> response = client.search(searchRequest, Map.class);
 
             // 검색 결과를 LogData로 변환하여 반환
@@ -111,7 +111,7 @@ public class LogService {
         try {
             ElasticsearchClient client = elasticsearchConfig.createElasticsearchClient(elasticSearchHost);
 
-            SearchRequest searchRequest = buildSearchRequestQuery(startTime, endTime, logLevel, containerName);
+            SearchRequest searchRequest = buildSearchRequest(startTime, endTime, logLevel, containerName);
             SearchResponse<Map> response = client.search(searchRequest, Map.class);
 
             List<String> logContents = response.hits().hits().stream()
@@ -192,22 +192,12 @@ public class LogService {
         return rawMessage != null ? rawMessage : "";
     }
 
-    private SearchResponse<Map> searchFromElasticSearch(String elasticSearchHost) {
+    private SearchResponse<Map> searchUnprocessedLogs(String elasticSearchHost) {
         String logIndex = getLogIndex();
 
         try {
+            SearchRequest searchRequest = buildSearchRequest(logIndex); // is_processed가 false인 데이터 검색
             ElasticsearchClient client = elasticsearchConfig.createElasticsearchClient(elasticSearchHost);
-
-            // is_processed가 false인 데이터 검색
-            SearchRequest searchRequest = new SearchRequest.Builder()
-                    .index(logIndex)
-                    .query(q -> q.bool(b -> b
-                            .should(s -> s.term(t -> t.field(LOG_KEY_PROCESSED).value(false)))  // is_processed가 false인 로그
-                            .should(s -> s.bool(bs -> bs.mustNot(mn -> mn.exists(e -> e.field(LOG_KEY_PROCESSED)))))  // is_processed 필드가 없는 로그
-                    ))
-                    .size(1000)  // 최대 1000개의 로그를 가져옴
-                    .build();
-
             return client.search(searchRequest, Map.class);
         } catch (ElasticsearchException e) {
             createElasticSearchIndex(logIndex, elasticSearchHost);
@@ -276,10 +266,10 @@ public class LogService {
         }
     }
 
-    private String extractLogLevelFromLog(String message) {
-        return (message == null) ? LOG_LEVEL_UNKNOWN :
+    private String extractLogLevelFromLog(String logContent) {
+        return (logContent == null) ? LOG_LEVEL_UNKNOWN :
                 Stream.of(LOG_LEVEL_INFO, LOG_LEVEL_ERROR, LOG_LEVEL_WARN)
-                        .filter(message::contains)
+                        .filter(logContent::contains)
                         .findFirst()
                         .orElse(LOG_LEVEL_INFO);
     }
@@ -409,7 +399,7 @@ public class LogService {
         return LocalDateTime.parse(dateTimePart, formatter);
     }
 
-    private SearchRequest buildSearchRequestQuery(Instant startTime, Instant endTime, String logLevel, String containerName) {
+    private SearchRequest buildSearchRequest(Instant startTime, Instant endTime, String logLevel, String containerName) {
         BoolQuery.Builder boolQuery = new BoolQuery.Builder();
 
         // 시간 범위 필터 추가
@@ -438,6 +428,17 @@ public class LogService {
         return new SearchRequest.Builder()
                 .index("docker-logs-*")
                 .query(q -> q.bool(boolQuery.build()))
+                .build();
+    }
+
+    private SearchRequest buildSearchRequest(String index) {
+        return new SearchRequest.Builder()
+                .index(index)
+                .query(q -> q.bool(b -> b
+                        .should(s -> s.term(t -> t.field(LOG_KEY_PROCESSED).value(false)))  // is_processed가 false인 로그
+                        .should(s -> s.bool(bs -> bs.mustNot(mn -> mn.exists(e -> e.field(LOG_KEY_PROCESSED)))))  // is_processed 필드가 없는 로그
+                ))
+                .size(1000)  // 최대 1000개의 로그를 가져옴
                 .build();
     }
 }
