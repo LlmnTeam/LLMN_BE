@@ -1,7 +1,6 @@
 package com.example.llmn.controller;
 
 import com.example.llmn.controller.DTO.LogDataDTO;
-import com.example.llmn.core.security.CustomUserDetails;
 import com.example.llmn.core.utils.ApiUtils;
 import com.example.llmn.service.LogService;
 import lombok.RequiredArgsConstructor;
@@ -10,7 +9,6 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 
@@ -30,7 +28,7 @@ public class LogController {
                                         @RequestParam(required = false) String logLevel,
                                         @RequestParam(required = false) String serviceName,
                                         @RequestParam String elasticSearchHost) {
-        List<LogDataDTO> responseDTO = logService.searchLogList(startTime, endTime, logLevel, serviceName, elasticSearchHost);
+        List<LogDataDTO> responseDTO = logService.searchLogData(startTime, endTime, logLevel, serviceName, elasticSearchHost);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 

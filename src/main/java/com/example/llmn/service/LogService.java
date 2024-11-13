@@ -15,7 +15,6 @@ import com.example.llmn.domain.SshInfo;
 import com.example.llmn.repository.SshInfoRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -73,65 +72,30 @@ public class LogService {
             SearchResponse<Map> searchResponse = searchFromElasticSearch(sshInfo.getRemoteHost());
             if (searchResponse == null) {
                 log.warn("Elasticsearch 응답이 null입니다. 검색에 실패했습니다.");
-                return;  // 검색 실패 시 프로세스를 종료
+                return;
             }
 
             // 2. 검색 결과를 맵으로 변환
             List<Map<String, Object>> logMaps = convertResponseToMap(searchResponse);
-            log.info("로그 데이터 변환 완료. 총 {}개의 로그가 변환됨.", logMaps.size());
 
-            // 2. map의 필드 업데이트 (원하는 형태로)
-            List<Map<String, Object>> updatedLogMaps = updateLogFields(logMaps);
+            // 2. map의 필드 원하는 형태로 재조립
+            List<Map<String, Object>> refinedLogMaps = refineLogFields(logMaps);
 
             // 3. 필드 업데이트 한 데이터를 Elasticsearch에도 반영
-            updateToElasticSearch(updatedLogMaps, sshInfo.getRemoteHost());
+            updateToElasticSearch(refinedLogMaps, sshInfo.getRemoteHost());
 
             // 4. .txt 파일로도 로그 저장
-            saveLogsToFile(updatedLogMaps, sshInfo.getId());
+            saveLogsToFile(refinedLogMaps, sshInfo.getId());
         }
-
-        log.info("업데이트 완료");
     }
 
-    public List<LogDataDTO> searchLogList(Instant startTime, Instant endTime, String logLevel, String containerName, String elasticSearchHost) {
+    public List<LogDataDTO> searchLogData(Instant startTime, Instant endTime, String logLevel, String containerName, String elasticSearchHost) {
         try {
             ElasticsearchClient client = elasticsearchConfig.createElasticsearchClient(elasticSearchHost);
 
-            // Elasticsearch 쿼리 생성
-            SearchRequest.Builder searchBuilder = new SearchRequest.Builder()
-                    .index("docker-logs-*")
-                    .query(q -> {
-                        BoolQuery.Builder boolQuery = new BoolQuery.Builder();
-
-                        // 시간 범위 필터
-                        boolQuery.must(m -> m.range(r -> r
-                                .field(LOG_KEY_TIMESTAMP)
-                                .gte(JsonData.of(startTime.toString()))
-                                .lte(JsonData.of(endTime.toString()))
-                        ));
-
-                        // 로그 레벨 필터 (필터 값이 null이 아닐 때만 추가)
-                        if (logLevel != null) {
-                            boolQuery.filter(f -> f.term(t -> t
-                                    .field(LOG_KEY_LEVEL)
-                                    .value(logLevel)
-                            ));
-                        }
-
-                        // 서비스 이름 필터
-                        if (containerName != null) {
-                            boolQuery.filter(f -> f.term(t -> t
-                                    .field(LOG_KEY_CONTAINER_NAME)
-                                    .value(containerName)
-                            ));
-                        }
-
-                        // BoolQuery를 Query로 변환하여 반환
-                        return q.bool(boolQuery.build());
-                    });
-
-            // Elasticsearch에서 쿼리 실행
-            SearchResponse<Map> response = client.search(searchBuilder.build(), Map.class);
+            // Elasticsearch 쿼리 생성 후 실행
+            SearchRequest searchRequest = buildSearchRequestQuery(startTime, endTime, logLevel, containerName);
+            SearchResponse<Map> response = client.search(searchRequest, Map.class);
 
             // 검색 결과를 LogData로 변환하여 반환
             return response.hits().hits().stream()
@@ -143,45 +107,20 @@ public class LogService {
         }
     }
 
-    public String searchLogInStr(Instant startTime, Instant endTime, String containerName, String elasticSearchHost) {
+    public String searchLogInStr(Instant startTime, Instant endTime, String logLevel, String containerName, String elasticSearchHost) {
         try {
             ElasticsearchClient client = elasticsearchConfig.createElasticsearchClient(elasticSearchHost);
 
-            // Elasticsearch 쿼리 생성
-            SearchRequest.Builder searchBuilder = new SearchRequest.Builder()
-                    .index("docker-logs-*")
-                    .query(q -> {
-                        BoolQuery.Builder boolQuery = new BoolQuery.Builder();
+            SearchRequest searchRequest = buildSearchRequestQuery(startTime, endTime, logLevel, containerName);
+            SearchResponse<Map> response = client.search(searchRequest, Map.class);
 
-                        // 시간 범위 필터
-                        boolQuery.must(m -> m.range(r -> r
-                                .field(LOG_KEY_TIMESTAMP)
-                                .gte(JsonData.of(startTime.toString()))
-                                .lte(JsonData.of(endTime.toString()))
-                        ));
-
-                        // 서비스 이름 필터
-                        if (containerName != null) {
-                            boolQuery.filter(f -> f.term(t -> t
-                                    .field(LOG_KEY_CONTAINER_NAME)
-                                    .value(containerName)
-                            ));
-                        }
-
-                        // BoolQuery를 Query로 변환하여 반환
-                        return q.bool(boolQuery.build());
-                    });
-
-            // Elasticsearch에서 쿼리 실행
-            SearchResponse<Map> response = client.search(searchBuilder.build(), Map.class);
-
-            List<String> messages = response.hits().hits().stream()
+            List<String> logContents = response.hits().hits().stream()
                     .map(hit -> convertToString(hit.source()))
                     .toList();
 
-            return String.join("\n", messages);  // 각 로그 사이에 줄 바꿈 추가
+            return String.join("\n", logContents);  // 각 로그 사이에 줄 바꿈 추가
         } catch (IOException e) {
-            log.info("<ElasticSearch> "+ containerName +" 어플리케이션에 대해 검색 실패");
+            log.info("<ElasticSearch> " + containerName + " 어플리케이션에 대해 검색 실패");
             return "";
         }
     }
@@ -322,7 +261,7 @@ public class LogService {
                 .collect(Collectors.toList());
     }
 
-    private List<Map<String, Object>> updateLogFields(List<Map<String, Object>> logs) {
+    private List<Map<String, Object>> refineLogFields(List<Map<String, Object>> logs) {
         return logs.stream()
                 .map(log -> {
                     // 맵에서 기존 데이터 추출
@@ -532,5 +471,37 @@ public class LogService {
 
     private boolean isLogDirectoryValid(Path logDirPath) {
         return Files.exists(logDirPath) && Files.isDirectory(logDirPath);
+    }
+
+    private SearchRequest buildSearchRequestQuery(Instant startTime, Instant endTime, String logLevel, String containerName) {
+        BoolQuery.Builder boolQuery = new BoolQuery.Builder();
+
+        // 시간 범위 필터 추가
+        boolQuery.must(m -> m.range(r -> r
+                .field(LOG_KEY_TIMESTAMP)
+                .gte(JsonData.of(startTime.toString()))
+                .lte(JsonData.of(endTime.toString()))
+        ));
+
+        // 로그 레벨 필터 (필터 값이 null이 아닐 때만 추가)
+        if (logLevel != null) {
+            boolQuery.filter(f -> f.term(t -> t
+                    .field(LOG_KEY_LEVEL)
+                    .value(logLevel)
+            ));
+        }
+
+        // 서비스 이름 필터
+        if (containerName != null) {
+            boolQuery.filter(f -> f.term(t -> t
+                    .field(LOG_KEY_CONTAINER_NAME)
+                    .value(containerName)
+            ));
+        }
+
+        return new SearchRequest.Builder()
+                .index("docker-logs-*")
+                .query(q -> q.bool(boolQuery.build()))
+                .build();
     }
 }
