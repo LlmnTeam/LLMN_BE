@@ -24,6 +24,8 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 
+import static com.example.llmn.core.utils.DateTimeUtils.formatLocalDateTime;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -299,15 +301,6 @@ public class ProjectService {
     public void initEmergency() {
         List<Project> projects = projectRepository.findAll();
         projects.forEach(project -> project.updateIsUrgent(false));
-    }
-
-    private String formatLocalDateTime(LocalDateTime localDateTime) {
-        if(localDateTime == null){
-            return null;
-        }
-
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
-        return localDateTime.format(formatter);
     }
 
     private String getSshInfoName(SshInfo sshInfo) {

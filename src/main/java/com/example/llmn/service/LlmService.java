@@ -20,6 +20,7 @@ import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
+import static com.example.llmn.core.utils.DateTimeUtils.formatLocalDateTime;
 import static com.example.llmn.core.utils.UriUtils.buildURI;
 
 @Service
@@ -268,11 +269,6 @@ public class LlmService {
                         .append("\n");
             }
         }
-    }
-
-    public String formatLocalDateTime(LocalDateTime localDateTime) {
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
-        return localDateTime.format(formatter);
     }
 
     private void processProjectLogSummary(Project project) {

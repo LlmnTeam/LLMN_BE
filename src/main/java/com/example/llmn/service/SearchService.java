@@ -18,6 +18,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import static com.example.llmn.core.utils.DateTimeUtils.formatLocalDateTime;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -125,15 +127,6 @@ public class SearchService {
 
     private String buildLogfileRedirectURL(Long projectId, String fileName) {
         return String.format(LOG_FILE_URL_TEMPLATE, projectId, fileName);
-    }
-
-    private String formatLocalDateTime(LocalDateTime localDateTime) {
-        if(localDateTime == null){
-            return null;
-        }
-
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
-        return localDateTime.format(formatter);
     }
 
     private boolean isWithinDateRange(LocalDateTime data, LocalDateTime startDate, LocalDateTime endDate) {
