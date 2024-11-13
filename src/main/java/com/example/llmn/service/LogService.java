@@ -124,16 +124,9 @@ public class LogService {
 
     public void deleteLogsBefore(Instant cutoffTime, String elasticSearchHost) {
         try {
-            // Elasticsearch에서 lastCollectedTime 이전의 로그 삭제
-            DeleteByQueryRequest deleteRequest = DeleteByQueryRequest.of(d -> d
-                    .index("docker-logs-*")
-                    .query(q -> q.range(r -> r
-                            .field(LOG_KEY_TIMESTAMP)
-                            .lte(JsonData.of(cutoffTime.toString()))
-                    ))
-            );
-
             ElasticsearchClient client = elasticsearchConfig.createElasticsearchClient(elasticSearchHost);
+
+            DeleteByQueryRequest deleteRequest = buildDeleteRequest(cutoffTime);
             client.deleteByQuery(deleteRequest);
         } catch (IOException e){
             log.info("<ElasticSearch> 데이터 삭제 실패");
@@ -153,7 +146,6 @@ public class LogService {
         }
 
         String fileContent = readFileAsString(latestLogFile);
-
         return extractRecentLogFromContent(fileContent);
     }
 
@@ -418,6 +410,16 @@ public class LogService {
                 ))
                 .size(1000)  // 최대 1000개의 로그를 가져옴
                 .build();
+    }
+
+    private DeleteByQueryRequest buildDeleteRequest(Instant cutoffTime) {
+        return DeleteByQueryRequest.of(d -> d
+                .index("docker-logs-*")
+                .query(q -> q.range(r -> r
+                        .field(LOG_KEY_TIMESTAMP)
+                        .lte(JsonData.of(cutoffTime.toString()))
+                ))
+        );
     }
 
     private int compareLogFileDates(String file1, String file2) {
