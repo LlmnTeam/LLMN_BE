@@ -193,37 +193,29 @@ public class LlmService {
         MetricResponse.FindMetricHistoryDTO metricHistory = metricService.findMetricHistory(METRIC_HISTORY_PREVIOUS_HOUR, sshInfoId);
 
         // 각 메트릭 정보를 추가
-        StringBuilder requestLogContent = new StringBuilder();
-        requestLogContent.append(PERFORMANCE_SUMMARY_HEADER);
+        StringBuilder summaryRequestBody = new StringBuilder();
+        summaryRequestBody.append(PERFORMANCE_SUMMARY_HEADER);
         
-        appendCpuMetrics(requestLogContent, metricHistory);
-        appendMemoryMetrics(requestLogContent, metricHistory);
-        appendNetworkInMetrics(requestLogContent, metricHistory);
-        appendNetworkOutMetrics(requestLogContent, metricHistory);
+        appendCpuMetrics(summaryRequestBody, metricHistory);
+        appendMemoryMetrics(summaryRequestBody, metricHistory);
+        appendNetworkInMetrics(summaryRequestBody, metricHistory);
+        appendNetworkOutMetrics(summaryRequestBody, metricHistory);
 
-        return sendSummaryRequest(PERFORMANCE_SUMMERY_URI, requestLogContent.toString(), LogDTO.PerformanceSummaryResponseDTO.class);
+        return sendSummaryRequest(PERFORMANCE_SUMMERY_URI, summaryRequestBody.toString(), LogDTO.PerformanceSummaryResponseDTO.class);
     }
 
     private LogDTO.HourlySummaryResponseDTO fetchHourlySummary(Long userId) {
-        StringBuilder requestContentBuilder = new StringBuilder();
-
         // 성능 요약 리스트와 어플리케이션 요약 리스트
         LocalDateTime startOfHour = LocalDateTime.now().withMinute(0).minusSeconds(0);
         List<Summary> performanceSummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.PERFORMANCE), userId, startOfHour);
         List<Summary> logSummaries = summaryRepository.findByTypeWithinDateWithProject(List.of(SummaryType.LOG), userId, startOfHour);
 
         // 성능 요약 추가
-        appendSummary(requestContentBuilder, PERFORMANCE_SUMMARY_HEADER, performanceSummaries);
+        StringBuilder summaryRequestBody = new StringBuilder();
+        appendSummaryWithHeader(summaryRequestBody, PERFORMANCE_SUMMARY_HEADER, performanceSummaries);
+        appendLogSummary(summaryRequestBody, logSummaries);
 
-        // 일반 및 이상 로그 요약 추가
-        appendSummaryWithApplicationName(requestContentBuilder, APPLICATION_LOG_SUMMARY_HEADER, logSummaries);
-
-        return webClient.post()
-                .uri(buildURI(HOURLY_SUMMARY_URI))
-                .bodyValue(new LogDTO.SummaryRequestDTO(requestContentBuilder.toString()))
-                .retrieve()
-                .bodyToMono(LogDTO.HourlySummaryResponseDTO.class)
-                .block();
+        return sendSummaryRequest(HOURLY_SUMMARY_URI, summaryRequestBody.toString(), LogDTO.HourlySummaryResponseDTO.class);
     }
 
     private LogDTO.DailySummaryResponseDTO fetchDailySummary(Long userId) {
@@ -235,10 +227,10 @@ public class LlmService {
         List<Summary> logSummaries = summaryRepository.findByTypeWithinDateWithProject(List.of(SummaryType.LOG), userId, startOfDay);
 
         // 성능 요약 추가
-        appendSummary(requestContentBuilder, PERFORMANCE_SUMMARY_HEADER, performanceSummaries);
+        appendSummaryWithHeader(requestContentBuilder, PERFORMANCE_SUMMARY_HEADER, performanceSummaries);
 
         // 일반 및 이상 로그 요약 추가
-        appendSummaryWithApplicationName(requestContentBuilder, APPLICATION_LOG_SUMMARY_HEADER, logSummaries);
+        appendLogSummary(requestContentBuilder, logSummaries);
 
         // LLM에 전달하기 위해 FastAPI에 요청
         return webClient.post()
@@ -256,7 +248,7 @@ public class LlmService {
         LocalDateTime startOfDay = LocalDateTime.now().minusWeeks(1).with(LocalTime.MIN);
         List<Summary> dailySummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.DAILY), userId, startOfDay);
 
-        appendSummary(requestContentBuilder, WEEKLY_TREND_HEADER, dailySummaries);
+        appendSummaryWithHeader(requestContentBuilder, WEEKLY_TREND_HEADER, dailySummaries);
 
         return webClient.post()
                 .uri(buildURI(TREND_SUMMERY_URI))
@@ -275,10 +267,10 @@ public class LlmService {
         List<Summary> logSummaries = summaryRepository.findByTypeWithinDateWithProject(List.of(SummaryType.LOG), userId, startOfTime);
 
         // 성능 요약 추가
-        appendSummary(requestContentBuilder, PERFORMANCE_SUMMARY_HEADER, performanceSummaries);
+        appendSummaryWithHeader(requestContentBuilder, PERFORMANCE_SUMMARY_HEADER, performanceSummaries);
 
         // 일반 및 이상 로그 요약 추가
-        appendSummaryWithApplicationName(requestContentBuilder, APPLICATION_LOG_SUMMARY_HEADER, logSummaries);
+        appendLogSummary(requestContentBuilder, logSummaries);
 
         // LLM에 전달하기 위해 FastAPI에 요청
         return webClient.post()
@@ -289,14 +281,14 @@ public class LlmService {
                 .block();
     }
 
-    private void appendSummary(StringBuilder requestContentBuilder, String header, List<Summary> summaries) {
-        requestContentBuilder.append(header);
+    private void appendSummaryWithHeader(StringBuilder summaryRequestBody, String header, List<Summary> summaries) {
+        summaryRequestBody.append(header);
 
         if (summaries.isEmpty()) {
-            requestContentBuilder.append(NO_SUMMARY_DATA);
+            summaryRequestBody.append(NO_SUMMARY_DATA);
         } else {
             for (Summary summary : summaries) {
-                requestContentBuilder.append("Summary Date: ")
+                summaryRequestBody.append("Summary Date: ")
                         .append(formatLocalDateTime(summary.getCreatedDate())) // 날짜 형식 변환
                         .append("\n")
                         .append("Summary Content: ")
@@ -306,14 +298,14 @@ public class LlmService {
         }
     }
 
-    private void appendSummaryWithApplicationName(StringBuilder requestContentBuilder, String header, List<Summary> summaries) {
-        requestContentBuilder.append(header);
+    private void appendLogSummary(StringBuilder summaryRequestBody, List<Summary> summaries) {
+        summaryRequestBody.append(APPLICATION_LOG_SUMMARY_HEADER);
 
         if (summaries.isEmpty()) {
-            requestContentBuilder.append(NO_SUMMARY_DATA);
+            summaryRequestBody.append(NO_SUMMARY_DATA);
         } else {
             for (Summary summary : summaries) {
-                requestContentBuilder.append("Application Name: ")
+                summaryRequestBody.append("Application Name: ")
                         .append(summary.getProject().getContainerName())
                         .append("\n")
                         .append("Summary Date: ")
