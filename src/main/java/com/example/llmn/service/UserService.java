@@ -47,6 +47,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import static com.example.llmn.core.utils.MailTemplate.VERIFICATION_CODE;
+import static com.example.llmn.core.utils.UriUtils.buildURI;
 
 @Service
 @RequiredArgsConstructor
@@ -623,11 +624,6 @@ public class UserService {
             log.info("API 키 업데이트 실패");
             throw new CustomException(ExceptionCode.LOG_CONVERT_TO_FILE_FAIL);
         }
-    }
-
-    private URI buildURI(String uri) {
-        UriComponentsBuilder uriBuilder = UriComponentsBuilder.fromHttpUrl(uri);
-        return uriBuilder.build().encode().toUri();
     }
 
     private List<SshInfo> saveSshInfos(List<UserRequest.SshInfoDTO> requestSshInfos, User user) {

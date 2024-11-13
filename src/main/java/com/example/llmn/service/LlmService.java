@@ -20,6 +20,8 @@ import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
+import static com.example.llmn.core.utils.UriUtils.buildURI;
+
 @Service
 @RequiredArgsConstructor
 public class LlmService {
@@ -283,11 +285,6 @@ public class LlmService {
         }
     }
 
-    private URI buildURI(String uri) {
-        UriComponentsBuilder uriBuilder = UriComponentsBuilder.fromHttpUrl(uri);
-        return uriBuilder.build().encode().toUri();
-    }
-
     public String formatLocalDateTime(LocalDateTime localDateTime) {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
         return localDateTime.format(formatter);
@@ -301,13 +298,7 @@ public class LlmService {
         }
 
         // 2nd 로그 요약 저장
-        Summary logSummary = Summary.builder()
-                .user(project.getUser())
-                .project(project)
-                .content(summaryDTO.logSummary())
-                .summaryType(SummaryType.LOG)
-                .build();
-        summaryRepository.save(logSummary);
+        saveSummary(project.getUser(), project, summaryDTO.logSummary(), SummaryType.LOG);
 
         // 3rd 긴급 체크 여부 업데이트
         if(summaryDTO.isUrgent()) {
@@ -373,6 +364,16 @@ public class LlmService {
     private void saveSummary(User user, String content, SummaryType summaryType) {
         Summary summary = Summary.builder()
                 .user(user)
+                .content(content)
+                .summaryType(summaryType)
+                .build();
+        summaryRepository.save(summary);
+    }
+
+    private void saveSummary(User user, Project project, String content, SummaryType summaryType) {
+        Summary summary = Summary.builder()
+                .user(user)
+                .project(project)
                 .content(content)
                 .summaryType(summaryType)
                 .build();
