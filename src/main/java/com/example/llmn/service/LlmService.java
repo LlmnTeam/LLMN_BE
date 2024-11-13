@@ -58,6 +58,7 @@ public class LlmService {
     private static final String LOG_UPDATE_ALARM_SUFFIX = "의 요약이 업데이트 되었습니다.";
     private static final int METRIC_HISTORY_PREVIOUS_HOUR = 1;
     private static final String PERFORMANCE_SUMMARY_ALARM = "새로운 성능 요약이 생성 되었습니다.";
+    private static final String HOURLY_SUMMARY_ALARM = "새로운 시간별 요약이 생성 되었습니다.";
     private static final String DAILY_SUMMARY_ALARM = "새로운 일일 요약이 생성 되었습니다.";
     private static final String TREND_SUMMARY_ALARM = "장기 트렌드 분석 요약이 생성 되었습니다.";
     private static final String RECOMMENDATION_ALARM = "새로운 추천 사항이 업데이트 되었습니다";
@@ -83,14 +84,10 @@ public class LlmService {
             Long monitoringSshInfoId = user.getMonitoringSshId();
             LogDTO.PerformanceSummaryResponseDTO performanceSummaryDTO = fetchMetricSummary(monitoringSshInfoId);
 
-            Summary performanceSummary = Summary.builder()
-                    .user(user)
-                    .content(performanceSummaryDTO.performanceSummary())
-                    .summaryType(SummaryType.PERFORMANCE)
-                    .build();
-            summaryRepository.save(performanceSummary);
+            // 1st 요약 결과 저장
+            saveSummary(user, performanceSummaryDTO.performanceSummary(), SummaryType.PERFORMANCE);
 
-            // 업데이트 알람 생성
+            // 2nd업데이트 알람 생성
             alarmService.generateAlarm(user.getId(), PERFORMANCE_SUMMARY_ALARM, AlarmType.UPDATE);
         }
     }
@@ -104,12 +101,9 @@ public class LlmService {
             LogDTO.HourlySummaryResponseDTO hourlySummaryDTO = fetchHourlySummary(userId);
 
             User userRef = userRepository.getReferenceById(userId);
-            Summary hourlySummary = Summary.builder()
-                    .user(userRef)
-                    .content(hourlySummaryDTO.hourlySummary())
-                    .summaryType(SummaryType.HOURLY)
-                    .build();
-            summaryRepository.save(hourlySummary);
+            saveSummary(userRef, hourlySummaryDTO.hourlySummary(), SummaryType.HOURLY);
+
+            alarmService.generateAlarm(userId, HOURLY_SUMMARY_ALARM, AlarmType.UPDATE);
         }
     }
 
@@ -122,14 +116,8 @@ public class LlmService {
             LogDTO.DailySummaryResponseDTO dailySummaryDTO = fetchDailySummary(userId);
 
             User userRef = userRepository.getReferenceById(userId);
-            Summary dailySummary = Summary.builder()
-                    .user(userRef)
-                    .content(dailySummaryDTO.dailySummary())
-                    .summaryType(SummaryType.DAILY)
-                    .build();
-            summaryRepository.save(dailySummary);
+            saveSummary(userRef, dailySummaryDTO.dailySummary(), SummaryType.DAILY);
 
-            // 업데이트 알람 생성
             alarmService.generateAlarm(userId, DAILY_SUMMARY_ALARM, AlarmType.UPDATE);
         }
     }
@@ -143,14 +131,8 @@ public class LlmService {
             LogDTO.TrendSummaryResponseDTO trendSummaryDTO = fetchTrendSummary(userId);
 
             User userRef = userRepository.getReferenceById(userId);
-            Summary trendSummary = Summary.builder()
-                    .user(userRef)
-                    .content(trendSummaryDTO.trendSummary())
-                    .summaryType(SummaryType.TEND)
-                    .build();
-            summaryRepository.save(trendSummary);
+            saveSummary(userRef, trendSummaryDTO.trendSummary(), SummaryType.TEND);
 
-            // 업데이트 알람 생성
             alarmService.generateAlarm(userId, TREND_SUMMARY_ALARM, AlarmType.UPDATE);
         }
     }
@@ -164,14 +146,8 @@ public class LlmService {
             LogDTO.RecommendationDTO recommendationDTO = fetchRecommendation(userId);
 
             User userRef = userRepository.getReferenceById(userId);
-            Summary recommend = Summary.builder()
-                    .user(userRef)
-                    .content(recommendationDTO.recommend())
-                    .summaryType(SummaryType.RECOMMENDATION)
-                    .build();
-            summaryRepository.save(recommend);
+            saveSummary(userRef, recommendationDTO.recommend(), SummaryType.RECOMMENDATION);
 
-            // 업데이트 알람 생성
             alarmService.generateAlarm(userId, RECOMMENDATION_ALARM, AlarmType.UPDATE);
         }
     }
@@ -392,5 +368,14 @@ public class LlmService {
                 .append(logMessage)
                 .append("\n")
                 .toString();
+    }
+
+    private void saveSummary(User user, String content, SummaryType summaryType) {
+        Summary summary = Summary.builder()
+                .user(user)
+                .content(content)
+                .summaryType(summaryType)
+                .build();
+        summaryRepository.save(summary);
     }
 }
