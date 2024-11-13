@@ -178,44 +178,30 @@ public class LlmService {
 
     private LogDTO.SummaryResponseDTO fetchLogSummary(String containerName) {
         // 로그 메시지는 ElasticSearch에서 조회
-        String logMessage = logService.getLogWithin30Minutes(containerName);
-
-        // 검색 결과가 빈 값이면 null을 반환
-        if (logMessage.isBlank()) {
+        String logContent = logService.getLogWithin30Minutes(containerName);
+        if (logContent.isBlank()) {
             return null;
         }
 
-        StringBuilder requestContentBuilder = new StringBuilder();
-        requestContentBuilder.append(LOG_DATA_HEADER)
-                .append("Application Name: ")
-                .append(containerName)
-                .append("\n")
-                .append("Log Content: ")
-                .append(logMessage)
-                .append("\n");
+        String summaryRequestBody = buildSummaryRequestBody(containerName, logContent);
 
-        return webClient.post()
-                .uri(buildURI(LOG_SUMMERY_URI))
-                .bodyValue(new LogDTO.SummaryRequestDTO(requestContentBuilder.toString()))
-                .retrieve()
-                .bodyToMono(LogDTO.SummaryResponseDTO.class)
-                .block();
+        return sendSummaryRequest(LOG_SUMMERY_URI, summaryRequestBody, LogDTO.SummaryResponseDTO.class);
     }
 
     private LogDTO.PerformanceSummaryResponseDTO fetchMetricSummary(Long sshInfoId){
         // 1시간 전까지의 성능 지표
         MetricResponse.FindMetricHistoryDTO metricHistory = metricService.findMetricHistory(METRIC_HISTORY_PREVIOUS_HOUR, sshInfoId);
 
-        StringBuilder logContentBuilder = new StringBuilder();
-        logContentBuilder.append(PERFORMANCE_SUMMARY_HEADER);
-
         // 각 메트릭 정보를 추가
-        appendCpuMetrics(logContentBuilder, metricHistory);
-        appendMemoryMetrics(logContentBuilder, metricHistory);
-        appendNetworkInMetrics(logContentBuilder, metricHistory);
-        appendNetworkOutMetrics(logContentBuilder, metricHistory);
+        StringBuilder requestLogContent = new StringBuilder();
+        requestLogContent.append(PERFORMANCE_SUMMARY_HEADER);
+        
+        appendCpuMetrics(requestLogContent, metricHistory);
+        appendMemoryMetrics(requestLogContent, metricHistory);
+        appendNetworkInMetrics(requestLogContent, metricHistory);
+        appendNetworkOutMetrics(requestLogContent, metricHistory);
 
-        return sendSummaryRequest(PERFORMANCE_SUMMERY_URI, logContentBuilder.toString(), LogDTO.PerformanceSummaryResponseDTO.class);
+        return sendSummaryRequest(PERFORMANCE_SUMMERY_URI, requestLogContent.toString(), LogDTO.PerformanceSummaryResponseDTO.class);
     }
 
     private LogDTO.HourlySummaryResponseDTO fetchHourlySummary(Long userId) {
@@ -413,5 +399,17 @@ public class LlmService {
                 .retrieve()
                 .bodyToMono(responseType)
                 .block();
+    }
+
+    private String buildSummaryRequestBody(String containerName, String logMessage) {
+        return new StringBuilder()
+                .append(LOG_DATA_HEADER)
+                .append("Application Name: ")
+                .append(containerName)
+                .append("\n")
+                .append("Log Content: ")
+                .append(logMessage)
+                .append("\n")
+                .toString();
     }
 }
