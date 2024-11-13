@@ -177,8 +177,6 @@ public class LlmService {
     }
 
     private LogDTO.SummaryResponseDTO fetchLogSummary(String containerName) {
-        StringBuilder requestContentBuilder = new StringBuilder();
-
         // 로그 메시지는 ElasticSearch에서 조회
         String logMessage = logService.getLogWithin30Minutes(containerName);
 
@@ -187,6 +185,7 @@ public class LlmService {
             return null;
         }
 
+        StringBuilder requestContentBuilder = new StringBuilder();
         requestContentBuilder.append(LOG_DATA_HEADER)
                 .append("Application Name: ")
                 .append(containerName)
@@ -204,43 +203,19 @@ public class LlmService {
     }
 
     private LogDTO.PerformanceSummaryResponseDTO fetchMetricSummary(Long sshInfoId){
-        StringBuilder requestContentBuilder = new StringBuilder();
-
         // 1시간 전까지의 성능 지표
         MetricResponse.FindMetricHistoryDTO metricHistory = metricService.findMetricHistory(METRIC_HISTORY_PREVIOUS_HOUR, sshInfoId);
 
-        requestContentBuilder.append(PERFORMANCE_SUMMARY_HEADER);
+        StringBuilder logContentBuilder = new StringBuilder();
+        logContentBuilder.append(PERFORMANCE_SUMMARY_HEADER);
 
-        // CPU 메트릭 정보를 추가
-        requestContentBuilder.append("1. CPU Metrics:\n");
-        for (MetricResponse.CpuMetricDTO cpuMetric : metricHistory.cpuMetrics()) {
-            requestContentBuilder.append(String.format("- Time: %s, CPU Usage: %.2f%%\n", cpuMetric.time(), cpuMetric.cpuUsage()));
-        }
+        // 각 메트릭 정보를 추가
+        appendCpuMetrics(logContentBuilder, metricHistory);
+        appendMemoryMetrics(logContentBuilder, metricHistory);
+        appendNetworkInMetrics(logContentBuilder, metricHistory);
+        appendNetworkOutMetrics(logContentBuilder, metricHistory);
 
-        // 메모리 메트릭 정보를 추가
-        requestContentBuilder.append("\n2. Memory Metrics:\n");
-        for (MetricResponse.MemoryMetricDTO memoryMetric : metricHistory.memoryMetrics()) {
-            requestContentBuilder.append(String.format("- Time: %s, Memory Usage: %.2f MB\n", memoryMetric.time(), memoryMetric.memoryUsage()));
-        }
-
-        // 네트워크 In 메트릭 정보를 추가
-        requestContentBuilder.append("\n3. Network In Metrics:\n");
-        for (MetricResponse.NetworkInMetricDTO networkInMetric : metricHistory.networkInMetrics()) {
-            requestContentBuilder.append(String.format("- Time: %s, Network Received: %.2f MB\n", networkInMetric.time(), networkInMetric.networkReceived()));
-        }
-
-        // 네트워크 Out 메트릭 정보를 추가
-        requestContentBuilder.append("\n4. Network Out Metrics:\n");
-        for (MetricResponse.NetworkOutMetricDTO networkOutMetric : metricHistory.networkOutMetrics()) {
-            requestContentBuilder.append(String.format("- Time: %s, Network Sent: %.2f MB\n", networkOutMetric.time(), networkOutMetric.networkSent()));
-        }
-
-        return webClient.post()
-                .uri(buildURI(PERFORMANCE_SUMMERY_URI))
-                .bodyValue(new LogDTO.SummaryRequestDTO(requestContentBuilder.toString()))
-                .retrieve()
-                .bodyToMono(LogDTO.PerformanceSummaryResponseDTO.class)
-                .block();
+        return sendSummaryRequest(PERFORMANCE_SUMMERY_URI, logContentBuilder.toString(), LogDTO.PerformanceSummaryResponseDTO.class);
     }
 
     private LogDTO.HourlySummaryResponseDTO fetchHourlySummary(Long userId) {
@@ -401,5 +376,42 @@ public class LlmService {
         // 4th 업데이트 알람 생성
         String updateAlarmContent = project.getProjectName() + LOG_UPDATE_ALARM_SUFFIX;
         alarmService.generateAlarm(project.getUser().getId(), updateAlarmContent, AlarmType.UPDATE);
+    }
+
+    private void appendCpuMetrics(StringBuilder builder, MetricResponse.FindMetricHistoryDTO metricHistory) {
+        builder.append("1. CPU Metrics:\n");
+        for (MetricResponse.CpuMetricDTO cpuMetric : metricHistory.cpuMetrics()) {
+            builder.append(String.format("- Time: %s, CPU Usage: %.2f%%\n", cpuMetric.time(), cpuMetric.cpuUsage()));
+        }
+    }
+
+    private void appendMemoryMetrics(StringBuilder builder, MetricResponse.FindMetricHistoryDTO metricHistory) {
+        builder.append("\n2. Memory Metrics:\n");
+        for (MetricResponse.MemoryMetricDTO memoryMetric : metricHistory.memoryMetrics()) {
+            builder.append(String.format("- Time: %s, Memory Usage: %.2f MB\n", memoryMetric.time(), memoryMetric.memoryUsage()));
+        }
+    }
+
+    private void appendNetworkInMetrics(StringBuilder builder, MetricResponse.FindMetricHistoryDTO metricHistory) {
+        builder.append("\n3. Network In Metrics:\n");
+        for (MetricResponse.NetworkInMetricDTO networkInMetric : metricHistory.networkInMetrics()) {
+            builder.append(String.format("- Time: %s, Network Received: %.2f MB\n", networkInMetric.time(), networkInMetric.networkReceived()));
+        }
+    }
+
+    private void appendNetworkOutMetrics(StringBuilder builder, MetricResponse.FindMetricHistoryDTO metricHistory) {
+        builder.append("\n4. Network Out Metrics:\n");
+        for (MetricResponse.NetworkOutMetricDTO networkOutMetric : metricHistory.networkOutMetrics()) {
+            builder.append(String.format("- Time: %s, Network Sent: %.2f MB\n", networkOutMetric.time(), networkOutMetric.networkSent()));
+        }
+    }
+
+    private <T> T sendSummaryRequest(String uri, String requestContent, Class<T> responseType) {
+        return webClient.post()
+                .uri(buildURI(uri))
+                .bodyValue(new LogDTO.SummaryRequestDTO(requestContent))
+                .retrieve()
+                .bodyToMono(responseType)
+                .block();
     }
 }
