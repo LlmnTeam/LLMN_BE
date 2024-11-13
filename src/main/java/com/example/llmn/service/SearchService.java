@@ -19,13 +19,14 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static com.example.llmn.core.utils.DateTimeUtils.formatLocalDateTime;
+import static com.example.llmn.core.utils.FileUtils.LOGS_DIRECTORY;
+import static com.example.llmn.core.utils.FileUtils.getFileList;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class SearchService {
 
-    private final LogService logService;
     private final ProjectRepository projectRepository;
     private final SummaryRepository summaryRepository;
     private static final String LOG_FILE_URL_TEMPLATE = "/project/%d/%s";
@@ -41,7 +42,7 @@ public class SearchService {
                 .collect(Collectors.toMap(Project::getContainerName, Project::getId));
 
         // 1. 로그 파일 검색
-        List<String> logFiles = logService.findLogFileList();
+        List<String> logFiles = getFileList(LOGS_DIRECTORY);
         List<SearchResponse.LogFileDTO> searchedLogDTOS = searchLogFiles(logFiles, lowerCaseKeyword, startDate, endDate, containerNameToIdMap);
 
         // 2. 인사이트 기록 검색

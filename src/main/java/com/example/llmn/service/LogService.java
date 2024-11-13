@@ -143,16 +143,12 @@ public class LogService {
         }
     }
 
-    public String getLogWithin30Minutes(String containerName){
+    public String getRecentLogs(String containerName){
         List<String> logFiles = getFileList(LOGS_DIRECTORY);
 
         String latestLogFile = logFiles.stream()
                 .filter(logFile -> logFile.startsWith(containerName + "-log"))
-                .max((file1, file2) -> { // 최신 파일을 찾기 위해 비교
-                    LocalDateTime dateTime1 = extractDateTimeFromLogFile(file1);
-                    LocalDateTime dateTime2 = extractDateTimeFromLogFile(file2);
-                    return dateTime1.compareTo(dateTime2);
-                })
+                .max(this::compareLogFileDates)
                 .orElse(null);
 
         if(latestLogFile == null){
@@ -161,7 +157,7 @@ public class LogService {
 
         String logContent = readFileAsString(latestLogFile);
 
-        return extractLogWithin30Minutes(logContent);
+        return extractRecentLogFromContent(logContent);
     }
 
     private LogDataDTO convertResponseToLogData(Map<String, Object> source) {
@@ -362,7 +358,7 @@ public class LogService {
         }
     }
 
-    private String extractLogWithin30Minutes(String logContent) {
+    private String extractRecentLogFromContent(String logContent) {
         StringBuilder resultLogs = new StringBuilder();
 
         // 로그 헤더의 날짜 패턴
@@ -440,5 +436,11 @@ public class LogService {
                 ))
                 .size(1000)  // 최대 1000개의 로그를 가져옴
                 .build();
+    }
+
+    private int compareLogFileDates(String file1, String file2) {
+        LocalDateTime fileDateTime1 = extractDateTimeFromLogFile(file1);
+        LocalDateTime fileDateTime2 = extractDateTimeFromLogFile(file2);
+        return fileDateTime1.compareTo(fileDateTime2);
     }
 }

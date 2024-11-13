@@ -12,12 +12,9 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.util.UriComponentsBuilder;
 
-import java.net.URI;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 import static com.example.llmn.core.utils.DateTimeUtils.formatLocalDateTime;
@@ -158,7 +155,7 @@ public class LlmService {
 
     private LogDTO.SummaryResponseDTO fetchLogSummary(String containerName) {
         // 로그 메시지는 ElasticSearch에서 조회
-        String logContent = logService.getLogWithin30Minutes(containerName);
+        String logContent = logService.getRecentLogs(containerName);
         if (logContent.isBlank()) {
             return null;
         }
