@@ -205,12 +205,11 @@ public class LlmService {
     }
 
     private LogDTO.HourlySummaryResponseDTO fetchHourlySummary(Long userId) {
-        // 성능 요약 리스트와 어플리케이션 요약 리스트
         LocalDateTime startOfHour = LocalDateTime.now().withMinute(0).minusSeconds(0);
         List<Summary> performanceSummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.PERFORMANCE), userId, startOfHour);
         List<Summary> logSummaries = summaryRepository.findByTypeWithinDateWithProject(List.of(SummaryType.LOG), userId, startOfHour);
 
-        // 성능 요약 추가
+        // 성능 요약과 로그 요약 추가 (시간)
         StringBuilder summaryRequestBody = new StringBuilder();
         appendSummaryWithHeader(summaryRequestBody, PERFORMANCE_SUMMARY_HEADER, performanceSummaries);
         appendLogSummary(summaryRequestBody, logSummaries);
@@ -219,26 +218,16 @@ public class LlmService {
     }
 
     private LogDTO.DailySummaryResponseDTO fetchDailySummary(Long userId) {
-        StringBuilder requestContentBuilder = new StringBuilder();
-
-        // 성능 요약 리스트와 어플리케이션 요약 리스트
         LocalDateTime startOfDay = LocalDateTime.now().with(LocalTime.MIN);
         List<Summary> performanceSummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.PERFORMANCE), userId, startOfDay);
         List<Summary> logSummaries = summaryRepository.findByTypeWithinDateWithProject(List.of(SummaryType.LOG), userId, startOfDay);
 
-        // 성능 요약 추가
-        appendSummaryWithHeader(requestContentBuilder, PERFORMANCE_SUMMARY_HEADER, performanceSummaries);
+        // 성능 요약과 로그 요약 추가 (일)
+        StringBuilder summaryRequestBody = new StringBuilder();
+        appendSummaryWithHeader(summaryRequestBody, PERFORMANCE_SUMMARY_HEADER, performanceSummaries);
+        appendLogSummary(summaryRequestBody, logSummaries);
 
-        // 일반 및 이상 로그 요약 추가
-        appendLogSummary(requestContentBuilder, logSummaries);
-
-        // LLM에 전달하기 위해 FastAPI에 요청
-        return webClient.post()
-                .uri(buildURI(DAILY_SUMMERY_URI))
-                .bodyValue(new LogDTO.SummaryRequestDTO(requestContentBuilder.toString()))
-                .retrieve()
-                .bodyToMono(LogDTO.DailySummaryResponseDTO.class)
-                .block();
+        return sendSummaryRequest(DAILY_SUMMERY_URI, summaryRequestBody.toString(), LogDTO.DailySummaryResponseDTO.class);
     }
 
     private LogDTO.TrendSummaryResponseDTO fetchTrendSummary(Long userId){
