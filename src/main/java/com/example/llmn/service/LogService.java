@@ -22,17 +22,14 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static com.example.llmn.core.utils.DateTimeUtils.getThirtyMinutesAgo;
-import static com.example.llmn.core.utils.DateTimeUtils.getTodayDateTimeInStr;
+import static com.example.llmn.core.utils.DateTimeUtils.*;
 import static com.example.llmn.core.utils.FileUtils.getFileList;
 import static com.example.llmn.core.utils.FileUtils.readFileAsString;
 
@@ -61,6 +58,8 @@ public class LogService {
     private static final String NO_MESSAGE = "No message";
     private static final String BLANK_STRING = "";
     private static final String LOG_FORMAT = "[%s]\n%s";
+    private static final String FILE_TIMESTAMP_FORMAT = "yyyy-MM-dd_HH";
+    private static final String LOG_TIMESTAMP_FORMAT = "yyyy-MM-dd_HH:mm";
     private static final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH");
     private static final DateTimeFormatter formatterWithMinute = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH:mm");
 
@@ -86,7 +85,7 @@ public class LogService {
             updateLogToElasticSearch(refinedLogMaps, sshInfo.getRemoteHost());
 
             // 4. .txt 파일로도 로그 저장
-            saveLogsToFile(refinedLogMaps, sshInfo.getId());
+            saveLogMapsToFile(refinedLogMaps, sshInfo.getId());
         }
     }
 
@@ -276,26 +275,24 @@ public class LogService {
         return "docker-logs-" + getTodayDateTimeInStr();
     }
 
-    private void saveLogsToFile(List<Map<String, Object>> logs, Long sshId) {
-        if (logs.isEmpty()) {
+    private void saveLogMapsToFile(List<Map<String, Object>> logMaps, Long sshId) {
+        if (logMaps.isEmpty()) {
             return;
         }
 
-        // 1. 서비스별로 로그를 그룹화
-        Map<String, List<Map<String, Object>>> logsByContainerName = logs.stream()
-                .collect(Collectors.groupingBy(log -> (String) log.getOrDefault(LOG_KEY_CONTAINER_NAME, UNKNOWN_CONTAINER)));
-
-        // 2. 로그를 저장할 디렉토리가 없으면 생성
+        // 1st 로그를 저장할 디렉토리가 없으면 생성
         createLogDirectoryIfNotExist();
 
-        // 3. 로그 파일 저장
-        Date now = new Date();
-        String timestampForTitle = new SimpleDateFormat("yyyy-MM-dd_HH").format(now);
-        String timestampForText = new SimpleDateFormat("yyyy-MM-dd_HH:mm").format(now);
+        // 2nd 서비스별로 로그를 그룹화
+        Map<String, List<Map<String, Object>>> logsGroupedByContainer = groupLogsByContainerName(logMaps);
 
-        logsByContainerName.forEach((containerName, logMaps) -> {
+        // 3rd 로그 파일 저장
+        String timestampForTitle = formatDate(new Date(), FILE_TIMESTAMP_FORMAT);
+        String timestampForText = formatDate(new Date(), LOG_TIMESTAMP_FORMAT);
+        
+        logsGroupedByContainer.forEach((containerName, maps) -> {
             String fileTitle = String.format("logs/%s-log-%s-%d.txt", containerName, timestampForTitle, sshId);
-            writeBufferAsFile(fileTitle, logMaps, timestampForText);
+            writeBufferAsFile(fileTitle, maps, timestampForText);
         });
     }
 
@@ -436,5 +433,10 @@ public class LogService {
 
     private String extractLogHeader(String log) {
         return log.substring(1, 17);
+    }
+
+    private Map<String, List<Map<String, Object>>> groupLogsByContainerName(List<Map<String, Object>> logs) {
+        return logs.stream()
+                .collect(Collectors.groupingBy(log -> (String) log.getOrDefault(LOG_KEY_CONTAINER_NAME, UNKNOWN_CONTAINER)));
     }
 }

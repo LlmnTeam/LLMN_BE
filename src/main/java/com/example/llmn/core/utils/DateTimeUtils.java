@@ -1,9 +1,11 @@
 package com.example.llmn.core.utils;
 
+import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
+import java.util.Date;
 
 public class DateTimeUtils {
     private static final DateTimeFormatter DEFAULT_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
@@ -24,5 +26,9 @@ public class DateTimeUtils {
 
     public static LocalDateTime getThirtyMinutesAgo(){
         return LocalDateTime.now().minus(30, ChronoUnit.MINUTES);
+    }
+
+    public static String formatDate(Date date, String format) {
+        return new SimpleDateFormat(format).format(date);
     }
 }
