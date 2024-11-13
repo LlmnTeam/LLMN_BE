@@ -131,8 +131,8 @@ public class LogService {
         String latestLogFile = logFiles.stream()
                 .filter(logFile -> logFile.startsWith(containerName + "-log"))
                 .max((file1, file2) -> { // 최신 파일을 찾기 위해 비교
-                    LocalDateTime dateTime1 = extractDateTimeFromFile(file1);
-                    LocalDateTime dateTime2 = extractDateTimeFromFile(file2);
+                    LocalDateTime dateTime1 = extractDateTimeFromLogFile(file1);
+                    LocalDateTime dateTime2 = extractDateTimeFromLogFile(file2);
                     return dateTime1.compareTo(dateTime2);
                 })
                 .orElse(null);
@@ -150,18 +150,23 @@ public class LogService {
         String containerName = Optional.ofNullable((String) source.get(LOG_KEY_CONTAINER_NAME))
                 .orElse(UNKNOWN_CONTAINER);
 
-        String timestampInStr = (String) source.get(LOG_KEY_TIMESTAMP);
-        Instant timestamp = timestampInStr != null ? Instant.parse(timestampInStr) : null;
+        Instant timestamp = parseTimestamp((String) source.get(LOG_KEY_TIMESTAMP));
 
-        String rawMessage = (String) source.get(LOG_KEY_MESSAGE);
-        String formattedMessage = rawMessage != null ? LogDataParser.formatMessage(rawMessage) : NO_MESSAGE;
+        String formattedMessage = Optional.ofNullable((String) source.get(LOG_KEY_MESSAGE))
+                .map(LogDataParser::formatMessage)
+                .orElse(NO_MESSAGE);
 
-        boolean isProcessed = (boolean) source.get(LOG_KEY_PROCESSED);
+        boolean isProcessed = Optional.ofNullable((Boolean) source.get(LOG_KEY_PROCESSED))
+                .orElse(false);
 
         String logLevel = Optional.ofNullable((String) source.get(LOG_KEY_LEVEL))
                 .orElse(LOG_LEVEL_UNKNOWN);
 
         return new LogDataDTO(containerName, timestamp, formattedMessage, isProcessed, logLevel);
+    }
+
+    private Instant parseTimestamp(String timestampInStr) {
+        return timestampInStr != null ? Instant.parse(timestampInStr) : null;
     }
 
     private String convertToString(Map<String, Object> source) {
@@ -188,8 +193,7 @@ public class LogService {
 
             return client.search(searchRequest, Map.class);
         } catch (ElasticsearchException e) {
-            // 인덱스가 없을 경우 생성
-            createIndexIfNotExists(indexName, elasticSearchHost);
+            createElasticSearchIndex(indexName, elasticSearchHost);
             return new SearchResponse.Builder<Map>().build();
         } catch (IOException e){
             log.info("<ElasticSearch> "+indexName + "에 대한 검색 실패");
@@ -218,7 +222,7 @@ public class LogService {
                             .orElse(NO_MESSAGE);
 
                     // 로그 레벨 추출
-                    String logLevel = extractLogLevel(message);
+                    String logLevel = extractLogLevelFromLog(message);
 
                     // 맵에 필드 추가
                     log.put(LOG_KEY_LEVEL, logLevel);
@@ -256,8 +260,7 @@ public class LogService {
         }
     }
 
-    // 로그 메시지에서 로그 레벨 추출
-    private String extractLogLevel(String message) {
+    private String extractLogLevelFromLog(String message) {
         return (message == null) ? LOG_LEVEL_UNKNOWN :
                 Stream.of(LOG_LEVEL_INFO, LOG_LEVEL_ERROR, LOG_LEVEL_WARN)
                         .filter(message::contains)
@@ -335,7 +338,7 @@ public class LogService {
                 if (logContent != null) {
                     writer.write(logContent);
                     writer.newLine();
-                    writer.newLine();  // 가독성을 위해 빈 줄 추가
+                    writer.newLine();
                 }
             }
         } catch (IOException e) {
@@ -355,10 +358,8 @@ public class LogService {
         return String.format(LOG_FORMAT, timestamp, logContent);
     }
 
-    private void createIndexIfNotExists(String indexName, String elasticSearchHost)  {
+    private void createElasticSearchIndex(String indexName, String elasticSearchHost)  {
         try {
-            ElasticsearchClient client = elasticsearchConfig.createElasticsearchClient(elasticSearchHost);
-
             CreateIndexRequest createIndexRequest = new CreateIndexRequest.Builder()
                     .index(indexName)
                     .mappings(m -> m
@@ -370,8 +371,8 @@ public class LogService {
                     )
                     .build();
 
+            ElasticsearchClient client = elasticsearchConfig.createElasticsearchClient(elasticSearchHost);
             client.indices().create(createIndexRequest);
-            log.info("인덱스 {} 생성 완료", indexName);
         } catch (IOException e) {
             log.info("ElasticSearch 인덱스 생성 실패!");
         }
@@ -408,7 +409,7 @@ public class LogService {
         return resultLogs.toString().trim();
     }
 
-    private LocalDateTime extractDateTimeFromFile(String file) {
+    private LocalDateTime extractDateTimeFromLogFile(String file) {
         // 파일 이름에서 "log-" 뒤부터 ".txt" 앞까지의 부분 추출
         String dateTimePart = file.substring(file.indexOf("log-") + 4, file.indexOf("-", file.indexOf("_")));
         return LocalDateTime.parse(dateTimePart, formatter);
