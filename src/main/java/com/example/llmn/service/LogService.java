@@ -59,6 +59,7 @@ public class LogService {
     private static final String UNKNOWN_CONTAINER = "unknown_container";
     private static final String NO_MESSAGE = "No message";
     private static final String BLANK_STRING = "";
+    private static final String LOG_FORMAT = "[%s]\n%s";
     private static final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH");
     private static final DateTimeFormatter formatterWithMinute = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH:mm");
 
@@ -329,10 +330,10 @@ public class LogService {
         // 파일에 기록하기 위한 BufferedWriter 생성
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(fileTitle, true))) {
             for (Map<String, Object> logMap : logMaps) {
-                String logMessage = formatLogToStr(logMap, timestamp);
+                String logContent = convertLogMapToString(logMap, timestamp);
 
-                if (logMessage != null) {
-                    writer.write(logMessage);
+                if (logContent != null) {
+                    writer.write(logContent);
                     writer.newLine();
                     writer.newLine();  // 가독성을 위해 빈 줄 추가
                 }
@@ -342,18 +343,16 @@ public class LogService {
         }
     }
 
-    private String formatLogToStr(Map<String, Object> logMap, String timestamp) {
-        // 필요한 로그 데이터만 추출하여 포맷팅
-        Object message = logMap.get(LOG_KEY_MESSAGE);
+    private String convertLogMapToString(Map<String, Object> logMap, String timestamp) {
+        String logContent = Optional.ofNullable(logMap.get(LOG_KEY_MESSAGE))
+                .map(Object::toString)
+                .orElse(null);
 
-        if (message == null) {
+        if (logContent == null) {
             return null;
         }
 
-        // 로그 데이터를 원하는 형식으로 포맷
-        return String.format("[%s]\n%s",
-                timestamp,
-                message.toString());
+        return String.format(LOG_FORMAT, timestamp, logContent);
     }
 
     private void createIndexIfNotExists(String indexName, String elasticSearchHost)  {
