@@ -17,7 +17,6 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.io.BufferedWriter;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -30,8 +29,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static com.example.llmn.core.utils.DateTimeUtils.*;
-import static com.example.llmn.core.utils.FileUtils.getFileList;
-import static com.example.llmn.core.utils.FileUtils.readFileAsString;
+import static com.example.llmn.core.utils.FileUtils.*;
 
 @Service
 @RequiredArgsConstructor
@@ -97,9 +95,8 @@ public class LogService {
             SearchRequest searchRequest = buildSearchRequest(startTime, endTime, logLevel, containerName);
             SearchResponse<Map> response = client.search(searchRequest, Map.class);
 
-            // 검색 결과를 LogData로 변환하여 반환
             return response.hits().hits().stream()
-                    .map(hit -> convertResponseToLogData(hit.source()))
+                    .map(hit -> convertResponseToLogData(hit.source())) // 검색 결과를 LogData로 변환하여 반환
                     .collect(Collectors.toList());
         } catch (IOException e) {
             log.info("<ElasticSearch> "+ containerName +" 어플리케이션에 대해 검색 실패");
@@ -160,40 +157,13 @@ public class LogService {
         return extractRecentLogFromContent(fileContent);
     }
 
-    private LogDataDTO convertResponseToLogData(Map<String, Object> source) {
-        String containerName = Optional.ofNullable((String) source.get(LOG_KEY_CONTAINER_NAME))
-                .orElse(UNKNOWN_CONTAINER);
-
-        Instant timestamp = convertStringToInstant((String) source.get(LOG_KEY_TIMESTAMP));
-
-        String formattedMessage = Optional.ofNullable((String) source.get(LOG_KEY_MESSAGE))
-                .map(LogDataParser::formatMessage)
-                .orElse(NO_MESSAGE);
-
-        boolean isProcessed = Optional.ofNullable((Boolean) source.get(LOG_KEY_PROCESSED))
-                .orElse(false);
-
-        String logLevel = Optional.ofNullable((String) source.get(LOG_KEY_LEVEL))
-                .orElse(LOG_LEVEL_UNKNOWN);
-
-        return new LogDataDTO(containerName, timestamp, formattedMessage, isProcessed, logLevel);
-    }
-
-    private Instant convertStringToInstant(String timestamp) {
-        return timestamp != null ? Instant.parse(timestamp) : null;
-    }
-
-    private String convertResponseToString(Map<String, Object> responseMap) {
-        String rawMessage = (String) responseMap.get(LOG_KEY_MESSAGE);
-        return rawMessage != null ? rawMessage : "";
-    }
-
     private SearchResponse<Map> searchUnprocessedLogs(String elasticSearchHost) {
         String logIndex = getLogIndex();
 
         try {
             SearchRequest searchRequest = buildSearchRequest(logIndex); // is_processed가 false인 데이터 검색
             ElasticsearchClient client = elasticsearchConfig.createElasticsearchClient(elasticSearchHost);
+
             return client.search(searchRequest, Map.class);
         } catch (ElasticsearchException e) {
             createElasticSearchIndex(logIndex, elasticSearchHost);
@@ -202,17 +172,6 @@ public class LogService {
             log.info("<ElasticSearch> "+logIndex + "에 대한 검색 실패");
             return null;
         }
-    }
-
-    private List<Map<String, Object>> convertResponseToMap(SearchResponse<Map> searchResponse){
-        return searchResponse
-                .hits().hits().stream()
-                .map(hit -> {
-                    Map<String, Object> logMap = hit.source();
-                    logMap.put(LOG_KEY_ID, hit.id());
-                    return logMap;
-                })
-                .collect(Collectors.toList());
     }
 
     private List<Map<String, Object>> refineLogFields(List<Map<String, Object>> logs) {
@@ -262,12 +221,87 @@ public class LogService {
         }
     }
 
+    private LogDataDTO convertResponseToLogData(Map<String, Object> source) {
+        String containerName = Optional.ofNullable((String) source.get(LOG_KEY_CONTAINER_NAME))
+                .orElse(UNKNOWN_CONTAINER);
+
+        Instant timestamp = convertStringToInstant((String) source.get(LOG_KEY_TIMESTAMP));
+
+        String formattedMessage = Optional.ofNullable((String) source.get(LOG_KEY_MESSAGE))
+                .map(LogDataParser::formatMessage)
+                .orElse(NO_MESSAGE);
+
+        boolean isProcessed = Optional.ofNullable((Boolean) source.get(LOG_KEY_PROCESSED))
+                .orElse(false);
+
+        String logLevel = Optional.ofNullable((String) source.get(LOG_KEY_LEVEL))
+                .orElse(LOG_LEVEL_UNKNOWN);
+
+        return new LogDataDTO(containerName, timestamp, formattedMessage, isProcessed, logLevel);
+    }
+
+    private Instant convertStringToInstant(String timestamp) {
+        return timestamp != null ? Instant.parse(timestamp) : null;
+    }
+
+    private String convertResponseToString(Map<String, Object> responseMap) {
+        String rawMessage = (String) responseMap.get(LOG_KEY_MESSAGE);
+        return rawMessage != null ? rawMessage : "";
+    }
+
+    private String convertLogMapToString(Map<String, Object> logMap, String timestamp) {
+        String logContent = Optional.ofNullable(logMap.get(LOG_KEY_MESSAGE))
+                .map(Object::toString)
+                .orElse(null);
+
+        if (logContent == null) {
+            return null;
+        }
+
+        return String.format(LOG_FORMAT, timestamp, logContent);
+    }
+
+    private List<Map<String, Object>> convertResponseToMap(SearchResponse<Map> searchResponse){
+        return searchResponse
+                .hits().hits().stream()
+                .map(hit -> {
+                    Map<String, Object> logMap = hit.source();
+                    logMap.put(LOG_KEY_ID, hit.id());
+                    return logMap;
+                })
+                .collect(Collectors.toList());
+    }
+
     private String extractLogLevelFromLog(String logContent) {
         return (logContent == null) ? LOG_LEVEL_UNKNOWN :
                 Stream.of(LOG_LEVEL_INFO, LOG_LEVEL_ERROR, LOG_LEVEL_WARN)
                         .filter(logContent::contains)
                         .findFirst()
                         .orElse(LOG_LEVEL_INFO);
+    }
+
+    private String extractRecentLogFromContent(String fileContent) {
+        LocalDateTime cutoffTime = getThirtyMinutesAgo();
+
+        String[] logs = fileContent.split("(?=\\[\\d{4}-\\d{2}-\\d{2}_\\d{2}:\\d{2}\\])");
+
+        String recentLogs = Arrays.stream(logs)
+                .map(String::trim)
+                .filter(log -> !log.isEmpty())
+                .filter(log -> isLogWithinLast30Minutes(log, cutoffTime))
+                .collect(Collectors.joining("\n\n"));
+
+        return recentLogs.isEmpty() ? BLANK_STRING : recentLogs;
+    }
+
+    private String extractHeaderFromLog(String log) {
+        return log.substring(1, 17);
+    }
+
+    private LocalDateTime extractDateTimeFromLogFile(String file) {
+        // 파일 이름에서 "log-" 뒤부터 ".txt" 앞까지의 부분 추출
+        String dateTimePart = file.substring(file.indexOf("log-") + 4, file.indexOf("-", file.indexOf("_")));
+        return LocalDateTime.parse(dateTimePart, formatter);
     }
 
     // 오늘 날짜를 기반으로 인덱스 이름 생성
@@ -289,10 +323,10 @@ public class LogService {
         // 3rd 로그 파일 저장
         String timestampForTitle = formatDate(new Date(), FILE_TIMESTAMP_FORMAT);
         String timestampForText = formatDate(new Date(), LOG_TIMESTAMP_FORMAT);
-        
+
         logsGroupedByContainer.forEach((containerName, maps) -> {
             String fileTitle = String.format("logs/%s-log-%s-%d.txt", containerName, timestampForTitle, sshId);
-            writeBufferAsFile(fileTitle, maps, timestampForText);
+            writeLogsToFile(fileTitle, maps, timestampForText);
         });
     }
 
@@ -307,9 +341,8 @@ public class LogService {
         }
     }
 
-    private void writeBufferAsFile(String fileTitle, List<Map<String, Object>> logMaps, String timestamp) {
-        // 파일에 기록하기 위한 BufferedWriter 생성
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(fileTitle, true))) {
+    private void writeLogsToFile(String fileTitle, List<Map<String, Object>> logMaps, String timestamp) {
+        try (BufferedWriter writer = getBufferedWriter(fileTitle, true)) {
             for (Map<String, Object> logMap : logMaps) {
                 String logContent = convertLogMapToString(logMap, timestamp);
 
@@ -322,18 +355,6 @@ public class LogService {
         } catch (IOException e) {
             log.error("로그 파일에 기록하는 중 오류 발생", e);
         }
-    }
-
-    private String convertLogMapToString(Map<String, Object> logMap, String timestamp) {
-        String logContent = Optional.ofNullable(logMap.get(LOG_KEY_MESSAGE))
-                .map(Object::toString)
-                .orElse(null);
-
-        if (logContent == null) {
-            return null;
-        }
-
-        return String.format(LOG_FORMAT, timestamp, logContent);
     }
 
     private void createElasticSearchIndex(String indexName, String elasticSearchHost)  {
@@ -354,26 +375,6 @@ public class LogService {
         } catch (IOException e) {
             log.info("ElasticSearch 인덱스 생성 실패!");
         }
-    }
-
-    private String extractRecentLogFromContent(String fileContent) {
-        LocalDateTime cutoffTime = getThirtyMinutesAgo();
-
-        String[] logs = fileContent.split("(?=\\[\\d{4}-\\d{2}-\\d{2}_\\d{2}:\\d{2}\\])");
-
-        String recentLogs = Arrays.stream(logs)
-                .map(String::trim)
-                .filter(log -> !log.isEmpty())
-                .filter(log -> isLogWithinLast30Minutes(log, cutoffTime))
-                .collect(Collectors.joining("\n\n"));
-
-        return recentLogs.isEmpty() ? BLANK_STRING : recentLogs;
-    }
-
-    private LocalDateTime extractDateTimeFromLogFile(String file) {
-        // 파일 이름에서 "log-" 뒤부터 ".txt" 앞까지의 부분 추출
-        String dateTimePart = file.substring(file.indexOf("log-") + 4, file.indexOf("-", file.indexOf("_")));
-        return LocalDateTime.parse(dateTimePart, formatter);
     }
 
     private SearchRequest buildSearchRequest(Instant startTime, Instant endTime, String logLevel, String containerName) {
@@ -426,13 +427,9 @@ public class LogService {
     }
 
     private boolean isLogWithinLast30Minutes(String log, LocalDateTime cutoffTime) {
-        String header = extractLogHeader(log);
+        String header = extractHeaderFromLog(log);
         LocalDateTime logTime = LocalDateTime.parse(header, formatterWithMinute);
         return logTime.isAfter(cutoffTime);
-    }
-
-    private String extractLogHeader(String log) {
-        return log.substring(1, 17);
     }
 
     private Map<String, List<Map<String, Object>>> groupLogsByContainerName(List<Map<String, Object>> logs) {

@@ -6,6 +6,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
 
+import java.io.BufferedWriter;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -59,6 +61,10 @@ public class FileUtils {
         }
 
         return listTextFiles(path);
+    }
+
+    public static BufferedWriter getBufferedWriter(String filePath, boolean append) throws IOException {
+        return new BufferedWriter(new FileWriter(filePath, append));
     }
 
     private static List<String> listTextFiles(Path filePath) {
