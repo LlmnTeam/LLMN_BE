@@ -24,7 +24,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
 import java.time.Instant;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
@@ -32,6 +31,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static com.example.llmn.core.utils.DateTimeUtils.getTodayDateTimeInStr;
 import static com.example.llmn.core.utils.FileUtils.getFileList;
 import static com.example.llmn.core.utils.FileUtils.readFileAsString;
 
@@ -82,7 +82,7 @@ public class LogService {
             List<Map<String, Object>> refinedLogMaps = refineLogFields(logMaps);
 
             // 3. 필드 업데이트 한 데이터를 Elasticsearch에도 반영
-            updateToElasticSearch(refinedLogMaps, sshInfo.getRemoteHost());
+            updateLogToElasticSearch(refinedLogMaps, sshInfo.getRemoteHost());
 
             // 4. .txt 파일로도 로그 저장
             saveLogsToFile(refinedLogMaps, sshInfo.getId());
@@ -99,7 +99,7 @@ public class LogService {
 
             // 검색 결과를 LogData로 변환하여 반환
             return response.hits().hits().stream()
-                    .map(hit -> convertToLogData(hit.source()))
+                    .map(hit -> convertResponseToLogData(hit.source()))
                     .collect(Collectors.toList());
         } catch (IOException e) {
             log.info("<ElasticSearch> "+ containerName +" 어플리케이션에 대해 검색 실패");
@@ -115,13 +115,31 @@ public class LogService {
             SearchResponse<Map> response = client.search(searchRequest, Map.class);
 
             List<String> logContents = response.hits().hits().stream()
-                    .map(hit -> convertToString(hit.source()))
+                    .map(hit -> convertResponseToString(hit.source()))
                     .toList();
 
             return String.join("\n", logContents);  // 각 로그 사이에 줄 바꿈 추가
         } catch (IOException e) {
             log.info("<ElasticSearch> " + containerName + " 어플리케이션에 대해 검색 실패");
             return "";
+        }
+    }
+
+    public void deleteLogsBefore(Instant cutoffTime, String elasticSearchHost) {
+        try {
+            // Elasticsearch에서 lastCollectedTime 이전의 로그 삭제
+            DeleteByQueryRequest deleteRequest = DeleteByQueryRequest.of(d -> d
+                    .index("docker-logs-*")
+                    .query(q -> q.range(r -> r
+                            .field(LOG_KEY_TIMESTAMP)
+                            .lte(JsonData.of(cutoffTime.toString()))
+                    ))
+            );
+
+            ElasticsearchClient client = elasticsearchConfig.createElasticsearchClient(elasticSearchHost);
+            client.deleteByQuery(deleteRequest);
+        } catch (IOException e){
+            log.info("<ElasticSearch> 데이터 삭제 실패");
         }
     }
 
@@ -146,11 +164,11 @@ public class LogService {
         return extractLogWithin30Minutes(logContent);
     }
 
-    private LogDataDTO convertToLogData(Map<String, Object> source) {
+    private LogDataDTO convertResponseToLogData(Map<String, Object> source) {
         String containerName = Optional.ofNullable((String) source.get(LOG_KEY_CONTAINER_NAME))
                 .orElse(UNKNOWN_CONTAINER);
 
-        Instant timestamp = parseTimestamp((String) source.get(LOG_KEY_TIMESTAMP));
+        Instant timestamp = convertStringToInstant((String) source.get(LOG_KEY_TIMESTAMP));
 
         String formattedMessage = Optional.ofNullable((String) source.get(LOG_KEY_MESSAGE))
                 .map(LogDataParser::formatMessage)
@@ -165,25 +183,24 @@ public class LogService {
         return new LogDataDTO(containerName, timestamp, formattedMessage, isProcessed, logLevel);
     }
 
-    private Instant parseTimestamp(String timestampInStr) {
-        return timestampInStr != null ? Instant.parse(timestampInStr) : null;
+    private Instant convertStringToInstant(String timestamp) {
+        return timestamp != null ? Instant.parse(timestamp) : null;
     }
 
-    private String convertToString(Map<String, Object> source) {
-        String rawMessage = (String) source.get(LOG_KEY_MESSAGE);
+    private String convertResponseToString(Map<String, Object> responseMap) {
+        String rawMessage = (String) responseMap.get(LOG_KEY_MESSAGE);
         return rawMessage != null ? rawMessage : "";
     }
 
     private SearchResponse<Map> searchFromElasticSearch(String elasticSearchHost) {
-        // 오늘 날짜의 인덱스 이름을 생성하여 사용
-        String indexName = getTodayIndexName();
+        String logIndex = getLogIndex();
 
         try {
             ElasticsearchClient client = elasticsearchConfig.createElasticsearchClient(elasticSearchHost);
 
             // is_processed가 false인 데이터 검색
             SearchRequest searchRequest = new SearchRequest.Builder()
-                    .index(indexName)
+                    .index(logIndex)
                     .query(q -> q.bool(b -> b
                             .should(s -> s.term(t -> t.field(LOG_KEY_PROCESSED).value(false)))  // is_processed가 false인 로그
                             .should(s -> s.bool(bs -> bs.mustNot(mn -> mn.exists(e -> e.field(LOG_KEY_PROCESSED)))))  // is_processed 필드가 없는 로그
@@ -193,10 +210,10 @@ public class LogService {
 
             return client.search(searchRequest, Map.class);
         } catch (ElasticsearchException e) {
-            createElasticSearchIndex(indexName, elasticSearchHost);
+            createElasticSearchIndex(logIndex, elasticSearchHost);
             return new SearchResponse.Builder<Map>().build();
         } catch (IOException e){
-            log.info("<ElasticSearch> "+indexName + "에 대한 검색 실패");
+            log.info("<ElasticSearch> "+logIndex + "에 대한 검색 실패");
             return null;
         }
     }
@@ -238,17 +255,16 @@ public class LogService {
                 .collect(Collectors.toList());
     }
 
-    private void updateToElasticSearch(List<Map<String, Object>> updatedLogMaps, String elasticSearchHost) {
-        String indexName = getTodayIndexName();
+    private void updateLogToElasticSearch(List<Map<String, Object>> updatedLogMaps, String elasticSearchHost) {
+        String logIndex = getLogIndex();
 
         try {
             ElasticsearchClient client = elasticsearchConfig.createElasticsearchClient(elasticSearchHost);
 
             for (Map<String, Object> logMap : updatedLogMaps) {
                 String id = (String) logMap.remove(LOG_KEY_ID);
-
                 UpdateRequest<Map<String, Object>, Map<String, Object>> updateRequest = new UpdateRequest.Builder<Map<String, Object>, Map<String, Object>>()
-                        .index(indexName)
+                        .index(logIndex)
                         .id(id)
                         .doc(logMap)
                         .build();
@@ -256,7 +272,7 @@ public class LogService {
                 client.update(updateRequest, Map.class);
             }
         } catch (IOException e){
-            log.info("<ElasticSearch> "+indexName + "에 대한 업데이트 실패");
+            log.info("<ElasticSearch> "+logIndex + "에 대한 업데이트 실패");
         }
     }
 
@@ -269,30 +285,8 @@ public class LogService {
     }
 
     // 오늘 날짜를 기반으로 인덱스 이름 생성
-    private String getTodayIndexName() {
-        LocalDate today = LocalDate.now();
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy.MM.dd");
-        return "docker-logs-" + today.format(formatter);
-    }
-
-    private void deleteOldLogs(Instant lastCollectedTime, String elasticSearchHost) {
-        try {
-            ElasticsearchClient client = elasticsearchConfig.createElasticsearchClient(elasticSearchHost);
-
-            // Elasticsearch에서 lastCollectedTime 이전의 로그 삭제
-            DeleteByQueryRequest deleteRequest = DeleteByQueryRequest.of(d -> d
-                    .index("docker-logs-*")
-                    .query(q -> q.range(r -> r
-                            .field(LOG_KEY_TIMESTAMP)
-                            .lte(JsonData.of(lastCollectedTime.toString()))
-                    ))
-            );
-
-            // 삭제 요청 실행
-            client.deleteByQuery(deleteRequest);
-        } catch (IOException e){
-            log.info("<ElasticSearch> 데이터 삭제 실패");
-        }
+    private String getLogIndex() {
+        return "docker-logs-" + getTodayDateTimeInStr();
     }
 
     private void saveLogsToFile(List<Map<String, Object>> logs, Long sshId) {

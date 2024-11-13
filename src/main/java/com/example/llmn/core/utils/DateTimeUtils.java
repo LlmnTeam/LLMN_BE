@@ -1,5 +1,6 @@
 package com.example.llmn.core.utils;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
@@ -12,5 +13,11 @@ public class DateTimeUtils {
         }
 
         return localDateTime.format(DEFAULT_FORMATTER);
+    }
+
+    public static String getTodayDateTimeInStr(){
+        LocalDate today = LocalDate.now();
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy.MM.dd");
+        return today.format(formatter);
     }
 }
