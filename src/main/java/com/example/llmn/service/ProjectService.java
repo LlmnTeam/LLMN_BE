@@ -25,6 +25,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 import static com.example.llmn.core.utils.DateTimeUtils.formatLocalDateTime;
+import static com.example.llmn.core.utils.FileUtils.*;
 
 @Service
 @RequiredArgsConstructor
@@ -32,7 +33,6 @@ import static com.example.llmn.core.utils.DateTimeUtils.formatLocalDateTime;
 public class ProjectService {
 
     private final DockerService dockerService;
-    private final LogService logService;
     private final ProjectRepository projectRepository;
     private final SummaryRepository summaryRepository;
     private final SshInfoRepository sshInfoRepository;
@@ -236,7 +236,7 @@ public class ProjectService {
         );
 
         // 로그 파일 목록을 가져옴
-        List<String> logFiles = logService.findLogFileList();
+        List<String> logFiles = getFileList(LOGS_DIRECTORY);
 
         // containerName과 일치하는 파일만 필터링
         List<String> filteredLogFiles = logFiles.stream()
@@ -252,13 +252,13 @@ public class ProjectService {
                 () -> new CustomException(ExceptionCode.PROJECT_NOT_FOUND)
         );
 
-        String logMessage = logService.readLogFile(fileName);
+        String logContent = readFileAsString(fileName);
 
         return new ProjectResponse.FindProjectLogByNameDTO(
                 project.getProjectName(),
                 project.getDescription(),
                 fileName,
-                logMessage
+                logContent
         );
     }
 
@@ -327,9 +327,9 @@ public class ProjectService {
     }
 
     private String getRecentLog(Project project){
-        List<String> logFileNames = logService.findLogFileList();
+        List<String> logFiles = getFileList(LOGS_DIRECTORY);
 
-        String latestLogFile = logFileNames.stream()
+        String latestLogFile = logFiles.stream()
                 .filter(logFile -> logFile.startsWith(project.getContainerName() + "-log"))
                 .max(this::compareLogFileDates) // 최신 파일 찾기
                 .orElse(null);
@@ -338,8 +338,8 @@ public class ProjectService {
             return NOT_EXIST_LOG;
         }
 
-        String logFileContent = logService.readLogFile(latestLogFile);
-        return parseLastTwoLogs(logFileContent);
+        String logContent = readFileAsString(latestLogFile);
+        return parseLastTwoLogs(logContent);
     }
 
     private int compareLogFileDates(String file1, String file2) {

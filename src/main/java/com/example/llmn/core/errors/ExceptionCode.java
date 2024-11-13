@@ -30,6 +30,9 @@ public enum ExceptionCode {
     NO_FILE_TO_UPLOAD(HttpStatus.BAD_REQUEST, "업로드할 파일이 존재하지 않습니다."),
     SAVE_FILE_FAIL(HttpStatus.INTERNAL_SERVER_ERROR, "파일 저장을 실패하였습니다."),
     UPDATE_KEY_FAIL(HttpStatus.INTERNAL_SERVER_ERROR, "API 등록을 실패했습니다."),
+    FILE_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 파일이 존재하지 않습니다."),
+    FILE_READ_FAIL(HttpStatus.BAD_REQUEST, "파일을 읽는 중 오류 발생했습니다."),
+    CONVERT_TO_FILE_FAIL(HttpStatus.INTERNAL_SERVER_ERROR, "파일로 변환하는 작업 중 오류가 발생했습니다."),
 
     // SSH
     SSH_INFO_EMPTY(HttpStatus.BAD_REQUEST, "SSH 정보는 적어도 하나 이상 입력해야 합니다."),
@@ -46,10 +49,7 @@ public enum ExceptionCode {
 
     // 로그 파일 관련 에러
     LOG_DIRECTORY_NOT_FOUND(HttpStatus.NOT_FOUND, "로그 디렉토리가 존재하지 않거나 디렉토리가 아닙니다."),
-    LOG_FILE_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 로그 파일이 존재하지 않습니다."),
-    LOG_FILE_READ_FAIL(HttpStatus.BAD_REQUEST, "로그 파일을 읽는 중 오류 발생했습니다."),
     LOG_FILE_LIST_READ_FAIL(HttpStatus.BAD_REQUEST, "로그 파일 목록을 가져오는 중 오류 발생했습니다."),
-    LOG_CONVERT_TO_FILE_FAIL(HttpStatus.INTERNAL_SERVER_ERROR, "로그를 파일로 변환하는 작업 중 오류가 발생했습니다."),
 
     // 요약 관련 에러
     SUMMARY_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 요약이 존재하지 않습니다."),

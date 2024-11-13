@@ -15,6 +15,9 @@ import org.springframework.web.bind.annotation.*;
 import java.time.Instant;
 import java.util.List;
 
+import static com.example.llmn.core.utils.FileUtils.LOGS_DIRECTORY;
+import static com.example.llmn.core.utils.FileUtils.getFileAsResource;
+
 @Controller
 @RequiredArgsConstructor
 @RequestMapping("/api")
@@ -34,7 +37,7 @@ public class LogController {
 
     @GetMapping("/logs/{logFileName}/download")
     public ResponseEntity<Resource> downloadLogFile(@PathVariable String logFileName) {
-        Resource resource = logService.getLogFileAsResource(logFileName);
+        Resource resource = getFileAsResource(LOGS_DIRECTORY, logFileName);
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType(MediaType.TEXT_PLAIN_VALUE))
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + logFileName + "\"")

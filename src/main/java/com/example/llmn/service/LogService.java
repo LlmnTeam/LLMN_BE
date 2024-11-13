@@ -8,15 +8,11 @@ import co.elastic.clients.elasticsearch.indices.CreateIndexRequest;
 import co.elastic.clients.json.JsonData;
 import com.example.llmn.controller.DTO.LogDataDTO;
 import com.example.llmn.core.config.ElasticsearchConfig;
-import com.example.llmn.core.errors.CustomException;
-import com.example.llmn.core.errors.ExceptionCode;
 import com.example.llmn.core.utils.LogDataParser;
 import com.example.llmn.domain.SshInfo;
 import com.example.llmn.repository.SshInfoRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.core.io.Resource;
-import org.springframework.core.io.UrlResource;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -35,6 +31,9 @@ import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+
+import static com.example.llmn.core.utils.FileUtils.getFileList;
+import static com.example.llmn.core.utils.FileUtils.readFileAsString;
 
 @Service
 @RequiredArgsConstructor
@@ -125,63 +124,10 @@ public class LogService {
         }
     }
 
-    public List<String> findLogFileList() {
-        Path logDirPath = Paths.get(LOGS_DIRECTORY);
-
-        // 1st 로그 파일들이 저장된 디렉토리가 존재하는지 확인
-        if (isLogDirectoryValid(logDirPath)) {
-            return Collections.emptyList();
-        }
-
-        // 2nd 디렉토리 내의 모든 파일 목록을 가져오고, ".txt" 확장자를 가진 파일들만 필터링
-        try (Stream<Path> fileListStream = Files.list(logDirPath)) {
-            return fileListStream
-                    .filter(Files::isRegularFile) // 일반 파일만 가져옴
-                    .filter(path -> path.toString().endsWith(".txt")) // .txt 파일만 가져옴
-                    .map(path -> path.getFileName().toString())
-                    .toList();
-        } catch (IOException e) {
-            log.error("로그 파일 목록을 가져오는 중 오류 발생했습니다.");
-            return Collections.emptyList();
-        }
-    }
-
-    public String readLogFile(String fileName) {
-        // 로그 파일은 logs 디렉토리에 위치
-        Path logFilePath = Paths.get(LOGS_DIRECTORY, fileName);
-
-        // 1st 파일이 존재하는지 확인
-        if (!Files.exists(logFilePath)) {
-            throw new CustomException(ExceptionCode.LOG_FILE_NOT_FOUND);
-        }
-
-        try { // 2nd 파일 내용을 읽어서, 하나의 문자열로 변환 (각 줄을 \n\n으로 구분)
-            List<String> lines = Files.readAllLines(logFilePath);
-            return String.join("\n\n", lines);
-        } catch (IOException e) {
-            throw new CustomException(ExceptionCode.LOG_FILE_READ_FAIL);
-        }
-    }
-
-    public Resource getLogFileAsResource(String fileName) {
-        try {
-            Path logFilePath = Paths.get(LOGS_DIRECTORY, fileName);
-
-            // 파일이 존재하는지 확인
-            if (!Files.exists(logFilePath)) {
-                throw new CustomException(ExceptionCode.LOG_FILE_NOT_FOUND);
-            }
-
-            return new UrlResource(logFilePath.toUri());
-        } catch (IOException e){
-            throw new CustomException(ExceptionCode.LOG_CONVERT_TO_FILE_FAIL);
-        }
-    }
-
     public String getLogWithin30Minutes(String containerName){
-        List<String> logFileList = findLogFileList();
+        List<String> logFiles = getFileList(LOGS_DIRECTORY);
 
-        String latestLogFile = logFileList.stream()
+        String latestLogFile = logFiles.stream()
                 .filter(logFile -> logFile.startsWith(containerName + "-log"))
                 .max((file1, file2) -> { // 최신 파일을 찾기 위해 비교
                     LocalDateTime dateTime1 = extractDateTimeFromFile(file1);
@@ -194,7 +140,7 @@ public class LogService {
             return BLANK_STRING;
         }
 
-        String logContent = readLogFile(latestLogFile);
+        String logContent = readFileAsString(latestLogFile);
 
         return extractLogWithin30Minutes(logContent);
     }
@@ -467,10 +413,6 @@ public class LogService {
         // 파일 이름에서 "log-" 뒤부터 ".txt" 앞까지의 부분 추출
         String dateTimePart = file.substring(file.indexOf("log-") + 4, file.indexOf("-", file.indexOf("_")));
         return LocalDateTime.parse(dateTimePart, formatter);
-    }
-
-    private boolean isLogDirectoryValid(Path logDirPath) {
-        return Files.exists(logDirPath) && Files.isDirectory(logDirPath);
     }
 
     private SearchRequest buildSearchRequestQuery(Instant startTime, Instant endTime, String logLevel, String containerName) {

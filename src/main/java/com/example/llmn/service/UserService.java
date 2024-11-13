@@ -31,13 +31,11 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.util.UriComponentsBuilder;
 import org.thymeleaf.context.Context;
 import org.thymeleaf.spring6.SpringTemplateEngine;
 
 import java.io.File;
 import java.io.IOException;
-import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -617,12 +615,12 @@ public class UserService {
                     .block();
 
             if (responseDTO == null || !responseDTO.success()) {
-                throw new CustomException(ExceptionCode.LOG_CONVERT_TO_FILE_FAIL);
+                throw new CustomException(ExceptionCode.CONVERT_TO_FILE_FAIL);
             }
 
         } catch (Exception e){
             log.info("API 키 업데이트 실패");
-            throw new CustomException(ExceptionCode.LOG_CONVERT_TO_FILE_FAIL);
+            throw new CustomException(ExceptionCode.CONVERT_TO_FILE_FAIL);
         }
     }
 
