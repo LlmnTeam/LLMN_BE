@@ -31,6 +31,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static com.example.llmn.core.utils.DateTimeUtils.getThirtyMinutesAgo;
 import static com.example.llmn.core.utils.DateTimeUtils.getTodayDateTimeInStr;
 import static com.example.llmn.core.utils.FileUtils.getFileList;
 import static com.example.llmn.core.utils.FileUtils.readFileAsString;
@@ -155,9 +156,9 @@ public class LogService {
             return BLANK_STRING;
         }
 
-        String logContent = readFileAsString(latestLogFile);
+        String fileContent = readFileAsString(latestLogFile);
 
-        return extractRecentLogFromContent(logContent);
+        return extractRecentLogFromContent(fileContent);
     }
 
     private LogDataDTO convertResponseToLogData(Map<String, Object> source) {
@@ -358,35 +359,18 @@ public class LogService {
         }
     }
 
-    private String extractRecentLogFromContent(String logContent) {
-        StringBuilder resultLogs = new StringBuilder();
+    private String extractRecentLogFromContent(String fileContent) {
+        LocalDateTime cutoffTime = getThirtyMinutesAgo();
 
-        // 로그 헤더의 날짜 패턴
-        String[] logs = logContent.split("(?=\\[\\d{4}-\\d{2}-\\d{2}_\\d{2}:\\d{2}\\])");
+        String[] logs = fileContent.split("(?=\\[\\d{4}-\\d{2}-\\d{2}_\\d{2}:\\d{2}\\])");
 
-        // 30분 전 시간
-        LocalDateTime thirtyMinutesAgo = LocalDateTime.now().minus(30, ChronoUnit.MINUTES);
+        String recentLogs = Arrays.stream(logs)
+                .map(String::trim)
+                .filter(log -> !log.isEmpty())
+                .filter(log -> isLogWithinLast30Minutes(log, cutoffTime))
+                .collect(Collectors.joining("\n\n"));
 
-        // 각 로그의 시간을 비교하여 30분 이내의 로그만 추가
-        for (String log : logs) {
-            if (log.trim().isEmpty()) continue;  // 빈 로그는 건너뜀
-
-            // 로그의 헤더에서 시간을 추출 ([yyyy-MM-dd_HH:mm] 형식)
-            String header = log.substring(1, 17);
-            LocalDateTime logTime = LocalDateTime.parse(header, formatterWithMinute);
-
-            // 로그 시간이 30분 이내인지 확인
-            if (logTime.isAfter(thirtyMinutesAgo)) {
-                resultLogs.append(log.trim()).append("\n\n");
-            }
-        }
-
-        // 결과가 없으면 빈 문자열 반환
-        if (resultLogs.length() == 0) {
-            return BLANK_STRING;
-        }
-
-        return resultLogs.toString().trim();
+        return recentLogs.isEmpty() ? BLANK_STRING : recentLogs;
     }
 
     private LocalDateTime extractDateTimeFromLogFile(String file) {
@@ -442,5 +426,15 @@ public class LogService {
         LocalDateTime fileDateTime1 = extractDateTimeFromLogFile(file1);
         LocalDateTime fileDateTime2 = extractDateTimeFromLogFile(file2);
         return fileDateTime1.compareTo(fileDateTime2);
+    }
+
+    private boolean isLogWithinLast30Minutes(String log, LocalDateTime cutoffTime) {
+        String header = extractLogHeader(log);
+        LocalDateTime logTime = LocalDateTime.parse(header, formatterWithMinute);
+        return logTime.isAfter(cutoffTime);
+    }
+
+    private String extractLogHeader(String log) {
+        return log.substring(1, 17);
     }
 }

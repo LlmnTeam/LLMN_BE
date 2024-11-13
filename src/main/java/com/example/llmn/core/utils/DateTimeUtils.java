@@ -3,6 +3,7 @@ package com.example.llmn.core.utils;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 
 public class DateTimeUtils {
     private static final DateTimeFormatter DEFAULT_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
@@ -19,5 +20,9 @@ public class DateTimeUtils {
         LocalDate today = LocalDate.now();
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy.MM.dd");
         return today.format(formatter);
+    }
+
+    public static LocalDateTime getThirtyMinutesAgo(){
+        return LocalDateTime.now().minus(30, ChronoUnit.MINUTES);
     }
 }
