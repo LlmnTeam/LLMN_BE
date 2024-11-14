@@ -204,6 +204,14 @@ public class MetricService {
         return networkMetricMap;
     }
 
+    private Map<String, Long> getTodayNetworkMetrics(Long sshInfoId) {
+        // 하루 동안의 누적 네트워크 트래픽 계산
+        LocalDateTime todayStart = LocalDateTime.now().withHour(0).withMinute(0).withSecond(0).withNano(0);
+        List<Metric> networkMetrics = metricRepository.findMetricsAfter(todayStart, sshInfoId);
+
+        return calculateTotalNetworkUsage(networkMetrics);
+    }
+
     private Map<String, Double> calculateNetworkDifferences(Map<String, Double> currentNetworkMetrics) {
         // 레디스에서 이전 네트워크 사용량 조회 (없으면 0.0 반환)
         Double previousReceived = redisService.getDataInDouble(REDIS_KEY_NETWORK_REC);
@@ -219,23 +227,18 @@ public class MetricService {
         return networkMetricMap;
     }
 
-    // 하루 동안의 누적 네트워크 트래픽 계산
-    private Map<String, Long> getTodayNetworkMetrics(Long sshInfoId) {
-        // minusHour 내 지표들을 모두 가져옴
-        LocalDateTime todayStart = LocalDateTime.now().withHour(0).withMinute(0).withSecond(0).withNano(0);
-        List<Metric> networkMetrics = metricRepository.findMetricsAfter(todayStart, sshInfoId);
-
-        double dailyReceived = networkMetrics.stream()
-                .mapToDouble(Metric::getTotalBytesReceived)
+    private Map<String, Long> calculateTotalNetworkUsage(List<Metric> metrics) {
+        long totalReceived = metrics.stream()
+                .mapToLong(metric -> Math.round(metric.getTotalBytesReceived()))
                 .sum();
 
-        double dailySent = networkMetrics.stream()
-                .mapToDouble(Metric::getTotalBytesSent)
+        long totalSent = metrics.stream()
+                .mapToLong(metric -> Math.round(metric.getTotalBytesSent()))
                 .sum();
 
         Map<String, Long> networkMetricMap = new HashMap<>();
-        networkMetricMap.put(METRIC_MAP_DAILY_NET_REC, (long) dailyReceived);
-        networkMetricMap.put(METRIC_MAP_DAILY_NET_SENT, (long) dailySent);
+        networkMetricMap.put(METRIC_MAP_DAILY_NET_REC, totalReceived);
+        networkMetricMap.put(METRIC_MAP_DAILY_NET_SENT, totalSent);
 
         return networkMetricMap;
     }
