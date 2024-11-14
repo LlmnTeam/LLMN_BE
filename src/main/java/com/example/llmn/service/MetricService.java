@@ -4,6 +4,7 @@ import com.example.llmn.controller.DTO.MetricResponse;
 import com.example.llmn.domain.Metric;
 
 import com.example.llmn.domain.SshInfo;
+import com.example.llmn.domain.User;
 import com.example.llmn.repository.MetricRepository;
 import com.example.llmn.repository.SshInfoRepository;
 import com.example.llmn.repository.UserRepository;
@@ -20,6 +21,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -58,16 +60,18 @@ public class MetricService {
     @Scheduled(cron = "0 0/10 * * * *")
     @Transactional
     public void collectMetrics() {
-        List<Long> userIds = userRepository.findIds();
+        List<User> usersWithMonitoringSshId = userRepository.findByMonitoringSshIdIsNotNull();
 
-        // 사용자가 monitoringSshId를 설정했다면, 설정한 SSH 정보를 사용하여 지표를 수집
-        for (Long userId : userIds) {
-            List<SshInfo> sshInfos = sshInfoRepository.findByUserId(userId);
-            userRepository.findMonitoringSshId(userId).ifPresent(monitoringSshId ->
-                    sshInfos.forEach(sshInfo -> processMetrics(sshInfo, monitoringSshId))
-            );
+        // 모든 Metric을 수집한 후 한 번에 저장
+        List<Metric> allMetrics = usersWithMonitoringSshId.stream()
+                .flatMap(user -> collectMetricsForUser(user).stream())
+                .collect(Collectors.toList());
+
+        if (!allMetrics.isEmpty()) {
+            metricRepository.saveAll(allMetrics);
         }
     }
+
 
     public MetricResponse.FindCurrentMetricDTO findCurrentMetric(Long sshInfoId) {
         // 1. 레디스에서 캐시된 값을 먼저 조회
@@ -117,6 +121,40 @@ public class MetricService {
         return new MetricResponse.FindMetricHistoryDTO(cpuMetricDTOS, memoryMetricDTOS, networkInMetricDTOS, networkOutMetricDTOS);
     }
 
+    private List<Metric> collectMetricsForUser(User user) {
+        Long monitoringSshId = user.getMonitoringSshId();
+        List<SshInfo> sshInfos = sshInfoRepository.findByUserId(user.getId());
+
+        return sshInfos.stream()
+                .map(sshInfo -> collectMetricsForSshInfo(sshInfo, monitoringSshId))
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                .collect(Collectors.toList());
+    }
+
+    private Optional<Metric> collectMetricsForSshInfo(SshInfo sshInfo, Long monitoringSshId) {
+        boolean updateCache = shouldUpdateCache(sshInfo, monitoringSshId);
+        return Optional.ofNullable(collectMetricsData(sshInfo, updateCache));
+    }
+
+    private Metric collectMetricsData(SshInfo sshInfo, boolean updateCache) {
+        Map<String, Double> cpuAndMemoryMetrics = collectCpuAndMemoryMetrics(sshInfo.getId());
+        Map<String, Double> networkMetrics = collectNetworkMetrics(sshInfo.getId(), updateCache);
+
+        if (cpuAndMemoryMetrics.isEmpty() || networkMetrics.isEmpty()) {
+            return null;
+        }
+
+        return Metric.builder()
+                .sshInfo(sshInfo)
+                .cpuUsage(cpuAndMemoryMetrics.get(METRIC_MAP_CPU_USAGE))
+                .totalMemory(cpuAndMemoryMetrics.get(METRIC_MAP_TOTAL_MEMORY))
+                .usedMemory(cpuAndMemoryMetrics.get(METRIC_MAP_USED_MEMORY))
+                .totalBytesReceived(networkMetrics.get(METRIC_MAP_NETWORK_REC))
+                .totalBytesSent(networkMetrics.get(METRIC_MAP_NETWORK_SENT))
+                .build();
+    }
+
     private Map<String, Double> collectCpuAndMemoryMetrics(Long sshInfoId) {
         Map<String, Double> metricsMap = new HashMap<>();
 
@@ -150,20 +188,20 @@ public class MetricService {
         Double receivedDiff = currentNetworkMetric.getOrDefault(METRIC_MAP_NETWORK_REC, DEFAULT_METRIC_VALUE) - previousReceived;
         Double transmittedDiff = currentNetworkMetric.getOrDefault(METRIC_MAP_NETWORK_SENT, DEFAULT_METRIC_VALUE) - previousTransmitted;
 
-        Map<String, Double> metricsMap = new HashMap<>();
-        metricsMap.put(METRIC_MAP_NETWORK_REC, receivedDiff);
-        metricsMap.put(METRIC_MAP_NETWORK_SENT, transmittedDiff);
+        Map<String, Double> networkMetricMap = new HashMap<>();
+        networkMetricMap.put(METRIC_MAP_NETWORK_REC, receivedDiff);
+        networkMetricMap.put(METRIC_MAP_NETWORK_SENT, transmittedDiff);
 
         // 캐시 업데이트
         if(updateCache) {
             updateNetworkCache(currentNetworkMetric);
         }
 
-        return metricsMap;
+        return networkMetricMap;
     }
 
     // 하루 동안의 누적 네트워크 트래픽 계산
-    private Map<String, Long> getTodayNetworkTraffic(Long sshInfoId) {
+    private Map<String, Long> getTodayNetworkMetrics(Long sshInfoId) {
         // minusHour 내 지표들을 모두 가져옴
         LocalDateTime todayStart = LocalDateTime.now().withHour(0).withMinute(0).withSecond(0).withNano(0);
         List<Metric> networkMetrics = metricRepository.findMetricsAfter(todayStart, sshInfoId);
@@ -176,11 +214,11 @@ public class MetricService {
                 .mapToDouble(Metric::getTotalBytesSent)
                 .sum();
 
-        Map<String, Long> dailyTraffic = new HashMap<>();
-        dailyTraffic.put(METRIC_MAP_DAILY_NET_REC, (long) dailyReceived);
-        dailyTraffic.put(METRIC_MAP_DAILY_NET_SENT, (long) dailySent);
+        Map<String, Long> networkMetricMap = new HashMap<>();
+        networkMetricMap.put(METRIC_MAP_DAILY_NET_REC, (long) dailyReceived);
+        networkMetricMap.put(METRIC_MAP_DAILY_NET_SENT, (long) dailySent);
 
-        return dailyTraffic;
+        return networkMetricMap;
     }
 
     private Map<String, Double> collectCurrentNetworkMetrics(Long sshInfoId) {
@@ -189,17 +227,17 @@ public class MetricService {
         String[] lines = commandResponse.split("\\n");
 
         // 2nd 명령어 결과 파싱
-        Map<String, Double> networkUsageMap = new HashMap<>();
+        Map<String, Double> networkMetricMap = new HashMap<>();
         for (String line : lines) {
-            parseNetworkUsageInLine(line.trim(), networkUsageMap);
-            if (!networkUsageMap.isEmpty()) break; // 최초로 찾은 유효한 인터페이스만 처리
+            parseNetworkUsageInLine(line.trim(), networkMetricMap);
+            if (!networkMetricMap.isEmpty()) break; // 최초로 찾은 유효한 인터페이스만 처리
         }
 
-        if (networkUsageMap.isEmpty()) {
+        if (networkMetricMap.isEmpty()) {
             log.error("유효한 네트워크 인터페이스가 존재하지 않음.");
         }
 
-        return networkUsageMap;
+        return networkMetricMap;
     }
 
     // 레디스에서 Metric을 가져오는 메서드
@@ -286,32 +324,6 @@ public class MetricService {
         return new MetricResponse.NetworkOutMetricDTO(time, networkSent);
     }
 
-    private void processMetrics(SshInfo sshInfo, Long monitoringSshId) {
-        // 모니터링할 클라우드의 경우 캐시를 업데이트
-        boolean updateCache = sshInfo.getId().equals(monitoringSshId);
-
-        Optional<Metric> collectedMetrics = collectMetricsData(sshInfo, updateCache);
-        collectedMetrics.ifPresent(metricRepository::save);
-    }
-
-    private Optional<Metric> collectMetricsData(SshInfo sshInfo, boolean updateCache) {
-        Map<String, Double> topMetrics = collectCpuAndMemoryMetrics(sshInfo.getId());
-        Map<String, Double> networkMetrics = collectNetworkMetrics(sshInfo.getId(), updateCache);
-
-        if (topMetrics.isEmpty() || networkMetrics.isEmpty()) {
-            return Optional.empty();
-        }
-
-        return Optional.of(Metric.builder()
-                .sshInfo(sshInfo)
-                .cpuUsage(topMetrics.get(METRIC_MAP_CPU_USAGE))
-                .totalMemory(topMetrics.get(METRIC_MAP_TOTAL_MEMORY))
-                .usedMemory(topMetrics.get(METRIC_MAP_USED_MEMORY))
-                .totalBytesReceived(networkMetrics.get(METRIC_MAP_NETWORK_REC))
-                .totalBytesSent(networkMetrics.get(METRIC_MAP_NETWORK_SENT))
-                .build());
-    }
-
     private void parseNetworkUsageInLine(String line, Map<String, Double> networkUsageMap) {
         Matcher matcher = NETWORK_PATTERN.matcher(line);
         if (matcher.find()) {
@@ -333,5 +345,9 @@ public class MetricService {
                 }
             }
         }
+    }
+
+    private boolean shouldUpdateCache(SshInfo sshInfo, Long monitoringSshId) {
+        return sshInfo.getId().equals(monitoringSshId);
     }
 }

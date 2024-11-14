@@ -24,6 +24,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Query("SELECT u.id FROM User u")
     List<Long> findIds();
 
+    @Query("SELECT u FROM User u WHERE u.monitoringSshId IS NOT NULL")
+    List<User> findByMonitoringSshIdIsNotNull();
+
     @Query("SELECT COUNT(u) > 0 FROM User u WHERE u.email = :email")
     boolean existsByEmail(@Param("email") String email);
 

@@ -299,8 +299,8 @@ public class LogService {
                 .orElse(NO_MESSAGE);
     }
 
-    // 오늘 날짜를 기반으로 인덱스 이름 생성
     private String getLogIndex() {
+        // 오늘 날짜를 기반으로 인덱스 이름 생성
         return "docker-logs-" + getTodayDateTimeInStr();
     }
 
