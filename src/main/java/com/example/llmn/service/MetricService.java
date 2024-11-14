@@ -39,7 +39,6 @@ public class MetricService {
     private static final String REDIS_KEY_NETWORK_TRANS = "network:transmitted";
     private static final String METRIC_KEY = "metric";
     private static final Long METRIC_EXP = 10 * 60 * 1000L; // 10분
-    private static final boolean UPDATE_CACHE = true;
     private static final boolean NOT_UPDATE_CACHE = false;
     private static final String METRIC_MAP_CPU_USAGE = "cpuUsage";
     private static final String METRIC_MAP_TOTAL_MEMORY = "totalMemory";
@@ -172,30 +171,53 @@ public class MetricService {
     }
 
     private Map<String, Double> collectNetworkMetrics(Long sshInfoId, boolean updateCache) {
-        // 1st 현재 네트워크 사용량 조회
+        // 현재 네트워크 사용량 조회
         Map<String, Double> currentNetworkMetric = collectCurrentNetworkMetrics(sshInfoId);
-
-        // 조회를 실패하면, 빈 맵 반환
         if(currentNetworkMetric.isEmpty()){
             return Collections.emptyMap();
         }
 
-        // 2nd Redis에서 이전 네트워크 사용량 조회 (없으면 0.0 반환)
-        Double previousReceived = redisService.getDataInDouble(REDIS_KEY_NETWORK_REC);
-        Double previousTransmitted = redisService.getDataInDouble(REDIS_KEY_NETWORK_TRANS);
-
-        // 3rd 네트워크 사용량 차이 계산
-        Double receivedDiff = currentNetworkMetric.getOrDefault(METRIC_MAP_NETWORK_REC, DEFAULT_METRIC_VALUE) - previousReceived;
-        Double transmittedDiff = currentNetworkMetric.getOrDefault(METRIC_MAP_NETWORK_SENT, DEFAULT_METRIC_VALUE) - previousTransmitted;
-
-        Map<String, Double> networkMetricMap = new HashMap<>();
-        networkMetricMap.put(METRIC_MAP_NETWORK_REC, receivedDiff);
-        networkMetricMap.put(METRIC_MAP_NETWORK_SENT, transmittedDiff);
+        // 네트워크 사용량 차이를 통해, 단위 시간당 네트워크 사용량 지표 계산
+        Map<String, Double> networkMetricMap = calculateNetworkDifferences(currentNetworkMetric);
 
         // 캐시 업데이트
         if(updateCache) {
             updateNetworkCache(currentNetworkMetric);
         }
+
+        return networkMetricMap;
+    }
+
+    private Map<String, Double> collectCurrentNetworkMetrics(Long sshInfoId) {
+        // 1st 네트워크를 조회하는 명령어를 실행
+        String commandResponse = sshService.executeCommandOnce(COMMAND_NETWORK_USAGE, sshInfoId);
+        String[] lines = commandResponse.split("\\n");
+
+        // 2nd 명령어 결과 파싱
+        Map<String, Double> networkMetricMap = new HashMap<>();
+        for (String line : lines) {
+            parseNetworkUsageInLine(line.trim(), networkMetricMap);
+            if (!networkMetricMap.isEmpty()) break; // 최초로 찾은 유효한 인터페이스만 처리
+        }
+
+        if (networkMetricMap.isEmpty()) {
+            log.error("유효한 네트워크 인터페이스가 존재하지 않음.");
+        }
+
+        return networkMetricMap;
+    }
+
+    private Map<String, Double> calculateNetworkDifferences(Map<String, Double> currentNetworkMetrics) {
+        // 레디스에서 이전 네트워크 사용량 조회 (없으면 0.0 반환)
+        Double previousReceived = redisService.getDataInDouble(REDIS_KEY_NETWORK_REC);
+        Double previousTransmitted = redisService.getDataInDouble(REDIS_KEY_NETWORK_TRANS);
+
+        Double receivedDiff = currentNetworkMetrics.getOrDefault(METRIC_MAP_NETWORK_REC, DEFAULT_METRIC_VALUE) - previousReceived;
+        Double transmittedDiff = currentNetworkMetrics.getOrDefault(METRIC_MAP_NETWORK_SENT, DEFAULT_METRIC_VALUE) - previousTransmitted;
+
+        Map<String, Double> networkMetricMap = new HashMap<>();
+        networkMetricMap.put(METRIC_MAP_NETWORK_REC, receivedDiff);
+        networkMetricMap.put(METRIC_MAP_NETWORK_SENT, transmittedDiff);
 
         return networkMetricMap;
     }
@@ -217,25 +239,6 @@ public class MetricService {
         Map<String, Long> networkMetricMap = new HashMap<>();
         networkMetricMap.put(METRIC_MAP_DAILY_NET_REC, (long) dailyReceived);
         networkMetricMap.put(METRIC_MAP_DAILY_NET_SENT, (long) dailySent);
-
-        return networkMetricMap;
-    }
-
-    private Map<String, Double> collectCurrentNetworkMetrics(Long sshInfoId) {
-        // 1st 네트워크를 조회하는 명령어를 실행
-        String commandResponse = sshService.executeCommandOnce(COMMAND_NETWORK_USAGE, sshInfoId);
-        String[] lines = commandResponse.split("\\n");
-
-        // 2nd 명령어 결과 파싱
-        Map<String, Double> networkMetricMap = new HashMap<>();
-        for (String line : lines) {
-            parseNetworkUsageInLine(line.trim(), networkMetricMap);
-            if (!networkMetricMap.isEmpty()) break; // 최초로 찾은 유효한 인터페이스만 처리
-        }
-
-        if (networkMetricMap.isEmpty()) {
-            log.error("유효한 네트워크 인터페이스가 존재하지 않음.");
-        }
 
         return networkMetricMap;
     }
