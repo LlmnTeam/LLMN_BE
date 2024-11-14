@@ -51,6 +51,8 @@ public class MetricService {
     private static final String COMMAND_NETWORK_USAGE = "cat /proc/net/dev";
     private static final double DEFAULT_METRIC_VALUE = 0.0;
     private static final double BYTES_TO_MB_DIVISOR = 1024.0 * 1024.0;
+    private static final int RECEIVED_BYTES_INDEX = 1;
+    private static final int TRANSMITTED_BYTES_INDEX = 9;
     private static final DateTimeFormatter formatterForHourAndMin = DateTimeFormatter.ofPattern("HH:mm"); // 시간 형식 "HH:mm"
     private static final Pattern CPU_PATTERN = Pattern.compile("%Cpu\\(s\\):\\s+([\\d.]+)\\s+us,\\s+([\\d.]+)\\s+sy,.*");
     private static final Pattern MEM_PATTERN = Pattern.compile("MiB Mem :\\s+([\\d.]+)\\s+total,\\s+([\\d.]+)\\s+free,\\s+([\\d.]+)\\s+used,.*");
@@ -171,13 +173,12 @@ public class MetricService {
     }
 
     private Map<String, Double> collectNetworkMetrics(Long sshInfoId, boolean updateCache) {
-        // 현재 네트워크 사용량 조회
         Map<String, Double> currentNetworkMetric = collectCurrentNetworkMetrics(sshInfoId);
         if(currentNetworkMetric.isEmpty()){
             return Collections.emptyMap();
         }
 
-        // 네트워크 사용량 차이를 통해, 단위 시간당 네트워크 사용량 지표 계산
+        // 현재와 과거의 네트워크 사용량 차이를 통해, 단위 시간당 네트워크 사용량 지표 계산
         Map<String, Double> networkMetricMap = calculateNetworkDifferences(currentNetworkMetric);
 
         // 캐시 업데이트
@@ -196,12 +197,8 @@ public class MetricService {
         // 2nd 명령어 결과 파싱
         Map<String, Double> networkMetricMap = new HashMap<>();
         for (String line : lines) {
-            parseNetworkUsageInLine(line.trim(), networkMetricMap);
+            networkMetricMap.putAll(parseNetworkUsage(line.trim()));
             if (!networkMetricMap.isEmpty()) break; // 최초로 찾은 유효한 인터페이스만 처리
-        }
-
-        if (networkMetricMap.isEmpty()) {
-            log.error("유효한 네트워크 인터페이스가 존재하지 않음.");
         }
 
         return networkMetricMap;
@@ -314,6 +311,25 @@ public class MetricService {
         return memoryMetrics;
     }
 
+    private Map<String, Double> parseNetworkUsage(String line) {
+        Map<String, Double> networkUsageMap = new HashMap<>();
+
+        Matcher matcher = NETWORK_PATTERN.matcher(line);
+        if (matcher.find()) {
+            String[] parts = line.split("\\s+");
+
+            if (parts.length >= 10) {
+                long receivedBytes = parseLongSafely(parts[RECEIVED_BYTES_INDEX]);  // 수신된 바이트
+                long transmittedBytes = parseLongSafely(parts[TRANSMITTED_BYTES_INDEX]);  // 송신된 바이트
+
+                networkUsageMap.put(METRIC_MAP_NETWORK_REC, convertBytesToMB(receivedBytes));
+                networkUsageMap.put(METRIC_MAP_NETWORK_SENT, convertBytesToMB(transmittedBytes));
+            }
+        }
+
+        return networkUsageMap;
+    }
+
     private MetricResponse.CpuMetricDTO createCpuMetricDTO(Metric metric, String time) {
         double cpuUsage = Math.round(metric.getCpuUsage() * 1000.0) / 1000.0;
         return new MetricResponse.CpuMetricDTO(time, cpuUsage);
@@ -335,26 +351,15 @@ public class MetricService {
         return new MetricResponse.NetworkOutMetricDTO(time, networkSent);
     }
 
-    private void parseNetworkUsageInLine(String line, Map<String, Double> networkUsageMap) {
-        Matcher matcher = NETWORK_PATTERN.matcher(line);
-        if (matcher.find()) {
-            String[] parts = line.split("\\s+");
+    private double convertBytesToMB(long bytes) {
+        return bytes / BYTES_TO_MB_DIVISOR;
+    }
 
-            if (parts.length >= 10) {
-                try {
-                    long receivedBytes = Long.parseLong(parts[1]);  // 수신된 바이트
-                    long transmittedBytes = Long.parseLong(parts[9]);  // 송신된 바이트
-
-                    // 바이트를 MB로 변환
-                    Double receivedMB = receivedBytes / BYTES_TO_MB_DIVISOR;
-                    Double transmittedMB = transmittedBytes / BYTES_TO_MB_DIVISOR;
-
-                    networkUsageMap.put(METRIC_MAP_NETWORK_REC, receivedMB);
-                    networkUsageMap.put(METRIC_MAP_NETWORK_SENT, transmittedMB);
-                } catch (NumberFormatException e) {
-                    log.error("네트워크 사용량 파싱 중 오류 발생: " + line + ", 오류 메시지: " + e.getMessage());
-                }
-            }
+    private long parseLongSafely(String value) {
+        try {
+            return Long.parseLong(value);
+        } catch (NumberFormatException e) {
+            return 0L;
         }
     }
 
