@@ -100,16 +100,14 @@ public class MetricService {
 
     @Transactional(readOnly = true)
     public MetricResponse.FindMetricHistoryDTO findMetricHistory(int minusHour, Long sshInfoId){
-        // minusHour 내 지표들을 모두 가져옴
-        LocalDateTime startTime = LocalDateTime.now().withMinute(0).withSecond(0).withNano(0).minusHours(minusHour);
-        List<Metric> metrics = metricRepository.findMetricsAfter(startTime, sshInfoId);
-
-        // CPU, 메모리, 네트워크 수신/송신 지표를 담을 리스트
         List<MetricResponse.CpuMetricDTO> cpuMetricDTOS = new ArrayList<>();
         List<MetricResponse.MemoryMetricDTO> memoryMetricDTOS = new ArrayList<>();
         List<MetricResponse.NetworkInMetricDTO> networkInMetricDTOS = new ArrayList<>();
         List<MetricResponse.NetworkOutMetricDTO> networkOutMetricDTOS = new ArrayList<>();
 
+        // minusHour 내 지표들을 모두 가져옴
+        LocalDateTime startTime = LocalDateTime.now().withMinute(0).withSecond(0).withNano(0).minusHours(minusHour);
+        List<Metric> metrics = metricRepository.findMetricsAfter(startTime, sshInfoId);
         metrics.forEach(metric -> {
             String time = metric.getCreatedDate().format(formatterForHourAndMin);
             cpuMetricDTOS.add(createCpuMetricDTO(metric, time));
@@ -162,10 +160,12 @@ public class MetricService {
         String commandResponse = sshService.executeCommandOnce(COMMAND_TOP, sshInfoId);
         String[] lines = commandResponse.split("\n");
 
+        // CPU와 메모리 사용률을 각각 파싱하여 metricsMap에 추가
         for (String line : lines) {
             line = line.trim();
-            parseCpuUsageInLine(metricsMap, line);
-            parseMemoryUsageInLine(metricsMap, line);
+
+            metricsMap.putAll(parseCpuUsage(line));
+            metricsMap.putAll(parseMemoryUsage(line));
         }
 
         return metricsMap;
@@ -283,24 +283,32 @@ public class MetricService {
         redisService.storeValue(REDIS_KEY_NETWORK_TRANS, String.valueOf(currentNetworkMetric.get(METRIC_MAP_NETWORK_SENT)));
     }
 
-    private void parseCpuUsageInLine(Map<String, Double> metricsMap, String line) {
+    private Map<String, Double> parseCpuUsage(String line) {
+        Map<String, Double> cpuMetrics = new HashMap<>();
+
         Matcher cpuMatcher = CPU_PATTERN.matcher(line);
         if (cpuMatcher.matches()) {
             Double usUsage = Double.parseDouble(cpuMatcher.group(1));
             Double syUsage = Double.parseDouble(cpuMatcher.group(2));
             Double cpuUsage = usUsage + syUsage;
-            metricsMap.put(METRIC_MAP_CPU_USAGE, cpuUsage);
+            cpuMetrics.put(METRIC_MAP_CPU_USAGE, cpuUsage);
         }
+
+        return cpuMetrics;
     }
 
-    private void parseMemoryUsageInLine(Map<String, Double> metricsMap, String line) {
+    private Map<String, Double> parseMemoryUsage(String line) {
+        Map<String, Double> memoryMetrics = new HashMap<>();
+
         Matcher memMatcher = MEM_PATTERN.matcher(line);
         if (memMatcher.matches()) {
             Double memTotal = Double.parseDouble(memMatcher.group(1));
             Double memUsed = Double.parseDouble(memMatcher.group(3));
-            metricsMap.put(METRIC_MAP_TOTAL_MEMORY, memTotal);
-            metricsMap.put(METRIC_MAP_USED_MEMORY, memUsed);
+            memoryMetrics.put(METRIC_MAP_TOTAL_MEMORY, memTotal);
+            memoryMetrics.put(METRIC_MAP_USED_MEMORY, memUsed);
         }
+
+        return memoryMetrics;
     }
 
     private MetricResponse.CpuMetricDTO createCpuMetricDTO(Metric metric, String time) {
