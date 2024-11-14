@@ -112,7 +112,7 @@ public class LogService {
             SearchResponse<Map> response = client.search(searchRequest, Map.class);
 
             List<String> logContents = response.hits().hits().stream()
-                    .map(hit -> convertResponseToString(hit.source()))
+                    .map(hit -> convertResponseToLog(hit.source()))
                     .toList();
 
             return String.join("\n", logContents);  // 각 로그 사이에 줄 바꿈 추가
@@ -150,18 +150,18 @@ public class LogService {
     }
 
     private SearchResponse<Map> searchUnprocessedLogs(String elasticSearchHost) {
-        String logIndex = getLogIndex();
+        String index = getLogIndex();
 
         try {
-            SearchRequest searchRequest = buildSearchRequest(logIndex); // is_processed가 false인 데이터 검색
             ElasticsearchClient client = elasticsearchConfig.createElasticsearchClient(elasticSearchHost);
 
+            SearchRequest searchRequest = buildSearchRequest(index); // is_processed가 false인 데이터 검색
             return client.search(searchRequest, Map.class);
         } catch (ElasticsearchException e) {
-            createElasticSearchIndex(logIndex, elasticSearchHost);
+            createElasticSearchIndex(index, elasticSearchHost);
             return new SearchResponse.Builder<Map>().build();
         } catch (IOException e){
-            log.info("<ElasticSearch> "+logIndex + "에 대한 검색 실패");
+            log.info("<ElasticSearch> "+index + "에 대한 검색 실패");
             return null;
         }
     }
@@ -169,13 +169,9 @@ public class LogService {
     private List<Map<String, Object>> refineLogFields(List<Map<String, Object>> logs) {
         return logs.stream()
                 .map(log -> {
-                    // 맵에서 기존 데이터 추출
-                    Map<String, Object> container = (Map<String, Object>) log.get(LOG_KEY_CONTAINER);
-                    String containerName = container != null ? (String) container.get(CONTAINER_KEY_NAME) : UNKNOWN_CONTAINER;
-                    String message = Optional.ofNullable((String) log.get(LOG_KEY_MESSAGE))
-                            .orElse(NO_MESSAGE);
-
-                    // 로그 레벨 추출
+                    // 컨테이너 이름, 메시지, 로그 레벨 추출
+                    String containerName = extractContainerNameFromLogMap(log);
+                    String message = extractMessageFromLogMap(log);
                     String logLevel = extractLogLevelFromLog(message);
 
                     // 맵에 필드 추가
@@ -200,12 +196,7 @@ public class LogService {
 
             for (Map<String, Object> logMap : updatedLogMaps) {
                 String id = (String) logMap.remove(LOG_KEY_ID);
-                UpdateRequest<Map<String, Object>, Map<String, Object>> updateRequest = new UpdateRequest.Builder<Map<String, Object>, Map<String, Object>>()
-                        .index(logIndex)
-                        .id(id)
-                        .doc(logMap)
-                        .build();
-
+                UpdateRequest<Map<String, Object>, Map<String, Object>> updateRequest = buildUpdateRequest(logIndex, logMap, id);
                 client.update(updateRequest, Map.class);
             }
         } catch (IOException e){
@@ -236,9 +227,9 @@ public class LogService {
         return timestamp != null ? Instant.parse(timestamp) : null;
     }
 
-    private String convertResponseToString(Map<String, Object> responseMap) {
-        String rawMessage = (String) responseMap.get(LOG_KEY_MESSAGE);
-        return rawMessage != null ? rawMessage : "";
+    private String convertResponseToLog(Map<String, Object> responseMap) {
+        String logContent = (String) responseMap.get(LOG_KEY_MESSAGE);
+        return logContent != null ? logContent : "";
     }
 
     private String convertLogMapToString(Map<String, Object> logMap, String timestamp) {
@@ -294,6 +285,18 @@ public class LogService {
         // 파일 이름에서 "log-" 뒤부터 ".txt" 앞까지의 부분 추출
         String dateTimePart = file.substring(file.indexOf("log-") + 4, file.indexOf("-", file.indexOf("_")));
         return LocalDateTime.parse(dateTimePart, formatter);
+    }
+
+    private String extractContainerNameFromLogMap(Map<String, Object> log) {
+        Map<String, Object> container = (Map<String, Object>) log.get(LOG_KEY_CONTAINER);
+        return Optional.ofNullable(container)
+                .map(c -> (String) c.get(CONTAINER_KEY_NAME))
+                .orElse(UNKNOWN_CONTAINER);
+    }
+
+    private String extractMessageFromLogMap(Map<String, Object> log) {
+        return Optional.ofNullable((String) log.get(LOG_KEY_MESSAGE))
+                .orElse(NO_MESSAGE);
     }
 
     // 오늘 날짜를 기반으로 인덱스 이름 생성
@@ -422,6 +425,14 @@ public class LogService {
         );
     }
 
+    private UpdateRequest<Map<String, Object>, Map<String, Object>> buildUpdateRequest(String index, Map<String, Object> logMap, String id) {
+        return new UpdateRequest.Builder<Map<String, Object>, Map<String, Object>>()
+                .index(index)
+                .id(id)
+                .doc(logMap)
+                .build();
+    }
+
     private int compareLogFileDates(String file1, String file2) {
         LocalDateTime fileDateTime1 = extractDateTimeFromLogFile(file1);
         LocalDateTime fileDateTime2 = extractDateTimeFromLogFile(file2);
@@ -434,8 +445,8 @@ public class LogService {
         return logTime.isAfter(cutoffTime);
     }
 
-    private Map<String, List<Map<String, Object>>> groupLogsByContainerName(List<Map<String, Object>> logs) {
-        return logs.stream()
+    private Map<String, List<Map<String, Object>>> groupLogsByContainerName(List<Map<String, Object>> logMaps) {
+        return logMaps.stream()
                 .collect(Collectors.groupingBy(log -> (String) log.getOrDefault(LOG_KEY_CONTAINER_NAME, UNKNOWN_CONTAINER)));
     }
 }
