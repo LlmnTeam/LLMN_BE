@@ -8,7 +8,7 @@ import co.elastic.clients.elasticsearch.indices.CreateIndexRequest;
 import co.elastic.clients.json.JsonData;
 import com.example.llmn.controller.DTO.LogDataDTO;
 import com.example.llmn.core.config.ElasticsearchConfig;
-import com.example.llmn.core.utils.LogDataParser;
+import com.example.llmn.core.utils.JsonUtils;
 import com.example.llmn.domain.SshInfo;
 import com.example.llmn.repository.SshInfoRepository;
 import lombok.RequiredArgsConstructor;
@@ -211,7 +211,7 @@ public class LogService {
         Instant timestamp = convertStringToInstant((String) source.get(LOG_KEY_TIMESTAMP));
 
         String formattedMessage = Optional.ofNullable((String) source.get(LOG_KEY_MESSAGE))
-                .map(LogDataParser::formatMessage)
+                .map(JsonUtils::normalizeJson)
                 .orElse(NO_MESSAGE);
 
         boolean isProcessed = Optional.ofNullable((Boolean) source.get(LOG_KEY_PROCESSED))
