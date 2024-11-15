@@ -44,6 +44,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+import static com.example.llmn.core.utils.FileUtils.getFilePath;
 import static com.example.llmn.core.utils.MailTemplate.VERIFICATION_CODE;
 import static com.example.llmn.core.utils.UriUtils.buildURI;
 
@@ -194,8 +195,7 @@ public class UserService {
         createDirIfNotExist();
 
         // 파일 업로드 경로 구하기
-        String fileName = file.getOriginalFilename();
-        Path path = Paths.get(UPLOAD_DIR + File.separator + fileName);
+        Path path = getFilePath(UPLOAD_DIR, file);
 
         // 파일 업로드
         try {

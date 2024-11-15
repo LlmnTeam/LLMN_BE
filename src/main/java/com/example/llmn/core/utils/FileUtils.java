@@ -5,8 +5,10 @@ import com.example.llmn.core.errors.ExceptionCode;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.io.BufferedWriter;
+import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -61,6 +63,11 @@ public class FileUtils {
         }
 
         return listTextFiles(path);
+    }
+
+    public static Path getFilePath(String directoryName, MultipartFile file){
+        String fileName = file.getOriginalFilename();
+        return Paths.get(directoryName + File.separator + fileName);
     }
 
     public static BufferedWriter getBufferedWriter(String filePath, boolean append) throws IOException {
