@@ -23,6 +23,15 @@ public class FileUtils {
 
     public static final String LOGS_DIRECTORY = "logs";
 
+    public static void writeFile(MultipartFile file, Path path) {
+        try {
+            Files.write(path, file.getBytes());
+        } catch (IOException e) {
+            log.error(path + "에 파일 저장 실패");
+            throw new CustomException(ExceptionCode.SAVE_FILE_FAIL);
+        }
+    }
+
     public static String readFileAsString(String fileName) {
         Path path = Paths.get(LOGS_DIRECTORY, fileName);
 
@@ -72,6 +81,18 @@ public class FileUtils {
 
     public static BufferedWriter getBufferedWriter(String filePath, boolean append) throws IOException {
         return new BufferedWriter(new FileWriter(filePath, append));
+    }
+
+    public static void createDirIfNotExist(String directoryName) {
+        Path uploadPath = Paths.get(directoryName);
+
+        try {
+            if (!Files.exists(uploadPath)) {
+                Files.createDirectories(uploadPath);
+            }
+        } catch (IOException e){
+            throw new CustomException(ExceptionCode.CREATE_DIR_FAIL);
+        }
     }
 
     private static List<String> listTextFiles(Path filePath) {

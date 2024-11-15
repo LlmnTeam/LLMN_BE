@@ -32,16 +32,13 @@ import org.springframework.web.reactive.function.client.WebClient;
 import org.thymeleaf.context.Context;
 import org.thymeleaf.spring6.SpringTemplateEngine;
 
-import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.security.SecureRandom;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-import static com.example.llmn.core.utils.FileUtils.getFilePath;
+import static com.example.llmn.core.utils.FileUtils.*;
 import static com.example.llmn.core.utils.MailTemplate.VERIFICATION_CODE;
 import static com.example.llmn.core.utils.UriUtils.buildURI;
 
@@ -79,7 +76,7 @@ public class UserService {
     private static final String REDIS_KEY_EMAIL_CODE = "code:";
     private static final String MAIL_TEMPLATE_FOR_CODE = "verification_code_email.html";
     private static final String UTF_EIGHT_ENCODING = "UTF-8";
-    private static final String UPLOAD_DIR = "ssh";
+    private static final String SSH_DIRECTORY = "ssh";
     private static final String REDIS_KEY_SESSION_ID = "sessionId";
     private static final String REDIS_KEY_REFRESH_TOKEN = "refreshToken";
     private static final String REDIS_KEY_ACCESS_TOKEN = "accessToken";
@@ -165,21 +162,15 @@ public class UserService {
     }
 
     public Path uploadSSHKey(MultipartFile file) {
-        // 요청으로 들어온 파일이 없음
         if (file.isEmpty()) {
             throw new CustomException(ExceptionCode.NO_FILE_TO_UPLOAD);
         }
 
-        createDirIfNotExist();
-        Path path = getFilePath(UPLOAD_DIR, file);
+        // SSH Key를 저장하는 디렉토리가 없으면 생성
+        createDirIfNotExist(SSH_DIRECTORY);
 
-        // 파일 업로드
-        try {
-            Files.write(path, file.getBytes());
-        } catch (IOException e) {
-            log.error("업로드 파일 저장 실패");
-            throw new CustomException(ExceptionCode.SAVE_FILE_FAIL);
-        }
+        Path path = getFilePath(SSH_DIRECTORY, file);
+        writeFile(file, path);
 
         return path;
     }
@@ -581,18 +572,6 @@ public class UserService {
             }
         }
         return false;
-    }
-
-    private void createDirIfNotExist() {
-        Path uploadPath = Paths.get(UPLOAD_DIR);
-
-        try {
-            if (!Files.exists(uploadPath)) {
-                Files.createDirectories(uploadPath);
-            }
-        } catch (IOException e){
-            throw new CustomException(ExceptionCode.CREATE_DIR_FAIL);
-        }
     }
 
     private void updateFastAPIEnvFile(String key, String value) {
