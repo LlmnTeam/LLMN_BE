@@ -6,12 +6,11 @@ import com.example.llmn.controller.DTO.UserResponse;
 import com.example.llmn.core.errors.CustomException;
 import com.example.llmn.core.errors.ExceptionCode;
 import com.example.llmn.core.security.JWTProvider;
+import com.example.llmn.core.utils.EmailUtils;
 import com.example.llmn.domain.SshInfo;
 import com.example.llmn.domain.SummaryType;
 import com.example.llmn.domain.User;
 import com.example.llmn.repository.*;
-import jakarta.mail.MessagingException;
-import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -20,16 +19,12 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseCookie;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.reactive.function.client.WebClient;
-import org.thymeleaf.context.Context;
-import org.thymeleaf.spring6.SpringTemplateEngine;
 
 import java.nio.file.Path;
 import java.security.SecureRandom;
@@ -56,12 +51,8 @@ public class UserService {
     private final RedisService redisService;
     private final SummaryRepository summaryRepository;
     private final MetricService metricService;
-    private final JavaMailSender mailSender;
-    private final SpringTemplateEngine templateEngine;
     private final WebClient webClient;
-
-    @Value("${spring.mail.username}")
-    private String SERVICE_MAIL_ACCOUNT;
+    private final EmailUtils mailUtils;
 
     @Value("${reload.uri}")
     private String REQUEST_RELOAD_KEY_URI;
@@ -74,7 +65,6 @@ public class UserService {
 
     private static final String REDIS_KEY_EMAIL_CODE = "code:";
     private static final String MAIL_TEMPLATE_FOR_CODE = "verification_code_email.html";
-    private static final String UTF_EIGHT_ENCODING = "UTF-8";
     private static final String SSH_DIRECTORY = "ssh";
     private static final String REDIS_KEY_SESSION_ID = "sessionId";
     private static final String REDIS_KEY_REFRESH_TOKEN = "refreshToken";
@@ -444,38 +434,16 @@ public class UserService {
 
     @Async
     public void sendCodeByEmail(String email, String codeType) {
-        // 인증 코드 전송 및 레디스에 저장
+        // 1st 검증 코드를 템플릿 모델에 담음
+        Map<String, Object> templateModel = new HashMap<>();
         String verificationCode = generateVerificationCode();
+        templateModel.put(MODEL_KEY_CODE, verificationCode);
 
-        // 메일 전송 템플릿 보낼 데이터는 map에 담음
-        Map<String, Object> model = new HashMap<>();
-        model.put(MODEL_KEY_CODE, verificationCode);
+        // 2nd 메일 전송
+        mailUtils.sendMail(email, VERIFICATION_CODE.getSubject(), MAIL_TEMPLATE_FOR_CODE, templateModel);
 
-        sendMail(email, VERIFICATION_CODE.getSubject(), MAIL_TEMPLATE_FOR_CODE, model);
-
-        redisService.storeValue(REDIS_KEY_EMAIL_CODE + codeType, email, verificationCode, 175 * 1000L); // 3분 동안 유효
-    }
-
-    @Async
-    public void sendMail(String toEmail, String subject, String templateName, Map<String, Object> templateModel) {
-        try {
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true, UTF_EIGHT_ENCODING);
-
-            // 템플릿 설정
-            Context context = new Context();
-            templateModel.forEach(context::setVariable);
-            String htmlContent = templateEngine.process(templateName, context);
-            helper.setText(htmlContent, true);
-
-            helper.setFrom(SERVICE_MAIL_ACCOUNT);
-            helper.setTo(toEmail);
-            helper.setSubject(subject);
-
-            mailSender.send(message);
-        } catch (MessagingException e){
-            log.info(toEmail + "로의 메일 전송에 실패했습니다");
-        }
+        // 3rd 검증 코드는 레디스에 3분 동안 저장
+        redisService.storeValue(REDIS_KEY_EMAIL_CODE + codeType, email, verificationCode, 175 * 1000L);
     }
 
     private void validateJoinRequest(UserRequest.JoinDTO requestDTO) {
