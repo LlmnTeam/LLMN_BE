@@ -31,8 +31,8 @@ public class UserController {
     private static final String CODE_TYPE_RECOVERY = "recovery";
 
     @PostMapping("/auth/login")
-    public ResponseEntity<?> login(@RequestBody @Valid UserRequest.LoginDTO requestDTO, HttpServletRequest request) {
-        Map<String, String> tokens = userService.login(requestDTO, request);
+    public ResponseEntity<?> login(@RequestBody @Valid UserRequest.LoginDTO requestDTO) {
+        Map<String, String> tokens = userService.login(requestDTO);
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, userService.createRefreshTokenCookie(tokens.get("refreshToken")))
                 .body(ApiUtils.success(HttpStatus.OK, new UserResponse.LoginDTO(tokens.get("accessToken"))));

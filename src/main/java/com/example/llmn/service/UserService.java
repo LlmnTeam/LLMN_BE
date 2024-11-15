@@ -12,8 +12,6 @@ import com.example.llmn.domain.User;
 import com.example.llmn.repository.*;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -34,7 +32,6 @@ import org.springframework.web.reactive.function.client.WebClient;
 import org.thymeleaf.context.Context;
 import org.thymeleaf.spring6.SpringTemplateEngine;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -99,7 +96,7 @@ public class UserService {
     private static final String CODE_TYPE_RECOVERY = "recovery";
 
     @Transactional
-    public Map<String, String> login(UserRequest.LoginDTO requestDTO, HttpServletRequest request) {
+    public Map<String, String> login(UserRequest.LoginDTO requestDTO) {
         User user = userRepository.findByEmail(requestDTO.email()).orElseThrow(
                 () -> new CustomException(ExceptionCode.USER_ACCOUNT_WRONG)
         );
@@ -129,7 +126,7 @@ public class UserService {
 
     @Transactional(readOnly = true)
     public UserResponse.CheckEmailExistDTO checkEmailExist(String email){
-        boolean isValid = !userRepository.existsByEmailWithRemoved(email);
+        boolean isValid = userRepository.doesNotExistByEmail(email);
         return new UserResponse.CheckEmailExistDTO(isValid);
     }
 
@@ -153,8 +150,7 @@ public class UserService {
     }
 
     public UserResponse.VerifyEmailCodeDTO verifyCode(UserRequest.VerifyCodeDTO requestDTO, String codeType){
-        // 레디스를 통해 해당 코드가 유효한지 확인
-        if(!redisService.validateData(REDIS_KEY_EMAIL_CODE + codeType, requestDTO.email(), requestDTO.code()))
+        if(redisService.isNotValidValue(REDIS_KEY_EMAIL_CODE + codeType, requestDTO.email(), requestDTO.code()))
             return new UserResponse.VerifyEmailCodeDTO(false);
 
         if(CODE_TYPE_RECOVERY.equals(codeType))
@@ -365,12 +361,12 @@ public class UserService {
             throw new CustomException(ExceptionCode.TOKEN_WRONG);
         }
 
-        Long userIdFromToken = JWTProvider.getUserIdFromToken(accessToken);
-        if(!redisService.validateValue(REDIS_KEY_ACCESS_TOKEN, String.valueOf(userIdFromToken), accessToken)){
+        Long userId = JWTProvider.getUserIdFromToken(accessToken);
+        if(redisService.isNotValidValue(REDIS_KEY_ACCESS_TOKEN, String.valueOf(userId), accessToken)){
             throw new CustomException(ExceptionCode.ACCESS_TOKEN_WRONG);
         }
 
-        String nickName = userRepository.findNickName(userIdFromToken).orElse(null);
+        String nickName = userRepository.findNickName(userId).orElse(null);
 
         return new UserResponse.ValidateAccessTokenDTO(nickName);
     }
