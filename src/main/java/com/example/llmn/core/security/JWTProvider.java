@@ -60,13 +60,23 @@ public class JWTProvider {
         return decodedJWT.getClaim("id").asLong();
     }
 
-    public static boolean validateToken(String token) {
+    public static boolean isValidToken(String token) {
         try {
             token = token.replace(JWTProvider.TOKEN_PREFIX, "");
             JWT.require(Algorithm.HMAC512(SECRET)).build().verify(token);
             return true;
         } catch (JWTVerificationException exception) { // 잘못된 서명 등 디코딩이 안되는 잘못된 토큰
             return false;
+        }
+    }
+
+    public static boolean isNotValidToken(String token) {
+        try {
+            token = token.replace(JWTProvider.TOKEN_PREFIX, "");
+            JWT.require(Algorithm.HMAC512(SECRET)).build().verify(token);
+            return false;
+        } catch (JWTVerificationException exception) {
+            return true;
         }
     }
 }

@@ -168,7 +168,6 @@ public class UserService {
 
         // SSH Key를 저장하는 디렉토리가 없으면 생성
         createDirIfNotExist(SSH_DIRECTORY);
-
         Path path = getFilePath(SSH_DIRECTORY, file);
         writeFile(file, path);
 
@@ -332,19 +331,19 @@ public class UserService {
     }
 
     @Transactional(readOnly = true)
-    public UserResponse.ValidateAccessTokenDTO validateAccessToken(@CookieValue String accessToken){
-        // 잘못된 토큰 형식인지 체크
-        if(!JWTProvider.validateToken(accessToken)) {
+    public UserResponse.ValidateAccessTokenDTO validateAccessToken(String accessToken){
+        // 토큰 형식 검증
+        if(JWTProvider.isNotValidToken(accessToken)) {
             throw new CustomException(ExceptionCode.TOKEN_WRONG);
         }
 
+        // 레디스에 저장된 값과 비교
         Long userId = JWTProvider.getUserIdFromToken(accessToken);
         if(redisService.isNotValidValue(REDIS_KEY_ACCESS_TOKEN, String.valueOf(userId), accessToken)){
             throw new CustomException(ExceptionCode.ACCESS_TOKEN_WRONG);
         }
 
         String nickName = userRepository.findNickName(userId).orElse(null);
-
         return new UserResponse.ValidateAccessTokenDTO(nickName);
     }
 
@@ -381,9 +380,8 @@ public class UserService {
 
     @Transactional(readOnly = true)
     public UserResponse.CheckAccountExistDTO checkLocalAccountExist(UserRequest.EmailDTO requestDTO){
-        Optional<User> userOP = userRepository.findByEmail(requestDTO.email());
-        boolean isValid = userOP.isPresent();
-
+        boolean isValid = userRepository.findByEmail(requestDTO.email())
+                .isPresent();
         return new UserResponse.CheckAccountExistDTO(isValid);
     }
 
