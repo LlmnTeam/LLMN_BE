@@ -26,7 +26,6 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.thymeleaf.context.Context;
@@ -118,7 +117,7 @@ public class UserService {
         setMonitoringSshInfo(requestDTO.monitoringSshHost(), sshInfos, user);
 
         // OpenAI API 키 저장
-        updateFastAPIEnvFile(OPEN_API_KEY, requestDTO.openAiKey());
+        updateApiKey(requestDTO.openAiKey());
     }
 
     @Transactional(readOnly = true)
@@ -326,8 +325,17 @@ public class UserService {
         redisService.storeValue(REDIS_SSH_KEY, userId.toString(), combinedInfo, REDIS_SSH_KEY_EXP);
     }
 
-    public void updateApiKey(String apiKey){
-        updateFastAPIEnvFile(OPEN_API_KEY, apiKey);
+    public void updateApiKey(String value) {
+        UserResponse.EnvUpdateDTO responseDTO = webClient.post()
+                .uri(buildURI(UPDATE_ENV_URI))
+                .bodyValue(new UserRequest.EnvUpdateDTO(OPEN_API_KEY, value))
+                .retrieve()
+                .bodyToMono(UserResponse.EnvUpdateDTO.class)
+                .block();
+
+        if (isUpdateSuccess(responseDTO)) {
+            throw new CustomException(ExceptionCode.UPDATE_KEY_FAIL);
+        }
     }
 
     @Transactional(readOnly = true)
@@ -564,25 +572,6 @@ public class UserService {
         return false;
     }
 
-    private void updateFastAPIEnvFile(String key, String value) {
-        try {
-            UserResponse.EnvUpdateDTO responseDTO = webClient.post()
-                    .uri(buildURI(UPDATE_ENV_URI))
-                    .bodyValue(new UserRequest.EnvUpdateDTO(key, value))
-                    .retrieve()
-                    .bodyToMono(UserResponse.EnvUpdateDTO.class)
-                    .block();
-
-            if (responseDTO == null || !responseDTO.success()) {
-                throw new CustomException(ExceptionCode.CONVERT_TO_FILE_FAIL);
-            }
-
-        } catch (Exception e){
-            log.info("API 키 업데이트 실패");
-            throw new CustomException(ExceptionCode.CONVERT_TO_FILE_FAIL);
-        }
-    }
-
     private List<SshInfo> saveSshInfos(List<UserRequest.SshInfoDTO> requestSshInfos, User user) {
         List<SshInfo> sshInfos = new ArrayList<>();
 
@@ -663,5 +652,9 @@ public class UserService {
                 .filter(sshInfo -> sshInfo.getRemoteHost().equals(monitoringSshHost))
                 .findFirst()
                 .orElseThrow(() -> new CustomException(ExceptionCode.MONITORING_SSH_NOT_SELECT));
+    }
+
+    private boolean isUpdateSuccess(UserResponse.EnvUpdateDTO responseDTO) {
+        return responseDTO == null || !responseDTO.success();
     }
 }
