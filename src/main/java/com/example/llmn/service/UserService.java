@@ -260,16 +260,8 @@ public class UserService {
                 () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
         );
 
-        List<SshInfo> sshInfos = sshInfoRepository.findByUserId(userId);
-
-        SshInfo foundSshInfo = sshInfos.stream()
-                .filter(sshInfo -> sshInfo.getRemoteHost().equals(monitoringSshHost))
-                .findFirst()
-                .orElseThrow(
-                        () -> new CustomException(ExceptionCode.MONITORING_SSH_NOT_SELECT)
-                );
-
-        user.updateMonitoringSshInfoId(foundSshInfo.getId());
+        SshInfo monitoringSshInfo = findMonitoringSshInfo(userId, monitoringSshHost);
+        user.updateMonitoringSshInfoId(monitoringSshInfo.getId());
     }
 
     @Transactional(readOnly = true)
@@ -666,5 +658,12 @@ public class UserService {
         return Optional.ofNullable(currentMetric)
                 .map(metric -> String.format("%.2f MB", metric.networkSent()))
                 .orElse(NOT_AVAILABLE);
+    }
+
+    private SshInfo findMonitoringSshInfo(Long userId, String monitoringSshHost) {
+        return sshInfoRepository.findByUserId(userId).stream()
+                .filter(sshInfo -> sshInfo.getRemoteHost().equals(monitoringSshHost))
+                .findFirst()
+                .orElseThrow(() -> new CustomException(ExceptionCode.MONITORING_SSH_NOT_SELECT));
     }
 }
