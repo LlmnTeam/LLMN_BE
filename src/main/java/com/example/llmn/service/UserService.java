@@ -188,6 +188,7 @@ public class UserService {
     public void resetPassword(UserRequest.ResetPasswordDTO requestDTO){
         // 전송한 코드로 세션에서 해당 이메일을 꺼내옴 (비밀번호 재설정 시 코드 전송을 거침)
         String email = redisService.getDataInStr(CODE_TO_EMAIL_KEY_PREFIX, requestDTO.code());
+
         if(email == null){
             throw new CustomException(ExceptionCode.BAD_APPROACH);
         }
@@ -428,7 +429,6 @@ public class UserService {
     }
 
     private void checkAlreadyJoin(String email) {
-        // 로컬 회원 가입을 통해 이미 가입함
         if(userRepository.existsByEmail(email))
             throw new CustomException(ExceptionCode.USER_EMAIL_EXIST);
     }

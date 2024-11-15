@@ -34,17 +34,16 @@ public class FileUtils {
 
     public static String readFileAsString(String fileName) {
         Path path = Paths.get(LOGS_DIRECTORY, fileName);
-
-        // 1st 파일이 존재하는지 확인
         if (!Files.exists(path)) {
             throw new CustomException(ExceptionCode.FILE_NOT_FOUND);
         }
 
-        // 2nd 파일 내용을 읽어서, 하나의 문자열로 변환 (각 줄을 \n\n으로 구분)
+        // 파일 내용을 읽어서, 하나의 문자열로 변환 (각 줄을 \n\n으로 구분)
         try {
             List<String> lines = Files.readAllLines(path);
             return String.join("\n\n", lines);
         } catch (IOException e) {
+            log.error(path + "의 " + fileName + " 파일 읽기 실패");
             throw new CustomException(ExceptionCode.FILE_READ_FAIL);
         }
     }
@@ -91,6 +90,7 @@ public class FileUtils {
                 Files.createDirectories(uploadPath);
             }
         } catch (IOException e){
+            log.error(directoryName + "에 대한 디렉토리 생성 실패");
             throw new CustomException(ExceptionCode.CREATE_DIR_FAIL);
         }
     }
