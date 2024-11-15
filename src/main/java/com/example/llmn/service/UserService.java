@@ -170,10 +170,7 @@ public class UserService {
             throw new CustomException(ExceptionCode.NO_FILE_TO_UPLOAD);
         }
 
-        // 로그 파일 디렉토리가 없으면 생성
         createDirIfNotExist();
-
-        // 파일 업로드 경로 구하기
         Path path = getFilePath(UPLOAD_DIR, file);
 
         // 파일 업로드
@@ -207,11 +204,7 @@ public class UserService {
         // CODE_TO_EMAIL 키 삭제
         redisService.removeData(CODE_TO_EMAIL_KEY_PREFIX, requestDTO.code());
 
-        // 새로운 비밀번호로 업데이트
-        User user = userRepository.findByEmail(email).orElseThrow(
-                () -> new CustomException(ExceptionCode.USER_EMAIL_NOT_FOUND)
-        );
-        user.updatePassword(passwordEncoder.encode(requestDTO.newPassword()));
+        updatePassword(email, requestDTO.newPassword());
     }
 
     @Transactional
@@ -637,6 +630,14 @@ public class UserService {
         });
 
         return sshInfos;
+    }
+
+    private void updatePassword(String email, String newPassword) {
+        User user = userRepository.findByEmail(email).orElseThrow(
+                () -> new CustomException(ExceptionCode.USER_EMAIL_NOT_FOUND)
+        );
+
+        user.updatePassword(passwordEncoder.encode(newPassword));
     }
 
     private User saveUser(UserRequest.JoinDTO joinRequestDTO) {
