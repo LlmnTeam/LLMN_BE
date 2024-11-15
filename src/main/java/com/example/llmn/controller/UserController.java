@@ -53,7 +53,7 @@ public class UserController {
     @PostMapping("/accounts/check/email")
     public ResponseEntity<?> checkEmailAndSendCode(@RequestBody @Valid UserRequest.EmailDTO requestDTO) {
         UserResponse.CheckEmailExistDTO responseDTO = userService.checkEmailExist(requestDTO.email());
-        userService.sendCodeWithValidation(requestDTO.email(), CODE_TYPE_JOIN, responseDTO.isValid());
+        if (responseDTO.isValid()) userService.sendCodeWithValidation(requestDTO.email(), CODE_TYPE_JOIN);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 
@@ -71,7 +71,7 @@ public class UserController {
 
     @PostMapping("/accounts/resend/code")
     public ResponseEntity<?> resendCode(@RequestBody @Valid UserRequest.EmailDTO requestDTO, @RequestParam String codeType) {
-        userService.sendCodeWithValidation(requestDTO.email(), codeType, true);
+        userService.sendCodeWithValidation(requestDTO.email(), codeType);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, null));
     }
 
@@ -126,7 +126,7 @@ public class UserController {
     @PostMapping("/accounts/recovery/code")
     public ResponseEntity<?> sendCodeForRecovery(@RequestBody @Valid UserRequest.EmailDTO requestDTO) {
         UserResponse.CheckAccountExistDTO responseDTO = userService.checkLocalAccountExist(requestDTO);
-        userService.sendCodeWithValidation(requestDTO.email(), CODE_TYPE_RECOVERY, responseDTO.isValid());
+        if (responseDTO.isValid()) userService.sendCodeWithValidation(requestDTO.email(), CODE_TYPE_JOIN);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 

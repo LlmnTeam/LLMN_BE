@@ -63,7 +63,7 @@ public class UserService {
     @Value("${update_env.uri}")
     private String UPDATE_ENV_URI;
 
-    private static final String REDIS_KEY_EMAIL_CODE = "code:";
+    private static final String KEY_PREFIX_CODE = "code:";
     private static final String MAIL_TEMPLATE_FOR_CODE = "verification_code_email.html";
     private static final String SSH_DIRECTORY = "ssh";
     private static final String REDIS_KEY_SESSION_ID = "sessionId";
@@ -124,20 +124,13 @@ public class UserService {
     }
 
     @Async
-    public void sendCodeWithValidation(String email, String codeType, boolean isValid) {
-        // TTL 체크
-        if(redisService.isValueExist(REDIS_KEY_EMAIL_CODE + codeType, email)){
-            throw new CustomException(ExceptionCode.ALREADY_SEND_EMAIL);
-        }
-
-        // 유효한 경우에만 메일 전송
-        if(isValid){
-            sendCodeByEmail(email, codeType);
-        }
+    public void sendCodeWithValidation(String email, String codeType) {
+        checkAlreadySendCode(email, codeType);
+        sendCodeByEmail(email, codeType);
     }
 
     public UserResponse.VerifyEmailCodeDTO verifyCode(UserRequest.VerifyCodeDTO requestDTO, String codeType){
-        if(redisService.isNotValidValue(REDIS_KEY_EMAIL_CODE + codeType, requestDTO.email(), requestDTO.code()))
+        if(redisService.isNotValidValue(buildRedisKey(KEY_PREFIX_CODE, codeType), requestDTO.email(), requestDTO.code()))
             return new UserResponse.VerifyEmailCodeDTO(false);
 
         if(CODE_TYPE_RECOVERY.equals(codeType))
@@ -215,7 +208,6 @@ public class UserService {
         );
 
         List<SshInfo> sshInfos = sshInfoRepository.findByUserId(userId);
-
         UserResponse.CloudInfoDTO selectedCloud = findSelectedCloud(sshInfos, user.getMonitoringSshId());
         List<UserResponse.CloudInfoDTO> cloudInfos = sshInfos.stream()
                 .map(this::convertToCloudInfoDTO)
@@ -360,8 +352,7 @@ public class UserService {
 
     @Transactional(readOnly = true)
     public UserResponse.CheckAccountExistDTO checkLocalAccountExist(UserRequest.EmailDTO requestDTO){
-        boolean isValid = userRepository.findByEmail(requestDTO.email())
-                .isPresent();
+        boolean isValid = userRepository.findByEmail(requestDTO.email()).isPresent();
         return new UserResponse.CheckAccountExistDTO(isValid);
     }
 
@@ -443,7 +434,7 @@ public class UserService {
         mailUtils.sendMail(email, VERIFICATION_CODE.getSubject(), MAIL_TEMPLATE_FOR_CODE, templateModel);
 
         // 3rd 검증 코드는 레디스에 3분 동안 저장
-        redisService.storeValue(REDIS_KEY_EMAIL_CODE + codeType, email, verificationCode, 175 * 1000L);
+        redisService.storeValue(buildRedisKey(KEY_PREFIX_CODE, codeType), email, verificationCode, 175 * 1000L);
     }
 
     private void validateJoinRequest(UserRequest.JoinDTO requestDTO) {
@@ -636,5 +627,15 @@ public class UserService {
 
     private UserResponse.CloudInfoDTO convertToCloudInfoDTO(SshInfo sshInfo) {
         return new UserResponse.CloudInfoDTO(sshInfo.getRemoteName(), sshInfo.getRemoteHost());
+    }
+
+    private String buildRedisKey(String prefix, String codeType) {
+        return prefix + codeType;
+    }
+
+    private void checkAlreadySendCode(String email, String codeType) {
+        if(redisService.isValueExist(buildRedisKey(KEY_PREFIX_CODE, codeType), email)){
+            throw new CustomException(ExceptionCode.ALREADY_SEND_EMAIL);
+        }
     }
 }
