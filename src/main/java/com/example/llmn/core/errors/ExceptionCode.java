@@ -59,7 +59,8 @@ public enum ExceptionCode {
 
     // 프로젝트 관련 에러
     PROJECT_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 프로젝트를 찾을 수 없습니다."),
-    SSH_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 SSH 정보를 찾을 수 없습니다"),
+    SSH_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 SSH 정보를 찾을 수 없습니다."),
+    MONITORING_SSH_NOT_FOUND(HttpStatus.NOT_FOUND, "모니터링 중인 SSH 정보가 설정되지 않았습니다."),
 
     // 셀 관련 에러
     SHELL_CONNECT_FAIL(HttpStatus.INTERNAL_SERVER_ERROR, "Shell 채널 초기화 실패");

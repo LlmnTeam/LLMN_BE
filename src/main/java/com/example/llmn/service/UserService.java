@@ -226,17 +226,12 @@ public class UserService {
 
         List<SshInfo> sshInfos = sshInfoRepository.findByUserId(userId);
 
-        List<UserResponse.CloudInfoDTO> cloudInfoDTOS = sshInfos.stream()
-                .map(sshInfo -> new UserResponse.CloudInfoDTO(sshInfo.getRemoteName(), sshInfo.getRemoteHost()))
+        UserResponse.CloudInfoDTO selectedCloud = findSelectedCloud(sshInfos, user.getMonitoringSshId());
+        List<UserResponse.CloudInfoDTO> cloudInfos = sshInfos.stream()
+                .map(this::convertToCloudInfoDTO)
                 .toList();
 
-        UserResponse.CloudInfoDTO selectedCloudDTO = sshInfos.stream()
-                .filter(sshInfo -> sshInfo.getId().equals(user.getMonitoringSshId()))
-                .map(sshInfo -> new UserResponse.CloudInfoDTO(sshInfo.getRemoteName(), sshInfo.getRemoteHost()))
-                .findFirst()
-                .get();
-
-        return new UserResponse.FindCloudInfoDTO(cloudInfoDTOS, selectedCloudDTO);
+        return new UserResponse.FindCloudInfoDTO(cloudInfos, selectedCloud);
     }
 
     @Transactional
@@ -661,5 +656,17 @@ public class UserService {
     private String findRemoteHost(Long sshInfoId) {
         return sshInfoRepository.findHostById(sshInfoId)
                 .orElseThrow(() -> new CustomException(ExceptionCode.SSH_NOT_FOUND));
+    }
+
+    private UserResponse.CloudInfoDTO findSelectedCloud(List<SshInfo> sshInfos, Long monitoringSshId) {
+        return sshInfos.stream()
+                .filter(sshInfo -> sshInfo.getId().equals(monitoringSshId))
+                .map(this::convertToCloudInfoDTO)
+                .findFirst()
+                .orElseThrow(() -> new CustomException(ExceptionCode.MONITORING_SSH_NOT_FOUND));
+    }
+
+    private UserResponse.CloudInfoDTO convertToCloudInfoDTO(SshInfo sshInfo) {
+        return new UserResponse.CloudInfoDTO(sshInfo.getRemoteName(), sshInfo.getRemoteHost());
     }
 }
