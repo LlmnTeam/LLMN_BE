@@ -90,6 +90,7 @@ public class UserService {
     private static final String OPEN_API_KEY = "OPENAI_API_KEY";
     private static final String CODE_TO_EMAIL_KEY_PREFIX = "codeToEmail";
     private static final String CODE_TYPE_RECOVERY = "recovery";
+    private static final String NO_SUMMARY_DATA = "요약된 내용이 존재하지 않습니다.";
 
     @Transactional
     public Map<String, String> login(UserRequest.LoginDTO requestDTO) {
@@ -190,32 +191,19 @@ public class UserService {
             throw new CustomException(ExceptionCode.BAD_APPROACH);
         }
 
-        // CODE_TO_EMAIL 키 삭제
+        // CODE_TO_EMAIL 키 삭제 후 업데이트
         redisService.removeValue(CODE_TO_EMAIL_KEY_PREFIX, requestDTO.code());
-
         updatePassword(email, requestDTO.newPassword());
     }
 
     @Transactional
     public UserResponse.FindDashboardDTO findDashboard(Long userId) {
-        Long sshInfoId = userRepository.findMonitoringSshId(userId).orElseThrow(
-                () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
-        );
+        Long sshInfoId = findMonitoringSshId(userId);
+        String remoteHost = findRemoteHost(sshInfoId);
 
-        // 1. 원격 클라우드 호스트 정보
-        String remoteHost = sshInfoRepository.findHostById(sshInfoId).orElseThrow(
-                () -> new CustomException(ExceptionCode.SSH_NOT_FOUND)
-        );
-
-        // 2. 현재 지표
         MetricResponse.FindCurrentMetricDTO currentMetric = metricService.findCurrentMetric(sshInfoId);
-
-        // 3. 과거 지표
         MetricResponse.FindMetricHistoryDTO metricHistory = metricService.findMetricHistory(24, sshInfoId);
-
-        // 4. 시간별 요약
-        String hourlySummary = getLatestHourlySummary()
-                .orElse("요약된 내용이 존재하지 않습니다.");
+        String hourlySummary = findLatestHourlySummary();
 
         return new UserResponse.FindDashboardDTO(
                 remoteHost,
@@ -420,6 +408,24 @@ public class UserService {
         userRepository.delete(user);
     }
 
+    private void validatePassword(UserRequest.JoinDTO requestDTO) {
+        if (!requestDTO.password().equals(requestDTO.passwordConfirm())) {
+            throw new CustomException(ExceptionCode.USER_PASSWORD_WRONG);
+        }
+    }
+
+    private void validateSshInfoPresence(UserRequest.JoinDTO requestDTO) {
+        if (requestDTO.sshInfos().isEmpty()) {
+            throw new CustomException(ExceptionCode.SSH_INFO_EMPTY);
+        }
+    }
+
+    private void validateUniqueSshHosts(UserRequest.JoinDTO requestDTO) {
+        if (hasDuplicateRemoteHost(requestDTO.sshInfos())) {
+            throw new CustomException(ExceptionCode.DUPLICATE_SSH_HOST);
+        }
+    }
+
     private void checkDuplicateNickname(String nickName) {
         if(userRepository.existsByNickname(nickName))
             throw new CustomException(ExceptionCode.USER_NICKNAME_EXIST);
@@ -478,27 +484,17 @@ public class UserService {
     }
 
     private void validateJoinRequest(UserRequest.JoinDTO requestDTO) {
-        if (!requestDTO.password().equals(requestDTO.passwordConfirm()))
-            throw new CustomException(ExceptionCode.USER_PASSWORD_WRONG);
-
+        validatePassword(requestDTO);
+        validateSshInfoPresence(requestDTO);
+        validateUniqueSshHosts(requestDTO);
         checkAlreadyJoin(requestDTO.email());
         checkDuplicateNickname(requestDTO.nickName());
-
-        // SshInfo가 비어 있음
-        if(requestDTO.sshInfos().isEmpty()){
-            throw new CustomException(ExceptionCode.SSH_INFO_EMPTY);
-        }
-
-        // Ssh Host가 중복된 게 있는지 체크
-        if(hasDuplicateRemoteHost(requestDTO.sshInfos())){
-            throw new CustomException(ExceptionCode.DUPLICATE_SSH_HOST);
-        }
     }
 
-    private Optional<String> getLatestHourlySummary(){
+    private String findLatestHourlySummary(){
         Pageable pageable = PageRequest.of(0, 1, Sort.by(Sort.Direction.DESC, SORT_BY_DATE));
         Page<String> page = summaryRepository.findContentByType(SummaryType.HOURLY, pageable);
-        return page.hasContent() ? Optional.of(page.getContent().get(0)) : Optional.empty();
+        return page.hasContent() ? page.getContent().get(0) : NO_SUMMARY_DATA;
     }
 
     private List<SshInfo> addNewSshInfos(List<SshInfo> sshInfos, List<UserRequest.SshInfoDTO> requestSshInfoDTOS, User user) {
@@ -655,5 +651,15 @@ public class UserService {
 
     private boolean isUpdateSuccess(UserResponse.EnvUpdateDTO responseDTO) {
         return responseDTO == null || !responseDTO.success();
+    }
+
+    private Long findMonitoringSshId(Long userId) {
+        return userRepository.findMonitoringSshId(userId)
+                .orElseThrow(() -> new CustomException(ExceptionCode.USER_NOT_FOUND));
+    }
+
+    private String findRemoteHost(Long sshInfoId) {
+        return sshInfoRepository.findHostById(sshInfoId)
+                .orElseThrow(() -> new CustomException(ExceptionCode.SSH_NOT_FOUND));
     }
 }
