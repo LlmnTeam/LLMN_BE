@@ -99,7 +99,7 @@ public class UserService {
     private static final String CODE_TYPE_RECOVERY = "recovery";
 
     @Transactional
-    public Map<String, String> login(UserRequest.@Valid LoginDTO requestDTO, HttpServletRequest request) {
+    public Map<String, String> login(UserRequest.LoginDTO requestDTO, HttpServletRequest request) {
         User user = userRepository.findByEmail(requestDTO.email()).orElseThrow(
                 () -> new CustomException(ExceptionCode.USER_ACCOUNT_WRONG)
         );
@@ -114,24 +114,7 @@ public class UserService {
 
     @Transactional
     public void join(UserRequest.JoinDTO requestDTO){
-        if (!requestDTO.password().equals(requestDTO.passwordConfirm()))
-            throw new CustomException(ExceptionCode.USER_PASSWORD_WRONG);
-
-        // 이미 가입된 계정인지 체크
-        checkAlreadyJoin(requestDTO.email());
-
-        // 중복된 닉네임 다시 체크 (프론트에서 체크하고 이중 체크)
-        checkDuplicateNickname(requestDTO.nickName());
-
-        // SshInfo가 비어 있음
-        if(requestDTO.sshInfos().isEmpty()){
-            throw new CustomException(ExceptionCode.SSH_INFO_EMPTY);
-        }
-
-        // Ssh Host가 중복된 게 있는지 체크
-        if(hasDuplicateRemoteHost(requestDTO.sshInfos())){
-            throw new CustomException(ExceptionCode.DUPLICATE_SSH_HOST);
-        }
+        validateJoinRequest(requestDTO);
 
         // 유저 엔티티 저장
         User user = saveUser(requestDTO);
@@ -174,7 +157,7 @@ public class UserService {
         if(!redisService.validateData(REDIS_KEY_EMAIL_CODE + codeType, requestDTO.email(), requestDTO.code()))
             return new UserResponse.VerifyEmailCodeDTO(false);
 
-        if(codeType.equals(CODE_TYPE_RECOVERY))
+        if(CODE_TYPE_RECOVERY.equals(codeType))
             redisService.storeValue(CODE_TO_EMAIL_KEY_PREFIX, requestDTO.code(), requestDTO.email(), 5 * 60 * 1000L);
 
         return new UserResponse.VerifyEmailCodeDTO(true);
@@ -514,6 +497,24 @@ public class UserService {
             mailSender.send(message);
         } catch (MessagingException e){
             log.info(toEmail + "로의 메일 전송에 실패했습니다");
+        }
+    }
+
+    private void validateJoinRequest(UserRequest.JoinDTO requestDTO) {
+        if (!requestDTO.password().equals(requestDTO.passwordConfirm()))
+            throw new CustomException(ExceptionCode.USER_PASSWORD_WRONG);
+
+        checkAlreadyJoin(requestDTO.email());
+        checkDuplicateNickname(requestDTO.nickName());
+
+        // SshInfo가 비어 있음
+        if(requestDTO.sshInfos().isEmpty()){
+            throw new CustomException(ExceptionCode.SSH_INFO_EMPTY);
+        }
+
+        // Ssh Host가 중복된 게 있는지 체크
+        if(hasDuplicateRemoteHost(requestDTO.sshInfos())){
+            throw new CustomException(ExceptionCode.DUPLICATE_SSH_HOST);
         }
     }
 
