@@ -143,7 +143,7 @@ public class SSHService {
     }
 
     private SshInfoDTO getSshInfo(Long sshInfoId) {
-        String sshInfoStr = redisService.getDataInStr(REDIS_SSH_KEY, sshInfoId.toString());
+        String sshInfoStr = redisService.getValueInString(REDIS_SSH_KEY, sshInfoId.toString());
 
         // 1st 레디스에 값이 있으면 파싱하여 바로 반환
         if (sshInfoStr != null) {

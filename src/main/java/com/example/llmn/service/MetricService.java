@@ -214,8 +214,8 @@ public class MetricService {
 
     private Map<String, Double> calculateNetworkDifferences(Map<String, Double> currentNetworkMetrics) {
         // 레디스에서 이전 네트워크 사용량 조회 (없으면 0.0 반환)
-        Double previousReceived = redisService.getDataInDouble(REDIS_KEY_NETWORK_REC);
-        Double previousTransmitted = redisService.getDataInDouble(REDIS_KEY_NETWORK_TRANS);
+        Double previousReceived = redisService.getValueInDouble(REDIS_KEY_NETWORK_REC);
+        Double previousTransmitted = redisService.getValueInDouble(REDIS_KEY_NETWORK_TRANS);
 
         Double receivedDiff = currentNetworkMetrics.getOrDefault(METRIC_MAP_NETWORK_REC, DEFAULT_METRIC_VALUE) - previousReceived;
         Double transmittedDiff = currentNetworkMetrics.getOrDefault(METRIC_MAP_NETWORK_SENT, DEFAULT_METRIC_VALUE) - previousTransmitted;
@@ -245,7 +245,7 @@ public class MetricService {
 
     // 레디스에서 Metric을 가져오는 메서드
     private MetricResponse.FindCurrentMetricDTO getCachedMetric(Long sshInfoId) {
-        String cachedValue = redisService.getDataInStr(METRIC_KEY, sshInfoId.toString());
+        String cachedValue = redisService.getValueInString(METRIC_KEY, sshInfoId.toString());
 
         // 캐시된 값이 없으면 null 반환
         if (cachedValue == null) {

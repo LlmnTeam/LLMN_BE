@@ -135,7 +135,7 @@ public class UserService {
     @Async
     public void sendCodeWithValidation(String email, String codeType, boolean isValid) {
         // TTL 체크
-        if(redisService.isDateExist(REDIS_KEY_EMAIL_CODE + codeType, email)){
+        if(redisService.isValueExist(REDIS_KEY_EMAIL_CODE + codeType, email)){
             throw new CustomException(ExceptionCode.ALREADY_SEND_EMAIL);
         }
 
@@ -185,14 +185,13 @@ public class UserService {
     @Transactional
     public void resetPassword(UserRequest.ResetPasswordDTO requestDTO){
         // 전송한 코드로 세션에서 해당 이메일을 꺼내옴 (비밀번호 재설정 시 코드 전송을 거침)
-        String email = redisService.getDataInStr(CODE_TO_EMAIL_KEY_PREFIX, requestDTO.code());
-
+        String email = redisService.getValueInString(CODE_TO_EMAIL_KEY_PREFIX, requestDTO.code());
         if(email == null){
             throw new CustomException(ExceptionCode.BAD_APPROACH);
         }
 
         // CODE_TO_EMAIL 키 삭제
-        redisService.removeData(CODE_TO_EMAIL_KEY_PREFIX, requestDTO.code());
+        redisService.removeValue(CODE_TO_EMAIL_KEY_PREFIX, requestDTO.code());
 
         updatePassword(email, requestDTO.newPassword());
     }
@@ -415,8 +414,8 @@ public class UserService {
         sshInfoRepository.deleteByUserId(userId);
 
         // 세션에 저장된 토큰 삭제
-        redisService.removeData(REDIS_KEY_ACCESS_TOKEN, userId.toString());
-        redisService.removeData(REDIS_KEY_REFRESH_TOKEN, userId.toString());
+        redisService.removeValue(REDIS_KEY_ACCESS_TOKEN, userId.toString());
+        redisService.removeValue(REDIS_KEY_REFRESH_TOKEN, userId.toString());
 
         userRepository.delete(user);
     }

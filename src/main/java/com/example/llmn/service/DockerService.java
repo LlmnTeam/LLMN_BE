@@ -5,7 +5,6 @@ import com.example.llmn.core.errors.ExceptionCode;
 import com.example.llmn.domain.Project;
 import com.example.llmn.domain.SshInfo;
 import com.example.llmn.repository.ProjectRepository;
-import com.example.llmn.repository.SshInfoRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -13,10 +12,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -118,7 +114,7 @@ public class DockerService {
     }
 
     private Map<String, Map<String, String>> getCachedResourceUsage(Long userId) {
-        String cachedValue = redisService.getDataInStr(RESOURCE_KEY, userId.toString());
+        String cachedValue = redisService.getValueInString(RESOURCE_KEY, userId.toString());
 
         // 캐시된 값이 없으면 null 반환
         if (cachedValue == null) {

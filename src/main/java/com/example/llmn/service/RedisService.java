@@ -18,10 +18,6 @@ public class RedisService {
         redisTemplate.opsForValue().set(buildKey(type, id), value, expirationTime, TimeUnit.MILLISECONDS);
     }
 
-    public void storeValue(String type, String value, Long expirationTime) {
-        redisTemplate.opsForValue().set(type, value, expirationTime, TimeUnit.MILLISECONDS);
-    }
-
     // 유효 기간 X
     public void storeValue(String key, String value) {
         redisTemplate.opsForValue().set(key, value);
@@ -32,16 +28,14 @@ public class RedisService {
         setOps.add(key, String.valueOf(value));
     }
 
-
-    public void setExpireDate(String type, String id, Long expirationTime){
+    public void setExpireValue(String type, String id, Long expirationTime){
         redisTemplate.expire(buildKey(type, id), expirationTime, TimeUnit.MILLISECONDS);
     }
 
     // 데이터 존재 여부
-    public boolean isDateExist(String type, String id) {
+    public boolean isValueExist(String type, String id) {
         return Boolean.TRUE.equals(redisTemplate.hasKey(buildKey(type, id)));
     }
-
 
     public boolean isValidValue(String type, String id, String value) {
         String storedValue = redisTemplate.opsForValue().get(buildKey(type, id));
@@ -53,23 +47,15 @@ public class RedisService {
         return (storedValue == null) || !storedValue.equals(value);
     }
 
-    // 데이터 삭제
-    public void removeData(String type, String id) { redisTemplate.delete(buildKey(type, id)); }
+    public void removeValue(String type, String id) { redisTemplate.delete(buildKey(type, id)); }
 
-    // String 반환
-    public String getDataInStr(String type, String id){ return redisTemplate.opsForValue().get(buildKey(type, id)); }
+    public String getValueInString(String type, String id){
+        return redisTemplate.opsForValue().get(buildKey(type, id));
+    }
 
-
-    // Double 반환
-    public Double getDataInDouble(String key){
+    public Double getValueInDouble(String key){
         String value = redisTemplate.opsForValue().get(key);
-
-        // 값이 없으면 0.0 반환
-        if(value == null){
-            return 0.0;
-        }
-
-        return Double.valueOf(value);
+        return value != null ? Double.parseDouble(value) : 0.0;
     }
 
     public Long getTTL(String type, String id) {
