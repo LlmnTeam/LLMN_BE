@@ -2,6 +2,8 @@ package com.example.llmn.service;
 
 import com.example.llmn.controller.DTO.AlarmRequest;
 import com.example.llmn.controller.DTO.AlarmResponse;
+import com.example.llmn.core.errors.CustomException;
+import com.example.llmn.core.errors.ExceptionCode;
 import com.example.llmn.domain.Alarm;
 import com.example.llmn.domain.AlarmType;
 import com.example.llmn.domain.User;
@@ -25,10 +27,11 @@ public class AlarmService {
 
     @Transactional
     public void generateAlarm(Long receiverId, String content, AlarmType alarmType){
-        User receiver = userRepository.getReferenceById(receiverId);
+        User receiver = userRepository.findById(receiverId).orElseThrow(
+                () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
+        );
 
-        // 알람을 수신하지 않는다면 리턴
-        if(!receiver.isReceivingAlarm()){
+        if(receiver.doesNotReceivingAlarm()){
             return;
         }
 
@@ -37,14 +40,12 @@ public class AlarmService {
                 .content(content)
                 .alarmType(alarmType)
                 .build();
-
         alarmRepository.save(alarm);
     }
 
     @Transactional(readOnly = true)
     public AlarmResponse.FindAlarmListDTO findAlarmList(Long userId){
         List<Alarm> alarms = alarmRepository.findByReceiverId(userId);
-
         List<AlarmResponse.AlarmDTO> alarmDTOS = alarms.stream()
                 .map(alarm -> new AlarmResponse.AlarmDTO(
                         alarm.getId(),

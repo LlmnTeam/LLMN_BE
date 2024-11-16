@@ -54,4 +54,8 @@ public class User extends TimeStamp {
         this.receivingAlarm = receivingAlarm;
         this.monitoringSshId = monitoringSshId;
     }
+
+    public boolean doesNotReceivingAlarm(){
+        return !receivingAlarm;
+    }
 }
