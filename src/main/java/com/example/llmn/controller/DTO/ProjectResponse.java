@@ -1,10 +1,7 @@
 package com.example.llmn.controller.DTO;
 
 import com.example.llmn.domain.ContainerStatus;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
 public class ProjectResponse {
@@ -15,7 +12,7 @@ public class ProjectResponse {
             String projectName,
             String usingContainerName,
             String description,
-            List<ContainerDTO> containers){}
+            List<ContainerDTO> selectableContainers){}
 
     public record FindProjectListDTO(List<ProjectDTO> projects){}
 

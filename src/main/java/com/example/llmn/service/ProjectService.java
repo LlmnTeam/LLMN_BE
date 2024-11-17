@@ -83,27 +83,19 @@ public class ProjectService {
     // 수정 시 사용할 API
     @Transactional(readOnly = true)
     public ProjectResponse.FindProjectInfoByIdDTO findProjectInfoById(Long projectId, Long userId){
-        // 존재하지 않으면 에러
         Project project = projectRepository.findById(projectId).orElseThrow(
                 () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
         );
 
         // 수정 시 선택할 수 있는 컨테이너들
-        List<ProjectResponse.ContainerDTO> containerDTOS = new ArrayList<>();
         List<SshInfo> sshInfos = sshInfoRepository.findByUserId(userId);
-        for(SshInfo sshInfo : sshInfos){
-            List<String> runningContainers = dockerService.findRunningContainerList(sshInfo.getId());
-            containerDTOS.addAll(runningContainers.stream()
-                    .map(ProjectResponse.ContainerDTO::new)
-                    .toList()
-            );
-        }
+        List<ProjectResponse.ContainerDTO> selectableContainers = createContainerDTOS(sshInfos);
 
         return new ProjectResponse.FindProjectInfoByIdDTO(
                 project.getProjectName(),
                 project.getContainerName(),
                 project.getDescription(),
-                containerDTOS);
+                selectableContainers);
     }
 
     @Transactional
@@ -383,5 +375,12 @@ public class ProjectService {
                 .toList();
 
         return new ProjectResponse.CloudInstanceDTO(cloudName, sshInfo.getId(), containerDTOS);
+    }
+
+    private List<ProjectResponse.ContainerDTO> createContainerDTOS(List<SshInfo> sshInfos){
+        return sshInfos.stream()
+                .flatMap(sshInfo -> dockerService.findRunningContainerList(sshInfo.getId()).stream())
+                .map(ProjectResponse.ContainerDTO::new)
+                .toList();
     }
 }
