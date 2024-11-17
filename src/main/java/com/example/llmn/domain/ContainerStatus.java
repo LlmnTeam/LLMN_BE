@@ -12,4 +12,9 @@ public enum ContainerStatus {
     NOT_WORKING("종료됨");
 
     private String value;
+
+    public boolean isProjectUrgent() {
+        // NOT_CONNECTED면 긴급으로 표시
+        return this == NOT_CONNECTED;
+    }
 }

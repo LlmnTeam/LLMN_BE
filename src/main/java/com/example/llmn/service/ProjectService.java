@@ -50,16 +50,11 @@ public class ProjectService {
 
     @Transactional
     public ProjectResponse.CreateProjectDTO createProject(ProjectRequest.CreateProjectDTO requestDTO, Long userId){
-        // 컨테이너 이름이 들어오지 않으면 NOT_CONNECTED로 처리
-        ContainerStatus containerStatus = requestDTO.containerName() != null
-                ? ContainerStatus.NOT_WORKING
-                : ContainerStatus.NOT_CONNECTED;
+        ContainerStatus containerStatus = determineContainerStatus(requestDTO);
+        boolean isUrgent = containerStatus.isProjectUrgent();;
 
-        // NOT_CONNECTED면 긴급으로 표시
-        boolean isUrgent = (containerStatus == ContainerStatus.NOT_CONNECTED);
-
-        User user = entityManager.getReference(User.class, userId);
-        SshInfo sshInfo = entityManager.getReference(SshInfo.class, requestDTO.sshInfoId());
+        User user = getUserReference(userId);
+        SshInfo sshInfo = getSshInfoReference(requestDTO.sshInfoId());
         Project project = Project.builder()
                 .user(user)
                 .sshInfo(sshInfo)
@@ -375,5 +370,18 @@ public class ProjectService {
         return Optional.ofNullable(containersResourceMap.get(project.getContainerName()))
                 .map(resourceMap -> resourceMap.get(resourceKey))
                 .orElse(NOT_ACCESSIBLE_VALUE); // CPU 및 메모리 사용량 값이 없을 경우 "N/A"로 처리
+    }
+
+    private ContainerStatus determineContainerStatus(ProjectRequest.CreateProjectDTO requestDTO) {
+        // 요청에 컨테이너 이름이 들어오지 않으면 NOT_CONNECTED로 처리
+        return requestDTO.containerName() != null ? ContainerStatus.NOT_WORKING : ContainerStatus.NOT_CONNECTED;
+    }
+
+    private User getUserReference(Long userId) {
+        return entityManager.getReference(User.class, userId);
+    }
+
+    private SshInfo getSshInfoReference(Long sshInfoId) {
+        return entityManager.getReference(SshInfo.class, sshInfoId);
     }
 }
