@@ -72,22 +72,10 @@ public class ProjectService {
 
     @Transactional
     public ProjectResponse.FindCloudAndContainerInfoDTO findCloudAndContainerInfo(Long userId) {
-        List<ProjectResponse.CloudInstanceDTO> cloudInstanceDTOS = new ArrayList<>();
-
         List<SshInfo> sshInfos = sshInfoRepository.findByUserId(userId);
-        for(SshInfo sshInfo : sshInfos){
-            // 해당 클라우드 인스턴스에 실행중인 컨테이너
-            List<String> runningContainers = dockerService.findRunningContainerList(sshInfo.getId());
-            List<ProjectResponse.ContainerDTO> containerDTOS = runningContainers.stream()
-                    .map(ProjectResponse.ContainerDTO::new)
-                    .toList();
-
-            // 클라우드 이름
-            String cloudName = getSshInfoName(sshInfo);
-
-            ProjectResponse.CloudInstanceDTO cloudInstanceDTO = new ProjectResponse.CloudInstanceDTO(cloudName, sshInfo.getId(), containerDTOS);
-            cloudInstanceDTOS.add(cloudInstanceDTO);
-        }
+        List<ProjectResponse.CloudInstanceDTO> cloudInstanceDTOS = sshInfos.stream()
+                .map(this::createCloudInstanceDTO)
+                .toList();
 
         return new ProjectResponse.FindCloudAndContainerInfoDTO(cloudInstanceDTOS);
     }
@@ -298,7 +286,7 @@ public class ProjectService {
         projects.forEach(project -> project.updateIsUrgent(false));
     }
 
-    private String getSshInfoName(SshInfo sshInfo) {
+    private String getCloudName(SshInfo sshInfo) {
         String remoteName = sshInfo.getRemoteName() != null ? sshInfo.getRemoteName() : "Unknown Name";
         String remoteHost = sshInfo.getRemoteHost() != null ? sshInfo.getRemoteHost() : "Unknown Host";
 
@@ -383,5 +371,17 @@ public class ProjectService {
 
     private SshInfo getSshInfoReference(Long sshInfoId) {
         return entityManager.getReference(SshInfo.class, sshInfoId);
+    }
+
+    private ProjectResponse.CloudInstanceDTO createCloudInstanceDTO(SshInfo sshInfo) {
+        // 클라우드 이름
+        String cloudName = getCloudName(sshInfo);
+
+        // 실행 중인 컨테이너 정보
+        List<ProjectResponse.ContainerDTO> containerDTOS = dockerService.findRunningContainerList(sshInfo.getId()).stream()
+                .map(ProjectResponse.ContainerDTO::new)
+                .toList();
+
+        return new ProjectResponse.CloudInstanceDTO(cloudName, sshInfo.getId(), containerDTOS);
     }
 }
