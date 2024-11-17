@@ -67,18 +67,16 @@ public class DockerService {
     }
 
     // 실행중인 도커 컨테이너 목록 조회
-    public List<String> findRunningContainerList(Long sshId) {
-        return Arrays.stream(sshService.executeCommandOnce(COMMAND_DOCKER_PS, sshId).split("\n"))
+    public List<String> findRunningContainerList(Long sshInfoId) {
+        return Arrays.stream(sshService.executeCommandOnce(COMMAND_DOCKER_PS, sshInfoId).split("\n"))
                 .map(String::trim)
                 .filter(name -> !name.isEmpty())
                 .toList();
     }
 
     // 특정 컨테이너의 실행 여부 확인
-    public boolean isContainerRunning(String containerName, Long sshId) {
-        List<String> containerList = findRunningContainerList(sshId);
-
-        return containerList.stream()
+    public boolean isContainerRunning(String containerName, Long sshInfoId) {
+        return findRunningContainerList(sshInfoId).stream()
                 .anyMatch(name -> name.equals(containerName));
     }
 

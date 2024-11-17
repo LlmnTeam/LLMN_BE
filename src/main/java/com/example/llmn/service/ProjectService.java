@@ -100,20 +100,16 @@ public class ProjectService {
 
     @Transactional
     public void updateProject(ProjectRequest.UpdateProjectDTO requestDTO, Long projectId, Long userId){
-        // 존재하지 않으면 에러
-        Project project = projectRepository.findById(projectId).orElseThrow(
+        Project project = projectRepository.findByIdWithUserAndSshInfo(projectId).orElseThrow(
                 () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
         );
 
         // 권한 체크
-        if(project.getUser().getId().equals(userId)){
+        if(project.isNotOwnedBy(userId)){
             throw new CustomException(ExceptionCode.USER_FORBIDDEN);
         }
 
-        ContainerStatus containerStatus = requestDTO.containerName() != null
-                ? ContainerStatus.NOT_WORKING
-                : project.getContainerStatus();
-
+        ContainerStatus containerStatus = determineContainerStatus(requestDTO, project.getSshInfo().getId());
         project.updateProject(requestDTO.projectName(), requestDTO.containerName(), requestDTO.description(), containerStatus);
     }
 
@@ -382,5 +378,13 @@ public class ProjectService {
                 .flatMap(sshInfo -> dockerService.findRunningContainerList(sshInfo.getId()).stream())
                 .map(ProjectResponse.ContainerDTO::new)
                 .toList();
+    }
+
+    private ContainerStatus determineContainerStatus(ProjectRequest.UpdateProjectDTO requestDTO, Long sshInfoId) {
+        if(requestDTO.containerName() == null){
+            return ContainerStatus.NOT_CONNECTED;
+        }
+
+        return dockerService.isContainerRunning(requestDTO.containerName(), sshInfoId) ? ContainerStatus.WORKING : ContainerStatus.NOT_WORKING;
     }
 }

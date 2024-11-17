@@ -18,6 +18,10 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
     @Query("SELECT p FROM Project p")
     List<Project> findAllWithUser();
 
+    @EntityGraph(attributePaths = {"user", "sshInfo"})
+    @Query("SELECT p FROM Project p WHERE p.id = :projectId")
+    Optional<Project> findByIdWithUserAndSshInfo(@Param("projectId") Long projectId);
+
     @Query("SELECT p FROM Project p WHERE p.user.id = :userId")
     List<Project> findByUserId(@Param("userId") Long userId);
 

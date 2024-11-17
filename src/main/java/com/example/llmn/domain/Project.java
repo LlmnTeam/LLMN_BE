@@ -65,4 +65,8 @@ public class Project extends TimeStamp{
     public boolean isConnected(){
         return containerStatus.equals(ContainerStatus.NOT_CONNECTED);
     }
+    
+    public boolean isNotOwnedBy(Long userId){
+        return !user.getId().equals(userId);
+    }
 }
