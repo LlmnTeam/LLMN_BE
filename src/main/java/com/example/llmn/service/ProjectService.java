@@ -36,9 +36,7 @@ public class ProjectService {
     private final ProjectRepository projectRepository;
     private final SummaryRepository summaryRepository;
     private final SshInfoRepository sshInfoRepository;
-    private final UserRepository userRepository;
     private final EntityManager entityManager;
-    private final SSHService sshService;
 
     private static final String DOCKER_RESOURCE_KEY_CPU = "CPU";
     private static final String DOCKER_RESOURCE_KEY_MEMORY = "Memory";
@@ -46,6 +44,7 @@ public class ProjectService {
     private static final String NOT_EXIST_SUMMARY = "";
     private static final String NOT_EXIST_LOG = "";
     private static final String SORT_BY_DATE = "createdDate";
+    private static final String LOG_FILE_SUFFIX = "-log";
     private static final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH");
 
     @Transactional
@@ -166,20 +165,14 @@ public class ProjectService {
 
     @Transactional(readOnly = true)
     public ProjectResponse.FindProjectLogListDTO findProjectLogList(Long projectId){
-        // projectId를 사용하여 containerName을 가져옴
         String containerName = projectRepository.findContainerNameById(projectId).orElseThrow(
                 () -> new CustomException(ExceptionCode.PROJECT_NOT_FOUND)
         );
 
-        // 로그 파일 목록을 가져옴
-        List<String> logFiles = getFileList(LOGS_DIRECTORY);
+        // 컨테이너 이름과 일치하는 로그 파일 가져오기
+        List<String> matchingLogFiles = findLogFilesForContainer(containerName);
 
-        // containerName과 일치하는 파일만 필터링
-        List<String> filteredLogFiles = logFiles.stream()
-                .filter(logFile -> logFile.startsWith(containerName + "-log"))
-                .toList();
-
-        return new ProjectResponse.FindProjectLogListDTO(filteredLogFiles);
+        return new ProjectResponse.FindProjectLogListDTO(matchingLogFiles);
     }
 
     @Transactional(readOnly = true)
@@ -235,16 +228,6 @@ public class ProjectService {
         String remoteHost = sshInfo.getRemoteHost() != null ? sshInfo.getRemoteHost() : "Unknown Host";
 
         return String.format("%s (%s)", remoteName, remoteHost);
-    }
-
-    public String getLatestLogFile(List<String> files) {
-        return files.stream()
-                .max((file1, file2) -> {
-                    LocalDateTime dateTime1 = parseDateTimeFromFileName(file1);
-                    LocalDateTime dateTime2 = parseDateTimeFromFileName(file2);
-                    return dateTime1.compareTo(dateTime2);  // 최신 파일을 찾기 위해 비교
-                })
-                .orElse(null);
     }
 
     private LocalDateTime parseDateTimeFromFileName(String file) {
@@ -379,6 +362,12 @@ public class ProjectService {
                         formatLocalDateTime(summary.getCreatedDate()),
                         summary.getContent(),
                         summary.isChecked()))
+                .toList();
+    }
+
+    private List<String> findLogFilesForContainer(String containerName) {
+        return getFileList(LOGS_DIRECTORY).stream()
+                .filter(logFile -> logFile.startsWith(containerName + LOG_FILE_SUFFIX))
                 .toList();
     }
 }
