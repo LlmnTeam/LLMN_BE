@@ -128,29 +128,24 @@ public class ProjectService {
 
     @Transactional(readOnly = true)
     public ProjectResponse.FindProjectByIdDTO findProjectById(Long projectId) {
-        // 존재하지 않으면 에러
         Project project = projectRepository.findById(projectId).orElseThrow(
                 () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
         );
 
-        // 최신 요약본 가져오기
-        Pageable pageable = PageRequest.of(0, 1, Sort.by(Sort.Direction.DESC, SORT_BY_DATE));
-        Optional<Summary> latestSummary = summaryRepository.findLatestSummaryByProject(project, pageable)
-                .getContent()
-                .stream()
-                .findFirst();
+        // 1. 최신 로그
+        String recentLog = getRecentLog(project);
 
-        String summaryContent = latestSummary.map(Summary::getContent)
-                .orElse(NOT_EXIST_SUMMARY);
-        LocalDateTime updateTime = latestSummary.map(Summary::getCreatedDate)
-                .orElse(null);
+        // 2. 최신 요약
+        Optional<Summary> latestSummaryOP = findLatestSummary(project);
+        String summaryContent = latestSummaryOP.map(Summary::getContent).orElse(NOT_EXIST_SUMMARY);
+        LocalDateTime summaryUpdateTime = latestSummaryOP.map(Summary::getCreatedDate).orElse(null);
 
         return new ProjectResponse.FindProjectByIdDTO(
                 project.getProjectName(),
                 project.getDescription(),
                 summaryContent,
-                formatLocalDateTime(updateTime),
-                getRecentLog(project)); // 최신 로그
+                formatLocalDateTime(summaryUpdateTime),
+                recentLog);
     }
 
     @Transactional(readOnly = true)
@@ -371,5 +366,13 @@ public class ProjectService {
                 containerStatus,
                 cpuUsage,
                 memoryUsage);
+    }
+
+    private Optional<Summary> findLatestSummary(Project project) {
+        Pageable pageable = PageRequest.of(0, 1, Sort.by(Sort.Direction.DESC, SORT_BY_DATE));
+        return summaryRepository.findByProject(project, pageable)
+                .getContent()
+                .stream()
+                .findFirst();
     }
 }

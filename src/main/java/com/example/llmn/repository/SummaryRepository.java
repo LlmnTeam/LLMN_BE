@@ -19,7 +19,7 @@ public interface SummaryRepository extends JpaRepository<Summary, Long> {
     @Query("SELECT s FROM Summary s " +
             "JOIN s.project p " +
             "WHERE p = :project")
-    Page<Summary> findLatestSummaryByProject(@Param("project") Project project, Pageable pageable);
+    Page<Summary> findByProject(@Param("project") Project project, Pageable pageable);
 
     @Query("SELECT s FROM Summary s " +
             "JOIN s.project p " +
