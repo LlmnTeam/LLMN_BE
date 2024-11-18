@@ -8,7 +8,6 @@ import com.example.llmn.domain.*;
 import com.example.llmn.repository.ProjectRepository;
 import com.example.llmn.repository.SshInfoRepository;
 import com.example.llmn.repository.SummaryRepository;
-import com.example.llmn.repository.UserRepository;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,6 +24,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 import static com.example.llmn.core.utils.DateTimeUtils.formatLocalDateTime;
+import static com.example.llmn.core.utils.DateTimeUtils.parseDateTimeFromFile;
 import static com.example.llmn.core.utils.FileUtils.*;
 
 @Service
@@ -130,7 +130,7 @@ public class ProjectService {
         );
 
         // 1. 최신 로그
-        String recentLog = getRecentLog(project);
+        String recentLog = findRecentLog(project);
 
         // 2. 최신 요약
         Optional<Summary> latestSummaryOP = findLatestSummary(project);
@@ -198,8 +198,7 @@ public class ProjectService {
                 () -> new CustomException(ExceptionCode.PROJECT_NOT_FOUND)
         );
 
-        // 권한 체크
-        if(!project.getUser().getId().equals(userId)){
+        if(project.isNotOwnedBy(userId)){
             throw new CustomException(ExceptionCode.USER_FORBIDDEN);
         }
         
@@ -212,8 +211,7 @@ public class ProjectService {
         Summary summary = summaryRepository.findById(summaryId).orElseThrow(
                 () -> new CustomException(ExceptionCode.SUMMARY_NOT_FOUND)
         );
-
-        summary.updateIsChecked(!summary.isChecked());
+        summary.reverseIsChecked();
     }
 
     @Transactional
@@ -226,20 +224,11 @@ public class ProjectService {
     private String getCloudName(SshInfo sshInfo) {
         String remoteName = sshInfo.getRemoteName() != null ? sshInfo.getRemoteName() : "Unknown Name";
         String remoteHost = sshInfo.getRemoteHost() != null ? sshInfo.getRemoteHost() : "Unknown Host";
-
         return String.format("%s (%s)", remoteName, remoteHost);
     }
 
-    private LocalDateTime parseDateTimeFromFileName(String file) {
-        // 파일 이름에서 "log-" 뒤부터 ".txt" 앞까지의 부분 추출
-        String dateTimePart = file.substring(file.indexOf("log-") + 4, file.lastIndexOf("-"));
-        return LocalDateTime.parse(dateTimePart, formatter);
-    }
-
-    private String getRecentLog(Project project){
-        List<String> logFiles = getFileList(LOGS_DIRECTORY);
-
-        String latestLogFile = logFiles.stream()
+    private String findRecentLog(Project project){
+        String latestLogFile = getFileList(LOGS_DIRECTORY).stream()
                 .filter(logFile -> logFile.startsWith(project.getContainerName() + "-log"))
                 .max(this::compareLogFileDates) // 최신 파일 찾기
                 .orElse(null);
@@ -252,8 +241,8 @@ public class ProjectService {
     }
 
     private int compareLogFileDates(String file1, String file2) {
-        LocalDateTime fileDateTime1 = parseDateTimeFromFileName(file1);
-        LocalDateTime fileDateTime2 = parseDateTimeFromFileName(file2);
+        LocalDateTime fileDateTime1 = parseDateTimeFromFile(file1);
+        LocalDateTime fileDateTime2 = parseDateTimeFromFile(file2);
         return fileDateTime1.compareTo(fileDateTime2);
     }
 
@@ -266,8 +255,7 @@ public class ProjectService {
             return logContent.trim();
         }
 
-        // 마지막 두 개의 로그를 추출하여 반환
-        return logs[logs.length - 2].trim() + "\n\n" + logs[logs.length - 1].trim();
+        return logs[logs.length - 2].trim() + "\n\n" + logs[logs.length - 1].trim(); // 마지막 두 개의 로그를 추출하여 반환
     }
 
     private ContainerStatus determineContainerStatus( List<String> runningContainerNames, Project project) {
@@ -277,6 +265,7 @@ public class ProjectService {
                     ? ContainerStatus.WORKING
                     : ContainerStatus.NOT_WORKING;
         }
+
         return ContainerStatus.NOT_CONNECTED;
     }
 
@@ -300,15 +289,12 @@ public class ProjectService {
     }
 
     private ProjectResponse.CloudInstanceDTO createCloudInstanceDTO(SshInfo sshInfo) {
-        // 클라우드 이름
         String cloudName = getCloudName(sshInfo);
-
-        // 실행 중인 컨테이너 정보
-        List<ProjectResponse.ContainerDTO> containerDTOS = dockerService.findRunningContainerList(sshInfo.getId()).stream()
+        List<ProjectResponse.ContainerDTO> runningContainerDTOS = dockerService.findRunningContainerList(sshInfo.getId()).stream()
                 .map(ProjectResponse.ContainerDTO::new)
                 .toList();
 
-        return new ProjectResponse.CloudInstanceDTO(cloudName, sshInfo.getId(), containerDTOS);
+        return new ProjectResponse.CloudInstanceDTO(cloudName, sshInfo.getId(), runningContainerDTOS);
     }
 
     private List<ProjectResponse.ProjectDTO> mapProjectsToDTOs(List<Project> projects, Map<String, Map<String, String>> containersResourceMap, List<String> runningContainers) {

@@ -264,7 +264,7 @@ public class LogService {
     }
 
     private String extractRecentLogFromContent(String fileContent) {
-        LocalDateTime cutoffTime = getThirtyMinutesAgo();
+        LocalDateTime cutoffTime = getThirtyMinutesAgoTime();
 
         String[] logs = fileContent.split("(?=\\[\\d{4}-\\d{2}-\\d{2}_\\d{2}:\\d{2}\\])");
 
@@ -301,7 +301,7 @@ public class LogService {
 
     private String getLogIndex() {
         // 오늘 날짜를 기반으로 인덱스 이름 생성
-        return "docker-logs-" + getTodayDateTimeInStr();
+        return "docker-logs-" + getTodayDateInString();
     }
 
     private void saveLogMapsToFile(List<Map<String, Object>> logMaps, Long sshId) {

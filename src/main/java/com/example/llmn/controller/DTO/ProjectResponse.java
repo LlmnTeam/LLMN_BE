@@ -12,7 +12,7 @@ public class ProjectResponse {
             String projectName,
             String usingContainerName,
             String description,
-            List<ContainerDTO> selectableContainers){}
+            List<ContainerDTO> containers){}
 
     public record FindProjectListDTO(List<ProjectDTO> projects){}
 
