@@ -119,9 +119,7 @@ public class ProjectService {
 
         Map<String, Map<String, String>> containersResourceMap = dockerService.findContainersResourceUsage(projects, userId, isUsingCache);
         List<String> runningContainers = new ArrayList<>(containersResourceMap.keySet());
-        List<ProjectResponse.ProjectDTO> projectDTOS = projects.stream()
-                .map(project -> createProjectDTO(containersResourceMap, runningContainers, project))
-                .toList();
+        List<ProjectResponse.ProjectDTO> projectDTOS = mapProjectsToDTOs(projects, containersResourceMap, runningContainers);
 
         return new ProjectResponse.FindProjectListDTO(projectDTOS);
     }
@@ -150,20 +148,12 @@ public class ProjectService {
 
     @Transactional(readOnly = true)
     public ProjectResponse.FindProjectSummaryDTO findProjectSummary(Long projectId, Pageable pageable) {
-        // 프로젝트가 존재하지 않으면 에러 발생
         Project project = projectRepository.findById(projectId).orElseThrow(
                 () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
         );
-
-        // 최신순으로 페이지네이션
+        
         Page<Summary> summaryPage = summaryRepository.findByProjectId(projectId, pageable);
-        List<ProjectResponse.SummaryDTO> summaryDTOS = summaryPage.getContent().stream()
-                .map(summary -> new ProjectResponse.SummaryDTO(
-                        summary.getId(),
-                        formatLocalDateTime(summary.getCreatedDate()),
-                        summary.getContent(),
-                        summary.isChecked()))
-                .toList();
+        List<ProjectResponse.SummaryDTO> summaryDTOS = mapSummariesToDTOs(summaryPage.getContent());
 
         return new ProjectResponse.FindProjectSummaryDTO(
                 project.getProjectName(),
@@ -338,6 +328,12 @@ public class ProjectService {
         return new ProjectResponse.CloudInstanceDTO(cloudName, sshInfo.getId(), containerDTOS);
     }
 
+    private List<ProjectResponse.ProjectDTO> mapProjectsToDTOs(List<Project> projects, Map<String, Map<String, String>> containersResourceMap, List<String> runningContainers) {
+        return projects.stream()
+                .map(project -> createProjectDTO(containersResourceMap, runningContainers, project))
+                .toList();
+    }
+
     private List<ProjectResponse.ContainerDTO> createContainerDTOS(List<SshInfo> sshInfos){
         return sshInfos.stream()
                 .flatMap(sshInfo -> dockerService.findRunningContainerList(sshInfo.getId()).stream())
@@ -374,5 +370,15 @@ public class ProjectService {
                 .getContent()
                 .stream()
                 .findFirst();
+    }
+
+    private List<ProjectResponse.SummaryDTO> mapSummariesToDTOs(List<Summary> summaries) {
+        return summaries.stream()
+                .map(summary -> new ProjectResponse.SummaryDTO(
+                        summary.getId(),
+                        formatLocalDateTime(summary.getCreatedDate()),
+                        summary.getContent(),
+                        summary.isChecked()))
+                .toList();
     }
 }
