@@ -47,8 +47,12 @@ public class SSHService {
     }
 
     @Transactional
-    public String executeCommandInShell(String command, boolean isFirstExecution, Long sshInfoId) {
-        SSHCommandExecutor executor = getSshExecutor(sshInfoId, isFirstExecution);
+    public String executeCommandInShell(String command, boolean isFirstExecution, Long userId){
+        Long monitoringSshId = userRepository.findMonitoringSshId(userId).orElseThrow(
+                () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
+        );
+
+        SSHCommandExecutor executor = getSshExecutor(monitoringSshId, isFirstExecution);
 
         if(executor == null){
             return EXECUTE_FAIL_BY_SESSION;

@@ -27,7 +27,6 @@ import java.util.List;
 public class ProjectController {
 
     private final ProjectService projectService;
-    private final SSHService sshService;
     private final DockerService dockerService;
     private static final String SORT_BY_DATE = "createdDate";
     private static final boolean USING_CACHE = true;
@@ -124,30 +123,6 @@ public class ProjectController {
     @PostMapping("/summaries/{summaryId}/check")
     public ResponseEntity<?> checkSummary(@PathVariable Long summaryId){
         projectService.checkSummary(summaryId);
-        return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, null));
-    }
-
-    @PostMapping("/command/init")
-    public ResponseEntity<?> initCommend(@AuthenticationPrincipal CustomUserDetails userDetails){
-        sshService.initCommend(userDetails.getUser().getId());
-        return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, null));
-    }
-
-    @PostMapping("/command/home")
-    public ResponseEntity<?> executeCommandInHome(@RequestBody ProjectRequest.ExecuteCommandDTO requestDTO, @AuthenticationPrincipal CustomUserDetails userDetails) {
-        String response = projectService.executeCommandInHome(requestDTO.command(), requestDTO.isFirstExecution(), userDetails.getUser().getId());
-        return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, response));
-    }
-
-    @PostMapping("/command/terminate")
-    public ResponseEntity<?> terminateCommand(@AuthenticationPrincipal CustomUserDetails userDetails) {
-        sshService.stopCommend(userDetails.getUser().getId());
-        return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, null));
-    }
-
-    @PostMapping("/command/interrupt")
-    public ResponseEntity<?> interruptCommand(@AuthenticationPrincipal CustomUserDetails userDetails) {
-        sshService.executeSigInt(userDetails.getUser().getId());
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, null));
     }
 }

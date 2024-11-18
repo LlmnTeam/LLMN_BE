@@ -145,15 +145,12 @@ public class ProjectService {
         LocalDateTime updateTime = latestSummary.map(Summary::getCreatedDate)
                 .orElse(null);
 
-        // 최신 로그 가져오기
-        String recentLog = getRecentLog(project);
-
         return new ProjectResponse.FindProjectByIdDTO(
                 project.getProjectName(),
                 project.getDescription(),
                 summaryContent,
                 formatLocalDateTime(updateTime),
-                recentLog);
+                getRecentLog(project)); // 최신 로그
     }
 
     @Transactional(readOnly = true)
@@ -239,15 +236,6 @@ public class ProjectService {
         );
 
         summary.updateIsChecked(!summary.isChecked());
-    }
-
-    @Transactional
-    public String executeCommandInHome(String command, boolean isFirstExecution, Long userId){
-        Long monitoringSshId = userRepository.findMonitoringSshId(userId).orElseThrow(
-                () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
-        );
-
-        return sshService.executeCommandInShell(command, isFirstExecution, monitoringSshId);
     }
 
     @Transactional
