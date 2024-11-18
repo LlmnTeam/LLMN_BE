@@ -117,27 +117,10 @@ public class ProjectService {
     public ProjectResponse.FindProjectListDTO findProjectList(Long userId, boolean isUsingCache) {
         List<Project> projects = projectRepository.findByUserIdWithSshInfo(userId);
 
-        // 실행중인 컨테이너의 리소스 조회 => 맵으로 변환
         Map<String, Map<String, String>> containersResourceMap = dockerService.findContainersResourceUsage(projects, userId, isUsingCache);
-
-        // 실행중인 컨테이너 목록 (리소스 맵의 키가 실행중인 컨테이너 이름인 것을 활용)
         List<String> runningContainers = new ArrayList<>(containersResourceMap.keySet());
-
         List<ProjectResponse.ProjectDTO> projectDTOS = projects.stream()
-                .map(project -> {
-                    ContainerStatus containerStatus = determineContainerStatus(runningContainers, project);
-                    String cpuUsage = getResourceUsageFromMap(containersResourceMap, project, DOCKER_RESOURCE_KEY_CPU);
-                    String memoryUsage = getResourceUsageFromMap(containersResourceMap, project, DOCKER_RESOURCE_KEY_MEMORY);
-
-                    return new ProjectResponse.ProjectDTO(
-                        project.getId(),
-                        project.isUrgent(),
-                        project.getProjectName(),
-                        project.getDescription(),
-                        containerStatus,
-                        cpuUsage,
-                        memoryUsage);
-                })
+                .map(project -> createProjectDTO(containersResourceMap, runningContainers, project))
                 .toList();
 
         return new ProjectResponse.FindProjectListDTO(projectDTOS);
@@ -309,8 +292,7 @@ public class ProjectService {
             return NOT_EXIST_LOG;
         }
 
-        String logContent = readFileAsString(latestLogFile);
-        return parseLastTwoLogs(logContent);
+        return parseLastTwoLogs(readFileAsString(latestLogFile));
     }
 
     private int compareLogFileDates(String file1, String file2) {
@@ -342,8 +324,8 @@ public class ProjectService {
         return ContainerStatus.NOT_CONNECTED;
     }
 
-    private String getResourceUsageFromMap(Map<String, Map<String, String>> containersResourceMap, Project project, String resourceKey) {
-        return Optional.ofNullable(containersResourceMap.get(project.getContainerName()))
+    private String getResourceUsageFromMap(Map<String, Map<String, String>> containersResourceMap, String containerName, String resourceKey) {
+        return Optional.ofNullable(containersResourceMap.get(containerName))
                 .map(resourceMap -> resourceMap.get(resourceKey))
                 .orElse(NOT_ACCESSIBLE_VALUE); // CPU 및 메모리 사용량 값이 없을 경우 "N/A"로 처리
     }
@@ -386,5 +368,20 @@ public class ProjectService {
         }
 
         return dockerService.isContainerRunning(requestDTO.containerName(), sshInfoId) ? ContainerStatus.WORKING : ContainerStatus.NOT_WORKING;
+    }
+
+    private ProjectResponse.ProjectDTO createProjectDTO(Map<String, Map<String, String>> containersResourceMap, List<String> runningContainers, Project project){
+        ContainerStatus containerStatus = determineContainerStatus(runningContainers, project);
+        String cpuUsage = getResourceUsageFromMap(containersResourceMap, project.getContainerName(), DOCKER_RESOURCE_KEY_CPU);
+        String memoryUsage = getResourceUsageFromMap(containersResourceMap, project.getContainerName(), DOCKER_RESOURCE_KEY_MEMORY);
+
+        return new ProjectResponse.ProjectDTO(
+                project.getId(),
+                project.isUrgent(),
+                project.getProjectName(),
+                project.getDescription(),
+                containerStatus,
+                cpuUsage,
+                memoryUsage);
     }
 }
