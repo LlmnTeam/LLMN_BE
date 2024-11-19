@@ -37,7 +37,7 @@ public class DateTimeUtils {
         return LocalDateTime.now().minus(30, ChronoUnit.MINUTES);
     }
 
-    public static LocalDateTime parseDateTimeFromFile(String file) {
+    public static LocalDateTime parseDateTimeFromLogFile(String file) {
         // 파일 이름에서 "log-" 뒤부터 ".txt" 앞까지의 부분 추출
         String dateTimePart = file.substring(file.indexOf("log-") + 4, file.lastIndexOf("-"));
         return LocalDateTime.parse(dateTimePart, FORMATTER_LOG_FILE);
@@ -49,5 +49,16 @@ public class DateTimeUtils {
                 .withSecond(0)
                 .withNano(0)
                 .minusHours(minusHour);
+    }
+
+    public static boolean isWithinDateRange(LocalDateTime dateTime, LocalDateTime startDate, LocalDateTime endDate) {
+        if (dateTime == null) {
+            return false;
+        }
+
+        boolean isAfterOrEqualStart = !dateTime.isBefore(startDate); // 시작일자와 같거나 이후
+        boolean isBeforeOrEqualEnd = !dateTime.isAfter(endDate);    // 종료일자와 같거나 이전
+
+        return isAfterOrEqualStart && isBeforeOrEqualEnd;
     }
 }

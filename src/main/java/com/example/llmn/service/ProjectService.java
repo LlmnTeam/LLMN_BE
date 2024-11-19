@@ -20,11 +20,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 import static com.example.llmn.core.utils.DateTimeUtils.formatLocalDateTime;
-import static com.example.llmn.core.utils.DateTimeUtils.parseDateTimeFromFile;
+import static com.example.llmn.core.utils.DateTimeUtils.parseDateTimeFromLogFile;
 import static com.example.llmn.core.utils.FileUtils.*;
 
 @Service
@@ -240,8 +239,8 @@ public class ProjectService {
     }
 
     private int compareLogFileDates(String file1, String file2) {
-        LocalDateTime fileDateTime1 = parseDateTimeFromFile(file1);
-        LocalDateTime fileDateTime2 = parseDateTimeFromFile(file2);
+        LocalDateTime fileDateTime1 = parseDateTimeFromLogFile(file1);
+        LocalDateTime fileDateTime2 = parseDateTimeFromLogFile(file2);
         return fileDateTime1.compareTo(fileDateTime2);
     }
 

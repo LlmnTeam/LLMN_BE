@@ -69,4 +69,15 @@ public class Project extends TimeStamp{
     public boolean isNotOwnedBy(Long userId){
         return !user.getId().equals(userId);
     }
+
+    public boolean isProjectRelatedToKeyword(String keyword) {
+        String lowerCaseKeyword = keyword.toLowerCase();
+        String projectName = getProjectName().toLowerCase();
+        String containerName = getContainerName().toLowerCase();
+
+        return projectName.contains(lowerCaseKeyword)
+                || containerName.contains(lowerCaseKeyword)
+                || lowerCaseKeyword.contains(projectName)
+                || lowerCaseKeyword.contains(containerName);
+    }
 }
