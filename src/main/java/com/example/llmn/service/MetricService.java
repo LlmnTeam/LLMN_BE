@@ -23,6 +23,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import static com.example.llmn.core.utils.ConverterUtils.convertStringToLong;
 import static com.example.llmn.core.utils.DateTimeUtils.*;
 
 @Service
@@ -313,8 +314,8 @@ public class MetricService {
             String[] parts = line.split("\\s+");
 
             if (parts.length >= 10) {
-                long receivedBytes = parseLongSafely(parts[RECEIVED_BYTES_INDEX]);  // 수신된 바이트
-                long transmittedBytes = parseLongSafely(parts[TRANSMITTED_BYTES_INDEX]);  // 송신된 바이트
+                long receivedBytes = convertStringToLong(parts[RECEIVED_BYTES_INDEX]);  // 수신된 바이트
+                long transmittedBytes = convertStringToLong(parts[TRANSMITTED_BYTES_INDEX]);  // 송신된 바이트
 
                 networkUsageMap.put(METRIC_MAP_NETWORK_REC, convertBytesToMB(receivedBytes));
                 networkUsageMap.put(METRIC_MAP_NETWORK_SENT, convertBytesToMB(transmittedBytes));
@@ -347,14 +348,6 @@ public class MetricService {
 
     private double convertBytesToMB(long bytes) {
         return bytes / BYTES_TO_MB_DIVISOR;
-    }
-
-    private long parseLongSafely(String value) {
-        try {
-            return Long.parseLong(value);
-        } catch (NumberFormatException e) {
-            return 0L;
-        }
     }
 
     private boolean shouldUpdateCache(SshInfo sshInfo, Long monitoringSshId) {

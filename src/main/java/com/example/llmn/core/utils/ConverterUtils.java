@@ -10,4 +10,12 @@ public class ConverterUtils {
                 .map(Enum::name)
                 .collect(Collectors.joining(", "));
     }
+
+    public static long convertStringToLong(String value) {
+        try {
+            return Long.parseLong(value);
+        } catch (NumberFormatException e) {
+            return 0L;
+        }
+    }
 }
