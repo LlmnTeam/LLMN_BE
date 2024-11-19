@@ -8,12 +8,17 @@ import java.time.temporal.ChronoUnit;
 import java.util.Date;
 
 public class DateTimeUtils {
-    private static final DateTimeFormatter DEFAULT_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
-    private static final DateTimeFormatter LOG_FILE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH");
-    private static final DateTimeFormatter SIMPLE_DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy.MM.dd");
+    private static final DateTimeFormatter FORMATTER_DATE_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+    private static final DateTimeFormatter FORMATTER_LOG_FILE = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH");
+    private static final DateTimeFormatter FORMATTER_SIMPLE_DATE = DateTimeFormatter.ofPattern("yyyy.MM.dd");
+    public static final DateTimeFormatter FORMATTER_HOUR_MINUTE = DateTimeFormatter.ofPattern("HH:mm");
 
     public static String formatDate(Date date, String format) {
         return new SimpleDateFormat(format).format(date);
+    }
+
+    public static String formatDateTime(LocalDateTime localDateTime, DateTimeFormatter formatter){
+        return localDateTime.format(formatter);
     }
 
     public static String formatLocalDateTime(LocalDateTime localDateTime) {
@@ -21,11 +26,11 @@ public class DateTimeUtils {
             return null;
         }
 
-        return localDateTime.format(DEFAULT_FORMATTER);
+        return localDateTime.format(FORMATTER_DATE_TIME);
     }
 
     public static String getTodayDateInString() {
-        return LocalDate.now().format(SIMPLE_DATE_FORMATTER);
+        return LocalDate.now().format(FORMATTER_SIMPLE_DATE);
     }
 
     public static LocalDateTime getThirtyMinutesAgoTime(){
@@ -35,6 +40,14 @@ public class DateTimeUtils {
     public static LocalDateTime parseDateTimeFromFile(String file) {
         // 파일 이름에서 "log-" 뒤부터 ".txt" 앞까지의 부분 추출
         String dateTimePart = file.substring(file.indexOf("log-") + 4, file.lastIndexOf("-"));
-        return LocalDateTime.parse(dateTimePart, LOG_FILE_FORMATTER);
+        return LocalDateTime.parse(dateTimePart, FORMATTER_LOG_FILE);
+    }
+
+    public static LocalDateTime getStartOfCurrentHourMinusHours(int minusHour){
+        return  LocalDateTime.now()
+                .withMinute(0)
+                .withSecond(0)
+                .withNano(0)
+                .minusHours(minusHour);
     }
 }

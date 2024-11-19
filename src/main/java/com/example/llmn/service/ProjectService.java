@@ -45,7 +45,6 @@ public class ProjectService {
     private static final String NOT_EXIST_LOG = "";
     private static final String SORT_BY_DATE = "createdDate";
     private static final String LOG_FILE_SUFFIX = "-log";
-    private static final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH");
 
     @Transactional
     public ProjectResponse.CreateProjectDTO createProject(ProjectRequest.CreateProjectDTO requestDTO, Long userId){

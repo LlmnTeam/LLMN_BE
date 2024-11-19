@@ -23,6 +23,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import static com.example.llmn.core.utils.DateTimeUtils.*;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -53,7 +55,6 @@ public class MetricService {
     private static final double BYTES_TO_MB_DIVISOR = 1024.0 * 1024.0;
     private static final int RECEIVED_BYTES_INDEX = 1;
     private static final int TRANSMITTED_BYTES_INDEX = 9;
-    private static final DateTimeFormatter formatterForHourAndMin = DateTimeFormatter.ofPattern("HH:mm"); // 시간 형식 "HH:mm"
     private static final Pattern CPU_PATTERN = Pattern.compile("%Cpu\\(s\\):\\s+([\\d.]+)\\s+us,\\s+([\\d.]+)\\s+sy,.*");
     private static final Pattern MEM_PATTERN = Pattern.compile("MiB Mem :\\s+([\\d.]+)\\s+total,\\s+([\\d.]+)\\s+free,\\s+([\\d.]+)\\s+used,.*");
     private static final Pattern NETWORK_PATTERN = Pattern.compile("^(eth|ens|enp|wlan)\\S*:"); // 주요 네트워크 인터페이스 패턴
@@ -75,26 +76,18 @@ public class MetricService {
 
 
     public MetricResponse.FindCurrentMetricDTO findCurrentMetric(Long sshInfoId) {
-        // 1. 레디스에서 캐시된 값을 먼저 조회
         MetricResponse.FindCurrentMetricDTO cachedMetric = getCachedMetric(sshInfoId);
         if (cachedMetric != null) {
             return cachedMetric;
         }
 
-        // 2. 캐시된 값이 없음 => 새로운 Metric 수집
+        // 캐시된 값이 없음 => 새로운 Metric 수집
         Map<String, Double> cpuAndMemoryMetrics = collectCpuAndMemoryMetrics(sshInfoId);
         Map<String, Double> networkMetrics = collectNetworkMetrics(sshInfoId, NOT_UPDATE_CACHE);
-        
-        MetricResponse.FindCurrentMetricDTO metricDTO = new MetricResponse.FindCurrentMetricDTO(
-                cpuAndMemoryMetrics.getOrDefault(METRIC_MAP_CPU_USAGE, DEFAULT_METRIC_VALUE),
-                cpuAndMemoryMetrics.getOrDefault(METRIC_MAP_TOTAL_MEMORY, DEFAULT_METRIC_VALUE),
-                cpuAndMemoryMetrics.getOrDefault(METRIC_MAP_USED_MEMORY, DEFAULT_METRIC_VALUE),
-                networkMetrics.getOrDefault(METRIC_MAP_NETWORK_REC, DEFAULT_METRIC_VALUE),
-                networkMetrics.getOrDefault(METRIC_MAP_NETWORK_SENT, DEFAULT_METRIC_VALUE)
-        );
+        MetricResponse.FindCurrentMetricDTO metricDTO = createFindCurrentMetricDTO(cpuAndMemoryMetrics, networkMetrics);
 
-        // 3. 새로운 Metric 저장
-        cacheMetricDTO(sshInfoId, metricDTO);
+        // 새로운 Metric 저장
+        saveMetricToCache(sshInfoId, metricDTO);
 
         return metricDTO;
     }
@@ -107,10 +100,11 @@ public class MetricService {
         List<MetricResponse.NetworkOutMetricDTO> networkOutMetricDTOS = new ArrayList<>();
 
         // minusHour 내 지표들을 모두 가져옴
-        LocalDateTime startTime = LocalDateTime.now().withMinute(0).withSecond(0).withNano(0).minusHours(minusHour);
+        LocalDateTime startTime = getStartOfCurrentHourMinusHours(minusHour);
         List<Metric> metrics = metricRepository.findMetricsAfter(startTime, sshInfoId);
+
         metrics.forEach(metric -> {
-            String time = metric.getCreatedDate().format(formatterForHourAndMin);
+            String time = formatDateTime(metric.getCreatedDate(), FORMATTER_HOUR_MINUTE);
             cpuMetricDTOS.add(createCpuMetricDTO(metric, time));
             memoryMetricDTOS.add(createMemoryMetricDTO(metric, time));
             networkInMetricDTOS.add(createNetworkInMetricDTO(metric, time));
@@ -155,16 +149,13 @@ public class MetricService {
     }
 
     private Map<String, Double> collectCpuAndMemoryMetrics(Long sshInfoId) {
-        Map<String, Double> metricsMap = new HashMap<>();
-
         // CPU와 메모리 사용량을 동시에 얻기 위해 top 명령어 실행
         String commandResponse = sshService.executeCommandOnce(COMMAND_TOP, sshInfoId);
         String[] lines = commandResponse.split("\n");
 
-        // CPU와 메모리 사용률을 각각 파싱하여 metricsMap에 추가
+        Map<String, Double> metricsMap = new HashMap<>();
         for (String line : lines) {
             line = line.trim();
-
             metricsMap.putAll(parseCpuUsage(line));
             metricsMap.putAll(parseMemoryUsage(line));
         }
@@ -273,7 +264,7 @@ public class MetricService {
         }
     }
 
-    private void cacheMetricDTO(Long sshInfoId, MetricResponse.FindCurrentMetricDTO metricDTO) {
+    private void saveMetricToCache(Long sshInfoId, MetricResponse.FindCurrentMetricDTO metricDTO) {
         String value = convertMetricDtoToString(metricDTO);
 
         if (!value.isBlank()) {
@@ -368,5 +359,15 @@ public class MetricService {
 
     private boolean shouldUpdateCache(SshInfo sshInfo, Long monitoringSshId) {
         return sshInfo.getId().equals(monitoringSshId);
+    }
+
+    private  MetricResponse.FindCurrentMetricDTO createFindCurrentMetricDTO(Map<String, Double> cpuAndMemoryMetrics, Map<String, Double> networkMetrics){
+        return new MetricResponse.FindCurrentMetricDTO(
+                cpuAndMemoryMetrics.getOrDefault(METRIC_MAP_CPU_USAGE, DEFAULT_METRIC_VALUE),
+                cpuAndMemoryMetrics.getOrDefault(METRIC_MAP_TOTAL_MEMORY, DEFAULT_METRIC_VALUE),
+                cpuAndMemoryMetrics.getOrDefault(METRIC_MAP_USED_MEMORY, DEFAULT_METRIC_VALUE),
+                networkMetrics.getOrDefault(METRIC_MAP_NETWORK_REC, DEFAULT_METRIC_VALUE),
+                networkMetrics.getOrDefault(METRIC_MAP_NETWORK_SENT, DEFAULT_METRIC_VALUE)
+        );
     }
 }
