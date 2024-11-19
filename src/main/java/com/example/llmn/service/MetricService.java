@@ -17,7 +17,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -42,7 +41,6 @@ public class MetricService {
     private static final String REDIS_KEY_NETWORK_TRANS = "network:transmitted";
     private static final String METRIC_KEY = "metric";
     private static final Long METRIC_EXP = 10 * 60 * 1000L; // 10분
-    private static final boolean NOT_UPDATE_CACHE = false;
     private static final String METRIC_MAP_CPU_USAGE = "cpuUsage";
     private static final String METRIC_MAP_TOTAL_MEMORY = "totalMemory";
     private static final String METRIC_MAP_USED_MEMORY = "usedMemory";
@@ -84,7 +82,7 @@ public class MetricService {
 
         // 캐시된 값이 없음 => 새로운 Metric 수집
         Map<String, Double> cpuAndMemoryMetrics = collectCpuAndMemoryMetrics(sshInfoId);
-        Map<String, Double> networkMetrics = collectNetworkMetrics(sshInfoId, NOT_UPDATE_CACHE);
+        Map<String, Double> networkMetrics = collectNetworkMetrics(sshInfoId);
         MetricResponse.FindCurrentMetricDTO metricDTO = createFindCurrentMetricDTO(cpuAndMemoryMetrics, networkMetrics);
 
         // 새로운 Metric 저장
@@ -120,20 +118,19 @@ public class MetricService {
         List<SshInfo> sshInfos = sshInfoRepository.findByUserId(user.getId());
 
         return sshInfos.stream()
-                .map(sshInfo -> collectMetricsForSshInfo(sshInfo, monitoringSshId))
+                .filter(sshInfo -> isMonitoringSsh(sshInfo, monitoringSshId))
+                .map(sshInfo -> Optional.ofNullable(collectMetricsData(sshInfo)))
                 .filter(Optional::isPresent)
                 .map(Optional::get)
                 .collect(Collectors.toList());
     }
 
-    private Optional<Metric> collectMetricsForSshInfo(SshInfo sshInfo, Long monitoringSshId) {
-        boolean updateCache = shouldUpdateCache(sshInfo, monitoringSshId);
-        return Optional.ofNullable(collectMetricsData(sshInfo, updateCache));
-    }
-
-    private Metric collectMetricsData(SshInfo sshInfo, boolean updateCache) {
+    private Metric collectMetricsData(SshInfo sshInfo) {
         Map<String, Double> cpuAndMemoryMetrics = collectCpuAndMemoryMetrics(sshInfo.getId());
-        Map<String, Double> networkMetrics = collectNetworkMetrics(sshInfo.getId(), updateCache);
+        Map<String, Double> networkMetrics = collectNetworkMetrics(sshInfo.getId());
+
+        // 다음 누적량 계산을 위해 네트워크 지표는 캐시로 저장
+        saveNetworkMetricToCache(networkMetrics);
 
         if (cpuAndMemoryMetrics.isEmpty() || networkMetrics.isEmpty()) {
             return null;
@@ -164,21 +161,13 @@ public class MetricService {
         return metricsMap;
     }
 
-    private Map<String, Double> collectNetworkMetrics(Long sshInfoId, boolean updateCache) {
+    private Map<String, Double> collectNetworkMetrics(Long sshInfoId) {
         Map<String, Double> currentNetworkMetric = collectCurrentNetworkMetrics(sshInfoId);
         if(currentNetworkMetric.isEmpty()){
             return Collections.emptyMap();
         }
 
-        // 현재와 과거의 네트워크 사용량 차이를 통해, 단위 시간당 네트워크 사용량 지표 계산
-        Map<String, Double> networkMetricMap = calculateNetworkDifferences(currentNetworkMetric);
-
-        // 캐시 업데이트
-        if(updateCache) {
-            updateNetworkCache(currentNetworkMetric);
-        }
-
-        return networkMetricMap;
+        return calculateNetworkUsage(currentNetworkMetric);
     }
 
     private Map<String, Double> collectCurrentNetworkMetrics(Long sshInfoId) {
@@ -196,7 +185,7 @@ public class MetricService {
         return networkMetricMap;
     }
 
-    private Map<String, Long> getTodayNetworkMetrics(Long sshInfoId) {
+    private Map<String, Long> findTodayNetworkMetrics(Long sshInfoId) {
         // 하루 동안의 누적 네트워크 트래픽 계산
         LocalDateTime todayStart = LocalDateTime.now().withHour(0).withMinute(0).withSecond(0).withNano(0);
         List<Metric> networkMetrics = metricRepository.findMetricsAfter(todayStart, sshInfoId);
@@ -204,7 +193,7 @@ public class MetricService {
         return calculateTotalNetworkUsage(networkMetrics);
     }
 
-    private Map<String, Double> calculateNetworkDifferences(Map<String, Double> currentNetworkMetrics) {
+    private Map<String, Double> calculateNetworkUsage(Map<String, Double> currentNetworkMetrics) {
         // 레디스에서 이전 네트워크 사용량 조회 (없으면 0.0 반환)
         Double previousReceived = redisService.getValueInDouble(REDIS_KEY_NETWORK_REC);
         Double previousTransmitted = redisService.getValueInDouble(REDIS_KEY_NETWORK_TRANS);
@@ -235,11 +224,8 @@ public class MetricService {
         return networkMetricMap;
     }
 
-    // 레디스에서 Metric을 가져오는 메서드
     private MetricResponse.FindCurrentMetricDTO getCachedMetric(Long sshInfoId) {
         String cachedValue = redisService.getValueInString(METRIC_KEY, sshInfoId.toString());
-
-        // 캐시된 값이 없으면 null 반환
         if (cachedValue == null) {
             return null;
         }
@@ -250,7 +236,7 @@ public class MetricService {
     private MetricResponse.FindCurrentMetricDTO convertStringToMetricDTO(String value) {
         try {
             return objectMapper.readValue(value, MetricResponse.FindCurrentMetricDTO.class);
-        } catch (JsonProcessingException e) {;
+        } catch (JsonProcessingException e) {
             log.error("ObjectMapper 파싱 과정에서 에러 발생");
             return null;
         }
@@ -273,7 +259,7 @@ public class MetricService {
         }
     }
 
-    private void updateNetworkCache(Map<String, Double> currentNetworkMetric) {
+    private void saveNetworkMetricToCache(Map<String, Double> currentNetworkMetric) {
         redisService.storeValue(REDIS_KEY_NETWORK_REC, String.valueOf(currentNetworkMetric.get(METRIC_MAP_NETWORK_REC)));
         redisService.storeValue(REDIS_KEY_NETWORK_TRANS, String.valueOf(currentNetworkMetric.get(METRIC_MAP_NETWORK_SENT)));
     }
@@ -350,7 +336,7 @@ public class MetricService {
         return bytes / BYTES_TO_MB_DIVISOR;
     }
 
-    private boolean shouldUpdateCache(SshInfo sshInfo, Long monitoringSshId) {
+    private boolean isMonitoringSsh(SshInfo sshInfo, Long monitoringSshId) {
         return sshInfo.getId().equals(monitoringSshId);
     }
 
