@@ -26,7 +26,7 @@ public class EmailUtils {
     private final JavaMailSender mailSender;
 
     @Value("${spring.mail.username}")
-    private String SERVICE_MAIL_ACCOUNT;
+    private String serviceMailAccount;
 
     private static final String UTF_EIGHT_ENCODING = "UTF-8";
 
@@ -55,7 +55,7 @@ public class EmailUtils {
         MimeMessage message = mailSender.createMimeMessage();
         MimeMessageHelper helper = new MimeMessageHelper(message, true, UTF_EIGHT_ENCODING);
 
-        helper.setFrom(SERVICE_MAIL_ACCOUNT);
+        helper.setFrom(serviceMailAccount);
         helper.setTo(toEmail);
         helper.setSubject(subject);
 

@@ -21,6 +21,8 @@ import java.util.stream.Stream;
 @Slf4j
 public class FileUtils {
 
+    private FileUtils() {}
+
     public static final String LOGS_DIRECTORY = "logs";
 
     public static void writeFile(MultipartFile file, Path path) {

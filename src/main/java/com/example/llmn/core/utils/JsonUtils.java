@@ -7,6 +7,8 @@ import java.io.IOException;
 
 public class JsonUtils {
 
+    private JsonUtils() {}
+
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
     public static String normalizeJson(String jsonValue) {
@@ -14,7 +16,7 @@ public class JsonUtils {
             JsonNode rootNode = objectMapper.readTree(jsonValue);
             return objectMapper.writeValueAsString(rootNode);
         } catch (IOException e) {
-            return jsonValue;  // 파싱 실패 시 원래 메시지 반환
+            return jsonValue;
         }
     }
 }

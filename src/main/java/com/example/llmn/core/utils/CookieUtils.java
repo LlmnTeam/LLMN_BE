@@ -10,6 +10,8 @@ import java.util.Arrays;
 
 public class CookieUtils {
 
+    private CookieUtils() {}
+
     public static String getCookieFromRequest(String cookieKey, HttpServletRequest request) {
         Cookie[] cookies = request.getCookies();
 

@@ -8,6 +8,9 @@ import java.time.temporal.ChronoUnit;
 import java.util.Date;
 
 public class DateTimeUtils {
+
+    private DateTimeUtils() {}
+
     private static final DateTimeFormatter FORMATTER_DATE_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
     private static final DateTimeFormatter FORMATTER_LOG_FILE = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH");
     private static final DateTimeFormatter FORMATTER_SIMPLE_DATE = DateTimeFormatter.ofPattern("yyyy.MM.dd");
