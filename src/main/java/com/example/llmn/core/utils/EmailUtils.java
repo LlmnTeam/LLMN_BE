@@ -12,7 +12,10 @@ import org.springframework.stereotype.Component;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
 
+import java.security.SecureRandom;
 import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 @Component
 @RequiredArgsConstructor
@@ -37,7 +40,18 @@ public class EmailUtils {
         }
     }
 
-    public MimeMessage createMimeMessage(String toEmail, String subject, String templateName, Map<String, Object> templateModel) throws MessagingException {
+    public static String generateVerificationCode() {
+        String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+        SecureRandom random = new SecureRandom();
+
+        return IntStream.range(0, 8) // 8자리
+                .map(i -> random.nextInt(chars.length()))
+                .mapToObj(chars::charAt)
+                .map(Object::toString)
+                .collect(Collectors.joining());
+    }
+
+    private MimeMessage createMimeMessage(String toEmail, String subject, String templateName, Map<String, Object> templateModel) throws MessagingException {
         MimeMessage message = mailSender.createMimeMessage();
         MimeMessageHelper helper = new MimeMessageHelper(message, true, UTF_EIGHT_ENCODING);
 
@@ -51,7 +65,7 @@ public class EmailUtils {
         return message;
     }
 
-    public String generateHtmlContent(String templateName, Map<String, Object> templateModel) {
+    private String generateHtmlContent(String templateName, Map<String, Object> templateModel) {
         Context context = new Context();
         templateModel.forEach(context::setVariable);
         return templateEngine.process(templateName, context);

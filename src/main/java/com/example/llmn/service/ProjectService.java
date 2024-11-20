@@ -48,7 +48,7 @@ public class ProjectService {
     @Transactional
     public ProjectResponse.CreateProjectDTO createProject(ProjectRequest.CreateProjectDTO requestDTO, Long userId){
         ContainerStatus containerStatus = determineContainerStatus(requestDTO);
-        boolean isUrgent = containerStatus.isProjectUrgent();;
+        boolean isUrgent = containerStatus.isProjectUrgent();
 
         User user = getUserReference(userId);
         SshInfo sshInfo = getSshInfoReference(requestDTO.sshInfoId());

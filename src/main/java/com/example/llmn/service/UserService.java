@@ -27,11 +27,9 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.nio.file.Path;
-import java.security.SecureRandom;
 import java.util.*;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
+import static com.example.llmn.core.utils.EmailUtils.generateVerificationCode;
 import static com.example.llmn.core.utils.FileUtils.*;
 import static com.example.llmn.core.utils.MailTemplate.VERIFICATION_CODE;
 import static com.example.llmn.core.utils.UriUtils.buildURI;
@@ -81,6 +79,7 @@ public class UserService {
     private static final String CODE_TO_EMAIL_KEY_PREFIX = "codeToEmail";
     private static final String CODE_TYPE_RECOVERY = "recovery";
     private static final String NO_SUMMARY_DATA = "요약된 내용이 존재하지 않습니다.";
+    private static final long VERIFICATION_CODE_EXPIRATION_MS = 175 * 1000L;
 
     @Transactional
     public Map<String, String> login(UserRequest.LoginDTO requestDTO) {
@@ -124,9 +123,14 @@ public class UserService {
     }
 
     @Async
-    public void sendCodeWithValidation(String email, String codeType) {
+    public void sendCodeByEmail(String email, String codeType) {
         checkAlreadySendCode(email, codeType);
-        sendCodeByEmail(email, codeType);
+
+        String verificationCode = generateVerificationCode();
+        storeVerificationCode(email, codeType, verificationCode);
+
+        Map<String, Object> templateModel = createTemplateModel(verificationCode);
+        mailUtils.sendMail(email, VERIFICATION_CODE.getSubject(), MAIL_TEMPLATE_FOR_CODE, templateModel);
     }
 
     public UserResponse.VerifyEmailCodeDTO verifyCode(UserRequest.VerifyCodeDTO requestDTO, String codeType){
@@ -412,31 +416,6 @@ public class UserService {
             throw new CustomException(ExceptionCode.USER_EMAIL_EXIST);
     }
 
-    private String generateVerificationCode() {
-        String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-        SecureRandom random = new SecureRandom();
-
-        return IntStream.range(0, 8) // 8자리
-                .map(i -> random.nextInt(chars.length()))
-                .mapToObj(chars::charAt)
-                .map(Object::toString)
-                .collect(Collectors.joining());
-    }
-
-    @Async
-    public void sendCodeByEmail(String email, String codeType) {
-        // 1st 검증 코드를 템플릿 모델에 담음
-        Map<String, Object> templateModel = new HashMap<>();
-        String verificationCode = generateVerificationCode();
-        templateModel.put(MODEL_KEY_CODE, verificationCode);
-
-        // 2nd 메일 전송
-        mailUtils.sendMail(email, VERIFICATION_CODE.getSubject(), MAIL_TEMPLATE_FOR_CODE, templateModel);
-
-        // 3rd 검증 코드는 레디스에 3분 동안 저장
-        redisService.storeValue(buildRedisKey(KEY_PREFIX_CODE, codeType), email, verificationCode, 175 * 1000L);
-    }
-
     private void validateJoinRequest(UserRequest.JoinDTO requestDTO) {
         validatePassword(requestDTO);
         validateSshInfoPresence(requestDTO);
@@ -637,5 +616,15 @@ public class UserService {
         if(redisService.isValueExist(buildRedisKey(KEY_PREFIX_CODE, codeType), email)){
             throw new CustomException(ExceptionCode.ALREADY_SEND_EMAIL);
         }
+    }
+
+    private Map<String, Object> createTemplateModel(String verificationCode) {
+        Map<String, Object> templateModel = new HashMap<>();
+        templateModel.put(MODEL_KEY_CODE, verificationCode);
+        return templateModel;
+    }
+
+    private void storeVerificationCode(String email, String codeType, String verificationCode) {
+        redisService.storeValue(buildRedisKey(KEY_PREFIX_CODE, codeType), email, verificationCode, VERIFICATION_CODE_EXPIRATION_MS);
     }
 }

@@ -5,8 +5,6 @@ import com.example.llmn.controller.DTO.UserResponse;
 import com.example.llmn.core.security.CustomUserDetails;
 import com.example.llmn.core.utils.ApiUtils;
 import com.example.llmn.service.UserService;
-import jakarta.mail.MessagingException;
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
@@ -16,8 +14,6 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
-import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Path;
 import java.util.Map;
 
@@ -53,7 +49,7 @@ public class UserController {
     @PostMapping("/accounts/check/email")
     public ResponseEntity<?> checkEmailAndSendCode(@RequestBody @Valid UserRequest.EmailDTO requestDTO) {
         UserResponse.CheckEmailExistDTO responseDTO = userService.checkEmailExist(requestDTO.email());
-        if (responseDTO.isValid()) userService.sendCodeWithValidation(requestDTO.email(), CODE_TYPE_JOIN);
+        if (responseDTO.isValid()) userService.sendCodeByEmail(requestDTO.email(), CODE_TYPE_JOIN);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 
@@ -71,7 +67,7 @@ public class UserController {
 
     @PostMapping("/accounts/resend/code")
     public ResponseEntity<?> resendCode(@RequestBody @Valid UserRequest.EmailDTO requestDTO, @RequestParam String codeType) {
-        userService.sendCodeWithValidation(requestDTO.email(), codeType);
+        userService.sendCodeByEmail(requestDTO.email(), codeType);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, null));
     }
 
@@ -126,7 +122,7 @@ public class UserController {
     @PostMapping("/accounts/recovery/code")
     public ResponseEntity<?> sendCodeForRecovery(@RequestBody @Valid UserRequest.EmailDTO requestDTO) {
         UserResponse.CheckAccountExistDTO responseDTO = userService.checkLocalAccountExist(requestDTO);
-        if (responseDTO.isValid()) userService.sendCodeWithValidation(requestDTO.email(), CODE_TYPE_JOIN);
+        if (responseDTO.isValid()) userService.sendCodeByEmail(requestDTO.email(), CODE_TYPE_JOIN);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 
