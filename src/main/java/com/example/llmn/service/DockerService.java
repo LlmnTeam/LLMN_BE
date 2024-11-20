@@ -5,15 +5,15 @@ import com.example.llmn.core.errors.ExceptionCode;
 import com.example.llmn.domain.Project;
 import com.example.llmn.domain.SshInfo;
 import com.example.llmn.repository.ProjectRepository;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
 import java.util.stream.Collectors;
+
+import static com.example.llmn.core.utils.JsonUtils.convertJsonToMap;
+import static com.example.llmn.core.utils.JsonUtils.convertMapToJson;
 
 @Service
 @RequiredArgsConstructor
@@ -23,7 +23,6 @@ public class DockerService {
     private final SSHService sshService;
     private final RedisService redisService;
     private final ProjectRepository projectRepository;
-    private final ObjectMapper objectMapper;
 
     private static final String RESOURCE_KEY = "resource";
     public static final String DOCKER_RESOURCE_KEY_CPU = "CPU";
@@ -33,7 +32,6 @@ public class DockerService {
     public static final String COMMAND_CONTAINER_PS = "docker ps --format \"{{.Names}}\"";
     public static final String COMMAND_CONTAINER_STATS = "docker stats --no-stream --format \"{{.Name}}:{{.CPUPerc}}:{{.MemUsage}}\"";
     private static final Long RESOURCE_EXP = 10 * 60 * 1000L; // 10분
-    private static final String BLANK_STRING = "";
 
     public boolean stopContainer(String containerName, Long projectId) {
         Long sshInfoId = projectRepository.findSshInfoId(projectId).orElseThrow(
@@ -92,19 +90,11 @@ public class DockerService {
             return Collections.emptyMap();
         }
 
-        return convertStringToMetricMap(cachedValue);
+        return convertJsonToMap(cachedValue);
     }
 
     private boolean hasCachedValue(Map<String, Map<String, String>> cachedResourceUsage) {
         return !cachedResourceUsage.isEmpty();
-    }
-
-    private Map<String, Map<String, String>> convertStringToMetricMap(String cachedValue) {
-        try {
-            return objectMapper.readValue(cachedValue, new TypeReference<Map<String, Map<String, String>>>() {});
-        } catch (JsonProcessingException e) {
-            return Collections.emptyMap();
-        }
     }
 
     private Map<String, Map<String, String>> fetchResourceUsageFromSsh(List<SshInfo> sshInfos) {
@@ -152,7 +142,7 @@ public class DockerService {
     }
 
     private void cacheResourceUsage(Long userId, Map<String, Map<String, String>> resourceUsage) {
-        String value = convertMetricMapToString(resourceUsage);
+        String value = convertMapToJson(resourceUsage);
         if (!value.isBlank()) {
             redisService.storeValue(RESOURCE_KEY, userId.toString(), value, RESOURCE_EXP);
         }
@@ -163,15 +153,6 @@ public class DockerService {
                 .map(Project::getSshInfo)
                 .distinct()
                 .toList();
-    }
-
-    private String convertMetricMapToString(Map<String, Map<String, String>> metricMap){
-        try {
-            return objectMapper.writeValueAsString(metricMap);
-        } catch (JsonProcessingException e) {
-            log.info("MetricMap 파싱 실패");
-            return BLANK_STRING;
-        }
     }
 
     private String buildContainerCommand(String commandType,String containerName) {
