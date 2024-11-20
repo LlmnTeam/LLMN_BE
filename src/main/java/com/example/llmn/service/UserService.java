@@ -53,13 +53,13 @@ public class UserService {
     private final EmailUtils mailUtils;
 
     @Value("${reload.uri}")
-    private String REQUEST_RELOAD_KEY_URI;
+    private String requestReloadKeyUri;
 
     @Value("${validate_key.uri}")
-    private String REQUEST_VALIDATE_KEY_URI;
+    private String requestValidateKeyUri;
 
     @Value("${update_env.uri}")
-    private String UPDATE_ENV_URI;
+    private String updateEnvUri;
 
     private static final String KEY_PREFIX_CODE = "code:";
     private static final String MAIL_TEMPLATE_FOR_CODE = "verification_code_email.html";
@@ -99,14 +99,11 @@ public class UserService {
     public void join(UserRequest.JoinDTO requestDTO){
         validateJoinRequest(requestDTO);
 
-        // 유저 엔티티 저장
         User user = saveUser(requestDTO);
 
-        // SSH 엔티티 저장 및 모니터링 SSH 정보 설정
         List<SshInfo> sshInfos = saveSshInfos(requestDTO.sshInfos(), user);
         setMonitoringSshInfo(requestDTO.monitoringSshHost(), sshInfos, user);
 
-        // OpenAI API 키 저장
         updateApiKey(requestDTO.openAiKey());
     }
 
@@ -163,7 +160,7 @@ public class UserService {
 
     public UserResponse.ValidateOpenAIKeyDTO validateOpenAIKey(String apiKey){
         return webClient.post()
-                .uri(buildURI(REQUEST_VALIDATE_KEY_URI))
+                .uri(buildURI(requestValidateKeyUri))
                 .bodyValue(new UserRequest.RequestValidateKeyDTO(apiKey))
                 .retrieve()
                 .bodyToMono(UserResponse.ValidateOpenAIKeyDTO.class)
@@ -295,7 +292,7 @@ public class UserService {
 
     public void updateApiKey(String value) {
         UserResponse.EnvUpdateDTO responseDTO = webClient.post()
-                .uri(buildURI(UPDATE_ENV_URI))
+                .uri(buildURI(updateEnvUri))
                 .bodyValue(new UserRequest.EnvUpdateDTO(OPEN_API_KEY, value))
                 .retrieve()
                 .bodyToMono(UserResponse.EnvUpdateDTO.class)
