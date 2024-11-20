@@ -4,10 +4,8 @@ import com.example.llmn.controller.DTO.ProjectRequest;
 import com.example.llmn.controller.DTO.ProjectResponse;
 import com.example.llmn.core.security.CustomUserDetails;
 import com.example.llmn.core.utils.ApiUtils;
-import com.example.llmn.core.utils.SSHCommandExecutor;
 import com.example.llmn.service.DockerService;
 import com.example.llmn.service.ProjectService;
-import com.example.llmn.service.SSHService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -15,7 +13,6 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.parameters.P;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 
@@ -104,13 +101,13 @@ public class ProjectController {
 
     @PostMapping("/project/{projectId}/container/stop")
     public ResponseEntity<?> stopContainer(@RequestBody ProjectRequest.ContainerDTO requestDTO, @PathVariable Long projectId) {
-        boolean response = dockerService.stopContainerByName(requestDTO.name(), projectId);
+        boolean response = dockerService.stopContainer(requestDTO.name(), projectId);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, response));
     }
 
     @PostMapping("/project/{projectId}/container/restart")
     public ResponseEntity<?> restartContainer(@RequestBody ProjectRequest.ContainerDTO requestDTO, @PathVariable Long projectId) {
-        boolean response = dockerService.restartContainerByName(requestDTO.name(), projectId);
+        boolean response = dockerService.restartContainer(requestDTO.name(), projectId);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, response));
     }
 

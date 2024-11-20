@@ -34,7 +34,7 @@ public class DockerService {
     private static final Long RESOURCE_EXP = 10 * 60 * 1000L; // 10분
     private static final String BLANK_STRING = "";
 
-    public boolean stopContainerByName(String containerName, Long projectId) {
+    public boolean stopContainer(String containerName, Long projectId) {
         Long sshInfoId = projectRepository.findSshInfoId(projectId).orElseThrow(
                 () -> new CustomException(ExceptionCode.PROJECT_NOT_FOUND)
         );
@@ -45,7 +45,7 @@ public class DockerService {
         return isCommandSuccess(containerName, commandResponse);
     }
 
-    public boolean restartContainerByName(String containerName, Long projectId) {
+    public boolean restartContainer(String containerName, Long projectId) {
         Long sshInfoId = projectRepository.findSshInfoId(projectId).orElseThrow(
                 () -> new CustomException(ExceptionCode.PROJECT_NOT_FOUND)
         );
@@ -56,15 +56,11 @@ public class DockerService {
         return isCommandSuccess(containerName, commandResponse);
     }
 
-    // 실행중인 도커 컨테이너 목록 조회
     public List<String> findRunningContainerList(Long sshInfoId) {
-        return Arrays.stream(sshService.executeCommandOnce(COMMAND_CONTAINER_PS, sshInfoId).split("\n"))
-                .map(String::trim)
-                .filter(name -> !name.isEmpty())
-                .toList();
+        String commandResponse = sshService.executeCommandOnce(COMMAND_CONTAINER_PS, sshInfoId);
+        return parseContainerList(commandResponse);
     }
 
-    // 특정 컨테이너의 실행 여부 확인
     public boolean isContainerRunning(String containerName, Long sshInfoId) {
         return findRunningContainerList(sshInfoId).stream()
                 .anyMatch(name -> name.equals(containerName));
@@ -160,5 +156,12 @@ public class DockerService {
 
     private boolean isCommandSuccess(String response, String containerName) {
         return response != null && response.trim().equals(containerName);
+    }
+
+    private List<String> parseContainerList(String commandResponse) {
+        return Arrays.stream(commandResponse.split("\n"))
+                .map(String::trim)
+                .filter(containerName -> !containerName.isBlank())
+                .toList();
     }
 }
