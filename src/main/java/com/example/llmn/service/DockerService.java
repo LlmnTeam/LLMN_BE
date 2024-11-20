@@ -13,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -119,28 +120,35 @@ public class DockerService {
     }
 
     private Map<String, Map<String, String>> parseCommandResponse(String commandResponse) {
-        Map<String, Map<String, String>> containerUsageMap = new HashMap<>();
-
-        // command 결과를 줄 단위로 나눔
-        String[] lines = commandResponse.split("\n");
+        if (commandResponse == null || commandResponse.isBlank()) {
+            return Collections.emptyMap();
+        }
 
         // 각 줄을 ':'로 나누어 컨테이너 이름, CPU, 메모리 사용량을 추출
-        for (String line : lines) {
-            String[] parts = line.split(":");
+        return Arrays.stream(commandResponse.split("\n"))
+                .map(this::parseLineToContainerUsage)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+    }
 
-            if (parts.length == 3) {
-                String containerName = parts[0].trim();
-                String cpuUsage = parts[1].trim();
-                String memUsage = parts[2].trim();
+    private Map.Entry<String, Map<String, String>> parseLineToContainerUsage(String line) {
+        String[] parts = line.split(":");
 
-                Map<String, String> resourceUsageMap = new HashMap<>();
-                resourceUsageMap.put(DOCKER_RESOURCE_KEY_CPU, cpuUsage);
-                resourceUsageMap.put(DOCKER_RESOURCE_KEY_MEMORY, memUsage);
+        // 유효한 라인만 처리
+        if (parts.length == 3) {
+            String containerName = parts[0].trim();
+            String cpuUsage = parts[1].trim();
+            String memUsage = parts[2].trim();
 
-                containerUsageMap.put(containerName, resourceUsageMap);
-            }
+            Map<String, String> resourceUsageMap = Map.of(
+                    DOCKER_RESOURCE_KEY_CPU, cpuUsage,
+                    DOCKER_RESOURCE_KEY_MEMORY, memUsage
+            );
+
+            return Map.entry(containerName, resourceUsageMap);
         }
-        return containerUsageMap;
+
+        return null;
     }
 
     private void cacheResourceUsage(Long userId, Map<String, Map<String, String>> resourceUsage) {
