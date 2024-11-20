@@ -66,54 +66,56 @@ public class DockerService {
                 .anyMatch(name -> name.equals(containerName));
     }
 
-    // 컨테이너의 사용 리소스 조회
     public Map<String, Map<String, String>> findContainersResourceUsage(List<Project> projects, Long userId, boolean isUsingCache) {
-        // 1. 캐시를 사용하면 => 레디스에서 캐시된 값을 먼저 조회
-        Map<String, Map<String, String>> cachedUsage = isUsingCache ? getCachedResourceUsage(userId) : null;
-        if (cachedUsage != null) {
-            return cachedUsage;
+        Map<String, Map<String, String>> cachedResourceUsage = retrieveCachedResourceUsage(isUsingCache, userId);
+        if (hasCachedValue(cachedResourceUsage)) {
+            return cachedResourceUsage;
         }
 
-        // 2. 캐시를 사용하지 않거나 캐시된 값이 없음 => 명령어를 통해 조회
-        List<SshInfo> sshInfos = projects.stream()
-                .map(Project::getSshInfo)
-                .distinct()
-                .toList();
+        List<SshInfo> sshInfos = extractUniqueSshInfos(projects);
+        Map<String, Map<String, String>> resourceUsage = fetchResourceUsageFromSsh(sshInfos);
 
-        Map<String, Map<String, String>> containerUsageMap = new HashMap<>();
-        for(SshInfo sshInfo : sshInfos){
-            String commandResponse = sshService.executeCommandOnce(COMMAND_CONTAINER_STATS, sshInfo.getId());
-            Map<String, Map<String, String>> parsedMap = parseCommandResponse(commandResponse);
+        cacheResourceUsage(userId, resourceUsage);
 
-            containerUsageMap.putAll(parsedMap);
-        }
-
-        // 유효 시간 10분으로 저장
-        String value = convertMetricMapToString(containerUsageMap);
-        if(!value.isBlank()){
-            redisService.storeValue(RESOURCE_KEY, userId.toString(), value, RESOURCE_EXP);
-        }
-
-        return containerUsageMap;
+        return resourceUsage;
     }
 
-    private Map<String, Map<String, String>> getCachedResourceUsage(Long userId) {
+    private Map<String, Map<String, String>> retrieveCachedResourceUsage(boolean isUsingCache, Long userId) {
+        if (!isUsingCache) {
+            return Collections.emptyMap();
+        }
+
         String cachedValue = redisService.getValueInString(RESOURCE_KEY, userId.toString());
 
-        // 캐시된 값이 없으면 null 반환
         if (cachedValue == null) {
-            return null;
+            return Collections.emptyMap();
         }
 
         return convertStringToMetricMap(cachedValue);
+    }
+
+    private boolean hasCachedValue(Map<String, Map<String, String>> cachedResourceUsage) {
+        return !cachedResourceUsage.isEmpty();
     }
 
     private Map<String, Map<String, String>> convertStringToMetricMap(String cachedValue) {
         try {
             return objectMapper.readValue(cachedValue, new TypeReference<Map<String, Map<String, String>>>() {});
         } catch (JsonProcessingException e) {
-            return null;
+            return Collections.emptyMap();
         }
+    }
+
+    private Map<String, Map<String, String>> fetchResourceUsageFromSsh(List<SshInfo> sshInfos) {
+        Map<String, Map<String, String>> resourceUsageMap = new HashMap<>();
+
+        for (SshInfo sshInfo : sshInfos) {
+            String commandResponse = sshService.executeCommandOnce(COMMAND_CONTAINER_STATS, sshInfo.getId());
+            Map<String, Map<String, String>> parsedUsage = parseCommandResponse(commandResponse);
+            resourceUsageMap.putAll(parsedUsage);
+        }
+
+        return resourceUsageMap;
     }
 
     private Map<String, Map<String, String>> parseCommandResponse(String commandResponse) {
@@ -139,6 +141,20 @@ public class DockerService {
             }
         }
         return containerUsageMap;
+    }
+
+    private void cacheResourceUsage(Long userId, Map<String, Map<String, String>> resourceUsage) {
+        String value = convertMetricMapToString(resourceUsage);
+        if (!value.isBlank()) {
+            redisService.storeValue(RESOURCE_KEY, userId.toString(), value, RESOURCE_EXP);
+        }
+    }
+
+    private List<SshInfo> extractUniqueSshInfos(List<Project> projects) {
+        return projects.stream()
+                .map(Project::getSshInfo)
+                .distinct()
+                .toList();
     }
 
     private String convertMetricMapToString(Map<String, Map<String, String>> metricMap){
