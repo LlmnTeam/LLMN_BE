@@ -33,22 +33,22 @@ public class LlmService {
     private final WebClient webClient;
 
     @Value("${log.summary.uri}")
-    private String LOG_SUMMERY_URI;
+    private String logSummeryUri;
 
     @Value("${performance_summary.uri}")
-    private String PERFORMANCE_SUMMERY_URI;
+    private String performanceSummeryUri;
 
     @Value("${daily_summary.uri}")
-    private String DAILY_SUMMERY_URI;
+    private String dailySummeryUri;
 
     @Value("${hourly.summary.uri}")
-    private String HOURLY_SUMMARY_URI;
+    private String hourlySummaryUri;
 
     @Value("${trend.summary.uri}")
-    private String TREND_SUMMERY_URI;
+    private String trendSummeryUri;
 
     @Value("${recommend.uri}")
-    private String RECOMMEND_URI;
+    private String recommendUri;
 
     private static final String LOG_DATA_HEADER = "<Log Data>\n";
     private static final String PERFORMANCE_SUMMARY_HEADER = "<Performance Summary>\n";
@@ -162,7 +162,7 @@ public class LlmService {
 
         String summaryRequestBody = buildSummaryRequestBody(containerName, logContent);
 
-        return sendSummaryRequest(LOG_SUMMERY_URI, summaryRequestBody, LogDTO.SummaryResponseDTO.class);
+        return sendSummaryRequest(logSummeryUri, summaryRequestBody, LogDTO.SummaryResponseDTO.class);
     }
 
     private LogDTO.PerformanceSummaryResponseDTO fetchMetricSummary(Long sshInfoId){
@@ -178,7 +178,7 @@ public class LlmService {
         appendNetworkInMetrics(summaryRequestBody, metricHistory);
         appendNetworkOutMetrics(summaryRequestBody, metricHistory);
 
-        return sendSummaryRequest(PERFORMANCE_SUMMERY_URI, summaryRequestBody.toString(), LogDTO.PerformanceSummaryResponseDTO.class);
+        return sendSummaryRequest(performanceSummeryUri, summaryRequestBody.toString(), LogDTO.PerformanceSummaryResponseDTO.class);
     }
 
     private LogDTO.HourlySummaryResponseDTO fetchHourlySummary(Long userId) {
@@ -191,7 +191,7 @@ public class LlmService {
         appendSummaryWithHeader(summaryRequestBody, PERFORMANCE_SUMMARY_HEADER, performanceSummaries);
         appendLogSummary(summaryRequestBody, logSummaries);
 
-        return sendSummaryRequest(HOURLY_SUMMARY_URI, summaryRequestBody.toString(), LogDTO.HourlySummaryResponseDTO.class);
+        return sendSummaryRequest(hourlySummaryUri, summaryRequestBody.toString(), LogDTO.HourlySummaryResponseDTO.class);
     }
 
     private LogDTO.DailySummaryResponseDTO fetchDailySummary(Long userId) {
@@ -204,7 +204,7 @@ public class LlmService {
         appendSummaryWithHeader(summaryRequestBody, PERFORMANCE_SUMMARY_HEADER, performanceSummaries);
         appendLogSummary(summaryRequestBody, logSummaries);
 
-        return sendSummaryRequest(DAILY_SUMMERY_URI, summaryRequestBody.toString(), LogDTO.DailySummaryResponseDTO.class);
+        return sendSummaryRequest(dailySummeryUri, summaryRequestBody.toString(), LogDTO.DailySummaryResponseDTO.class);
     }
 
     private LogDTO.TrendSummaryResponseDTO fetchTrendSummary(Long userId){
@@ -215,7 +215,7 @@ public class LlmService {
         StringBuilder summaryRequestBody = new StringBuilder();
         appendSummaryWithHeader(summaryRequestBody, WEEKLY_TREND_HEADER, dailySummaries);
 
-        return sendSummaryRequest(TREND_SUMMERY_URI, summaryRequestBody.toString(), LogDTO.TrendSummaryResponseDTO.class);
+        return sendSummaryRequest(trendSummeryUri, summaryRequestBody.toString(), LogDTO.TrendSummaryResponseDTO.class);
     }
 
     private LogDTO.RecommendationDTO fetchRecommendation(Long userId) {
@@ -228,7 +228,7 @@ public class LlmService {
         appendSummaryWithHeader(summaryRequestBody, PERFORMANCE_SUMMARY_HEADER, performanceSummaries);
         appendLogSummary(summaryRequestBody, logSummaries);
 
-        return sendSummaryRequest(RECOMMEND_URI, summaryRequestBody.toString(), LogDTO.RecommendationDTO.class);
+        return sendSummaryRequest(recommendUri, summaryRequestBody.toString(), LogDTO.RecommendationDTO.class);
     }
 
     private void appendSummaryWithHeader(StringBuilder summaryRequestBody, String header, List<Summary> summaries) {
