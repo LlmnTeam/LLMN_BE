@@ -27,48 +27,38 @@ public class DockerService {
     private static final String RESOURCE_KEY = "resource";
     public static final String DOCKER_RESOURCE_KEY_CPU = "CPU";
     public static final String DOCKER_RESOURCE_KEY_MEMORY = "Memory";
-    public static final String COMMAND_DOCKER_STOP = "docker stop ";
-    public static final String COMMAND_DOCKER_RESTART = "docker restart ";
-    public static final String COMMAND_DOCKER_PS = "docker ps --format \"{{.Names}}\"";
-    public static final String COMMAND_DOCKER_STATS = "docker stats --no-stream --format \"{{.Name}}:{{.CPUPerc}}:{{.MemUsage}}\"";
+    public static final String COMMAND_CONTAINER_STOP = "docker stop ";
+    public static final String COMMAND_CONTAINER_RESTART = "docker restart ";
+    public static final String COMMAND_CONTAINER_PS = "docker ps --format \"{{.Names}}\"";
+    public static final String COMMAND_CONTAINER_STATS = "docker stats --no-stream --format \"{{.Name}}:{{.CPUPerc}}:{{.MemUsage}}\"";
     private static final Long RESOURCE_EXP = 10 * 60 * 1000L; // 10분
     private static final String BLANK_STRING = "";
 
-    // 도커 컨테이너 종료
     public boolean stopContainerByName(String containerName, Long projectId) {
         Long sshInfoId = projectRepository.findSshInfoId(projectId).orElseThrow(
                 () -> new CustomException(ExceptionCode.PROJECT_NOT_FOUND)
         );
 
-        String command = COMMAND_DOCKER_STOP + containerName;
+        String command = buildContainerCommand(COMMAND_CONTAINER_STOP, containerName);
         String commandResponse = sshService.executeCommandOnce(command, sshInfoId);
 
-        if(commandResponse.isBlank()){
-            return false;
-        }
-
-        return commandResponse.trim().equals(containerName);  // 성공 여부 true/false로 리턴
+        return isCommandSuccess(containerName, commandResponse);
     }
 
-    // 도커 컨테이너 재시작
     public boolean restartContainerByName(String containerName, Long projectId) {
         Long sshInfoId = projectRepository.findSshInfoId(projectId).orElseThrow(
                 () -> new CustomException(ExceptionCode.PROJECT_NOT_FOUND)
         );
 
-        String command = COMMAND_DOCKER_RESTART + containerName;
+        String command = buildContainerCommand(COMMAND_CONTAINER_RESTART, containerName);
         String commandResponse = sshService.executeCommandOnce(command, sshInfoId);
 
-        if(commandResponse.isBlank()){
-            return false;
-        }
-
-        return commandResponse.trim().equals(containerName); // 성공 여부 true/false로 리턴
+        return isCommandSuccess(containerName, commandResponse);
     }
 
     // 실행중인 도커 컨테이너 목록 조회
     public List<String> findRunningContainerList(Long sshInfoId) {
-        return Arrays.stream(sshService.executeCommandOnce(COMMAND_DOCKER_PS, sshInfoId).split("\n"))
+        return Arrays.stream(sshService.executeCommandOnce(COMMAND_CONTAINER_PS, sshInfoId).split("\n"))
                 .map(String::trim)
                 .filter(name -> !name.isEmpty())
                 .toList();
@@ -96,7 +86,7 @@ public class DockerService {
 
         Map<String, Map<String, String>> containerUsageMap = new HashMap<>();
         for(SshInfo sshInfo : sshInfos){
-            String commandResponse = sshService.executeCommandOnce(COMMAND_DOCKER_STATS, sshInfo.getId());
+            String commandResponse = sshService.executeCommandOnce(COMMAND_CONTAINER_STATS, sshInfo.getId());
             Map<String, Map<String, String>> parsedMap = parseCommandResponse(commandResponse);
 
             containerUsageMap.putAll(parsedMap);
@@ -162,5 +152,13 @@ public class DockerService {
             log.info("MetricMap 파싱 실패");
             return BLANK_STRING;
         }
+    }
+
+    private String buildContainerCommand(String commandType,String containerName) {
+        return commandType + containerName;
+    }
+
+    private boolean isCommandSuccess(String response, String containerName) {
+        return response != null && response.trim().equals(containerName);
     }
 }
