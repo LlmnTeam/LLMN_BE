@@ -144,7 +144,6 @@ public class MetricService {
     }
 
     private Map<String, Double> collectCpuAndMemoryMetrics(Long sshInfoId) {
-        // CPU와 메모리 사용량을 동시에 얻기 위해 top 명령어 실행
         String commandResponse = sshService.executeCommandOnce(COMMAND_TOP, sshInfoId);
         String[] lines = commandResponse.split("\n");
 
@@ -160,6 +159,7 @@ public class MetricService {
 
     private Map<String, Double> collectNetworkMetrics(Long sshInfoId) {
         Map<String, Double> currentNetworkMetric = collectCurrentNetworkMetrics(sshInfoId);
+
         if(currentNetworkMetric.isEmpty()){
             return Collections.emptyMap();
         }
@@ -168,11 +168,13 @@ public class MetricService {
     }
 
     private Map<String, Double> collectCurrentNetworkMetrics(Long sshInfoId) {
-        // 1st 네트워크를 조회하는 명령어를 실행
         String commandResponse = sshService.executeCommandOnce(COMMAND_NETWORK_USAGE, sshInfoId);
         String[] lines = commandResponse.split("\\n");
 
-        // 2nd 명령어 결과 파싱
+        return createNetworkMetricMap(lines);
+    }
+
+    private Map<String, Double> createNetworkMetricMap(String[] lines) {
         Map<String, Double> networkMetricMap = new HashMap<>();
         for (String line : lines) {
             networkMetricMap.putAll(parseNetworkUsage(line.trim()));
