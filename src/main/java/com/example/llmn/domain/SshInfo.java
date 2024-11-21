@@ -51,4 +51,8 @@ public class SshInfo extends TimeStamp{
     public void updateIsWorking(boolean isWorking){
         this.isWorking = isWorking;
     }
+
+    public boolean isMonitoringSsh(Long monitoringSshId) {
+        return this.id.equals(monitoringSshId);
+    }
 }

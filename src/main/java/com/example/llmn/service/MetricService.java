@@ -20,7 +20,6 @@ import java.time.LocalDateTime;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 import static com.example.llmn.core.utils.ConverterUtils.convertStringToLong;
 import static com.example.llmn.core.utils.DateTimeUtils.*;
@@ -61,18 +60,14 @@ public class MetricService {
     @Scheduled(cron = "0 0/10 * * * *")
     @Transactional
     public void collectMetrics() {
-        List<User> usersWithMonitoringSshId = userRepository.findByMonitoringSshIdIsNotNull();
+        List<User> users = userRepository.findByMonitoringSshIdIsNotNull();
 
-        // 모든 Metric을 수집한 후 한 번에 저장
-        List<Metric> allMetrics = usersWithMonitoringSshId.stream()
-                .flatMap(user -> collectMetricsForUser(user).stream())
-                .collect(Collectors.toList());
+        List<Metric> allMetrics = collectAllMetrics(users);
 
         if (!allMetrics.isEmpty()) {
             metricRepository.saveAll(allMetrics);
         }
     }
-
 
     public MetricResponse.FindCurrentMetricDTO findCurrentMetric(Long sshInfoId) {
         MetricResponse.FindCurrentMetricDTO cachedMetric = getCachedMetric(sshInfoId);
@@ -80,13 +75,11 @@ public class MetricService {
             return cachedMetric;
         }
 
-        // 캐시된 값이 없음 => 새로운 Metric 수집
         Map<String, Double> cpuAndMemoryMetrics = collectCpuAndMemoryMetrics(sshInfoId);
         Map<String, Double> networkMetrics = collectNetworkMetrics(sshInfoId);
         MetricResponse.FindCurrentMetricDTO metricDTO = createFindCurrentMetricDTO(cpuAndMemoryMetrics, networkMetrics);
 
-        // 새로운 Metric 저장
-        saveMetricToCache(sshInfoId, metricDTO);
+        cacheMetric(sshInfoId, metricDTO);
 
         return metricDTO;
     }
@@ -98,8 +91,7 @@ public class MetricService {
         List<MetricResponse.NetworkInMetricDTO> networkInMetricDTOS = new ArrayList<>();
         List<MetricResponse.NetworkOutMetricDTO> networkOutMetricDTOS = new ArrayList<>();
 
-        // minusHour 내 지표들을 모두 가져옴
-        LocalDateTime startTime = getStartOfCurrentHourMinusHours(minusHour);
+        LocalDateTime startTime = getCurrentHourStartMinusHours(minusHour);
         List<Metric> metrics = metricRepository.findMetricsAfter(startTime, sshInfoId);
 
         metrics.forEach(metric -> {
@@ -113,28 +105,33 @@ public class MetricService {
         return new MetricResponse.FindMetricHistoryDTO(cpuMetricDTOS, memoryMetricDTOS, networkInMetricDTOS, networkOutMetricDTOS);
     }
 
+    private List<Metric> collectAllMetrics(List<User> users) {
+        return users.stream()
+                .flatMap(user -> collectMetricsForUser(user).stream())
+                .toList();
+    }
+
     private List<Metric> collectMetricsForUser(User user) {
         Long monitoringSshId = user.getMonitoringSshId();
         List<SshInfo> sshInfos = sshInfoRepository.findByUserId(user.getId());
 
         return sshInfos.stream()
-                .filter(sshInfo -> isMonitoringSsh(sshInfo, monitoringSshId))
-                .map(sshInfo -> Optional.ofNullable(collectMetricsData(sshInfo)))
+                .filter(sshInfo -> sshInfo.isMonitoringSsh(monitoringSshId))
+                .map(sshInfo -> Optional.ofNullable(collectMetricsFromSsh(sshInfo)))
                 .filter(Optional::isPresent)
                 .map(Optional::get)
-                .collect(Collectors.toList());
+                .toList();
     }
 
-    private Metric collectMetricsData(SshInfo sshInfo) {
+    private Metric collectMetricsFromSsh(SshInfo sshInfo) {
         Map<String, Double> cpuAndMemoryMetrics = collectCpuAndMemoryMetrics(sshInfo.getId());
         Map<String, Double> networkMetrics = collectNetworkMetrics(sshInfo.getId());
-
-        // 다음 누적량 계산을 위해 네트워크 지표는 캐시로 저장
-        saveNetworkMetricToCache(networkMetrics);
 
         if (cpuAndMemoryMetrics.isEmpty() || networkMetrics.isEmpty()) {
             return null;
         }
+
+        cacheNetworkMetric(networkMetrics);
 
         return Metric.builder()
                 .sshInfo(sshInfo)
@@ -251,7 +248,7 @@ public class MetricService {
         }
     }
 
-    private void saveMetricToCache(Long sshInfoId, MetricResponse.FindCurrentMetricDTO metricDTO) {
+    private void cacheMetric(Long sshInfoId, MetricResponse.FindCurrentMetricDTO metricDTO) {
         String value = convertMetricDtoToString(metricDTO);
 
         if (!value.isBlank()) {
@@ -259,7 +256,7 @@ public class MetricService {
         }
     }
 
-    private void saveNetworkMetricToCache(Map<String, Double> currentNetworkMetric) {
+    private void cacheNetworkMetric(Map<String, Double> currentNetworkMetric) {
         redisService.storeValue(REDIS_KEY_NETWORK_REC, String.valueOf(currentNetworkMetric.get(METRIC_MAP_NETWORK_REC)));
         redisService.storeValue(REDIS_KEY_NETWORK_TRANS, String.valueOf(currentNetworkMetric.get(METRIC_MAP_NETWORK_SENT)));
     }
@@ -334,10 +331,6 @@ public class MetricService {
 
     private double convertBytesToMB(long bytes) {
         return bytes / BYTES_TO_MB_DIVISOR;
-    }
-
-    private boolean isMonitoringSsh(SshInfo sshInfo, Long monitoringSshId) {
-        return sshInfo.getId().equals(monitoringSshId);
     }
 
     private  MetricResponse.FindCurrentMetricDTO createFindCurrentMetricDTO(Map<String, Double> cpuAndMemoryMetrics, Map<String, Double> networkMetrics){

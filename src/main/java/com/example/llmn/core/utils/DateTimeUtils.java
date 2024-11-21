@@ -46,7 +46,7 @@ public class DateTimeUtils {
         return LocalDateTime.parse(dateTimePart, FORMATTER_LOG_FILE);
     }
 
-    public static LocalDateTime getStartOfCurrentHourMinusHours(int minusHour){
+    public static LocalDateTime getCurrentHourStartMinusHours(int minusHour){
         return  LocalDateTime.now()
                 .withMinute(0)
                 .withSecond(0)

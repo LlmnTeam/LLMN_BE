@@ -80,10 +80,10 @@ public class SSHCommandExecutor {
             }
             return resultBuilder.toString();
         } catch (IOException e){
-            log.info("<SSHD> ShellChannel에서 '" + command + "' 명령어 실행 실패 : " + e);
+            log.error("<SSHD> ShellChannel에서 '" + command + "' 명령어 실행 실패 : " + e);
             return FAIL_COMMAND;
         } catch (InterruptedException e) {
-            log.info("<SSHD> 명령어 실행 중 쓰레드에 문제 발생 : " + e);
+            log.error("<SSHD> 명령어 실행 중 쓰레드에 문제 발생 : " + e);
             return FAIL_COMMAND;
         }
     }
