@@ -8,8 +8,6 @@ import com.example.llmn.domain.User;
 import com.example.llmn.repository.MetricRepository;
 import com.example.llmn.repository.SshInfoRepository;
 import com.example.llmn.repository.UserRepository;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -44,9 +42,9 @@ public class MetricService {
     private static final String METRIC_MAP_CPU_USAGE = "cpuUsage";
     private static final String METRIC_MAP_TOTAL_MEMORY = "totalMemory";
     private static final String METRIC_MAP_USED_MEMORY = "usedMemory";
-    private static final String METRIC_MAP_NETWORK_REC = "networkReceived";
+    private static final String METRIC_MAP_NETWORK_RECEIVED = "networkReceived";
     private static final String METRIC_MAP_NETWORK_SENT ="networkSent";
-    private static final String METRIC_MAP_DAILY_NET_REC = "dailyReceived";
+    private static final String METRIC_MAP_DAILY_NET_RECEIVED = "dailyReceived";
     private static final String METRIC_MAP_DAILY_NET_SENT ="dailySent";
     private static final String COMMAND_TOP = "top -b -n1 | grep \"Cpu(s)\\|Mem\"";
     private static final String COMMAND_NETWORK_USAGE = "cat /proc/net/dev";
@@ -139,7 +137,7 @@ public class MetricService {
                 .cpuUsage(cpuAndMemoryMetrics.get(METRIC_MAP_CPU_USAGE))
                 .totalMemory(cpuAndMemoryMetrics.get(METRIC_MAP_TOTAL_MEMORY))
                 .usedMemory(cpuAndMemoryMetrics.get(METRIC_MAP_USED_MEMORY))
-                .totalBytesReceived(networkMetrics.get(METRIC_MAP_NETWORK_REC))
+                .totalBytesReceived(networkMetrics.get(METRIC_MAP_NETWORK_RECEIVED))
                 .totalBytesSent(networkMetrics.get(METRIC_MAP_NETWORK_SENT))
                 .build();
     }
@@ -186,7 +184,6 @@ public class MetricService {
     }
 
     private Map<String, Long> findTodayNetworkMetrics(Long sshInfoId) {
-        // 하루 동안의 누적 네트워크 트래픽 계산
         LocalDateTime todayStart = LocalDateTime.now().withHour(0).withMinute(0).withSecond(0).withNano(0);
         List<Metric> networkMetrics = metricRepository.findMetricsAfter(todayStart, sshInfoId);
 
@@ -194,34 +191,31 @@ public class MetricService {
     }
 
     private Map<String, Double> calculateNetworkUsage(Map<String, Double> currentNetworkMetrics) {
-        // 레디스에서 이전 네트워크 사용량 조회 (없으면 0.0 반환)
-        Double previousReceived = redisService.getValueInDouble(REDIS_KEY_NETWORK_REC);
-        Double previousTransmitted = redisService.getValueInDouble(REDIS_KEY_NETWORK_TRANS);
+        Double previousReceivedMB = redisService.getValueInDouble(REDIS_KEY_NETWORK_REC);
+        Double previousTransmittedMB = redisService.getValueInDouble(REDIS_KEY_NETWORK_TRANS);
 
-        Double receivedDiff = currentNetworkMetrics.getOrDefault(METRIC_MAP_NETWORK_REC, DEFAULT_METRIC_VALUE) - previousReceived;
-        Double transmittedDiff = currentNetworkMetrics.getOrDefault(METRIC_MAP_NETWORK_SENT, DEFAULT_METRIC_VALUE) - previousTransmitted;
+        Double receivedDifference = currentNetworkMetrics.getOrDefault(METRIC_MAP_NETWORK_RECEIVED, DEFAULT_METRIC_VALUE) - previousReceivedMB;
+        Double transmittedDifference = currentNetworkMetrics.getOrDefault(METRIC_MAP_NETWORK_SENT, DEFAULT_METRIC_VALUE) - previousTransmittedMB;
 
-        Map<String, Double> networkMetricMap = new HashMap<>();
-        networkMetricMap.put(METRIC_MAP_NETWORK_REC, receivedDiff);
-        networkMetricMap.put(METRIC_MAP_NETWORK_SENT, transmittedDiff);
-
-        return networkMetricMap;
+        return Map.of(
+                METRIC_MAP_NETWORK_RECEIVED, receivedDifference,
+                METRIC_MAP_NETWORK_SENT, transmittedDifference
+        );
     }
 
     private Map<String, Long> calculateTotalNetworkUsage(List<Metric> metrics) {
-        long totalReceived = metrics.stream()
+        Long totalReceived = metrics.stream()
                 .mapToLong(metric -> Math.round(metric.getTotalBytesReceived()))
                 .sum();
 
-        long totalSent = metrics.stream()
+        Long totalSent = metrics.stream()
                 .mapToLong(metric -> Math.round(metric.getTotalBytesSent()))
                 .sum();
 
-        Map<String, Long> networkMetricMap = new HashMap<>();
-        networkMetricMap.put(METRIC_MAP_DAILY_NET_REC, totalReceived);
-        networkMetricMap.put(METRIC_MAP_DAILY_NET_SENT, totalSent);
-
-        return networkMetricMap;
+        return Map.of(
+                METRIC_MAP_DAILY_NET_RECEIVED, totalReceived,
+                METRIC_MAP_DAILY_NET_SENT, totalSent
+        );
     }
 
     private MetricResponse.FindCurrentMetricDTO getCachedMetric(Long sshInfoId) {
@@ -242,7 +236,7 @@ public class MetricService {
     }
 
     private void cacheNetworkMetric(Map<String, Double> currentNetworkMetric) {
-        redisService.storeValue(REDIS_KEY_NETWORK_REC, String.valueOf(currentNetworkMetric.get(METRIC_MAP_NETWORK_REC)));
+        redisService.storeValue(REDIS_KEY_NETWORK_REC, String.valueOf(currentNetworkMetric.get(METRIC_MAP_NETWORK_RECEIVED)));
         redisService.storeValue(REDIS_KEY_NETWORK_TRANS, String.valueOf(currentNetworkMetric.get(METRIC_MAP_NETWORK_SENT)));
     }
 
@@ -285,7 +279,7 @@ public class MetricService {
                 long receivedBytes = convertStringToLong(parts[RECEIVED_BYTES_INDEX]);  // 수신된 바이트
                 long transmittedBytes = convertStringToLong(parts[TRANSMITTED_BYTES_INDEX]);  // 송신된 바이트
 
-                networkUsageMap.put(METRIC_MAP_NETWORK_REC, convertBytesToMB(receivedBytes));
+                networkUsageMap.put(METRIC_MAP_NETWORK_RECEIVED, convertBytesToMB(receivedBytes));
                 networkUsageMap.put(METRIC_MAP_NETWORK_SENT, convertBytesToMB(transmittedBytes));
             }
         }
@@ -323,7 +317,7 @@ public class MetricService {
                 cpuAndMemoryMetrics.getOrDefault(METRIC_MAP_CPU_USAGE, DEFAULT_METRIC_VALUE),
                 cpuAndMemoryMetrics.getOrDefault(METRIC_MAP_TOTAL_MEMORY, DEFAULT_METRIC_VALUE),
                 cpuAndMemoryMetrics.getOrDefault(METRIC_MAP_USED_MEMORY, DEFAULT_METRIC_VALUE),
-                networkMetrics.getOrDefault(METRIC_MAP_NETWORK_REC, DEFAULT_METRIC_VALUE),
+                networkMetrics.getOrDefault(METRIC_MAP_NETWORK_RECEIVED, DEFAULT_METRIC_VALUE),
                 networkMetrics.getOrDefault(METRIC_MAP_NETWORK_SENT, DEFAULT_METRIC_VALUE)
         );
     }
