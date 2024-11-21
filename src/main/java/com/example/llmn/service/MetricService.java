@@ -23,6 +23,8 @@ import java.util.regex.Pattern;
 
 import static com.example.llmn.core.utils.ConverterUtils.convertStringToLong;
 import static com.example.llmn.core.utils.DateTimeUtils.*;
+import static com.example.llmn.core.utils.JsonUtils.convertJsonToMetricDTO;
+import static com.example.llmn.core.utils.JsonUtils.convertMetricDtoToJson;
 
 @Service
 @RequiredArgsConstructor
@@ -34,7 +36,6 @@ public class MetricService {
     private final SshInfoRepository sshInfoRepository;
     private final RedisService redisService;
     private final SSHService sshService;
-    private final ObjectMapper objectMapper;
 
     private static final String REDIS_KEY_NETWORK_REC = "network:received";
     private static final String REDIS_KEY_NETWORK_TRANS = "network:transmitted";
@@ -229,29 +230,11 @@ public class MetricService {
             return null;
         }
 
-        return convertStringToMetricDTO(cachedValue);
-    }
-
-    private MetricResponse.FindCurrentMetricDTO convertStringToMetricDTO(String value) {
-        try {
-            return objectMapper.readValue(value, MetricResponse.FindCurrentMetricDTO.class);
-        } catch (JsonProcessingException e) {
-            log.error("ObjectMapper 파싱 과정에서 에러 발생");
-            return null;
-        }
-    }
-
-    private String convertMetricDtoToString(MetricResponse.FindCurrentMetricDTO metricDTO){
-        try {
-            return objectMapper.writeValueAsString(metricDTO);
-        } catch (JsonProcessingException e) {
-            log.error("ObjectMapper 파싱 과정에서 에러 발생");
-            return "";
-        }
+        return convertJsonToMetricDTO(cachedValue);
     }
 
     private void cacheMetric(Long sshInfoId, MetricResponse.FindCurrentMetricDTO metricDTO) {
-        String value = convertMetricDtoToString(metricDTO);
+        String value = convertMetricDtoToJson(metricDTO);
 
         if (!value.isBlank()) {
             redisService.storeValue(METRIC_KEY, sshInfoId.toString(), value, METRIC_EXP);

@@ -1,5 +1,6 @@
 package com.example.llmn.core.utils;
 
+import com.example.llmn.controller.DTO.MetricResponse;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -40,6 +41,22 @@ public class JsonUtils {
             return objectMapper.readValue(json, new TypeReference<Map<String, Map<String, String>>>() {});
         } catch (JsonProcessingException e) {
             return Collections.emptyMap();
+        }
+    }
+
+    public static MetricResponse.FindCurrentMetricDTO convertJsonToMetricDTO(String json) {
+        try {
+            return objectMapper.readValue(json, MetricResponse.FindCurrentMetricDTO.class);
+        } catch (JsonProcessingException e) {
+            return null;
+        }
+    }
+
+    public static String convertMetricDtoToJson(MetricResponse.FindCurrentMetricDTO metricDTO){
+        try {
+            return objectMapper.writeValueAsString(metricDTO);
+        } catch (JsonProcessingException e) {
+            return "";
         }
     }
 }
