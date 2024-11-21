@@ -29,6 +29,7 @@ public class EmailUtils {
     private String serviceMailAccount;
 
     private static final String UTF_EIGHT_ENCODING = "UTF-8";
+    private static final String CHAR_SET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 
     @Async
     public void sendMail(String toEmail, String subject, String templateName, Map<String, Object> templateModel) {
@@ -36,36 +37,32 @@ public class EmailUtils {
             MimeMessage message = createMimeMessage(toEmail, subject, templateName, templateModel);
             mailSender.send(message);
         } catch (MessagingException e){
-            log.info(toEmail + "로의 메일 전송에 실패했습니다");
+            log.error("{}로의 메일 전송에 실패했습니다", toEmail);
         }
     }
 
     public static String generateVerificationCode() {
-        String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
         SecureRandom random = new SecureRandom();
-
         return IntStream.range(0, 8) // 8자리
-                .map(i -> random.nextInt(chars.length()))
-                .mapToObj(chars::charAt)
+                .map(i -> random.nextInt(CHAR_SET.length()))
+                .mapToObj(CHAR_SET::charAt)
                 .map(Object::toString)
                 .collect(Collectors.joining());
     }
 
     private MimeMessage createMimeMessage(String toEmail, String subject, String templateName, Map<String, Object> templateModel) throws MessagingException {
         MimeMessage message = mailSender.createMimeMessage();
-        MimeMessageHelper helper = new MimeMessageHelper(message, true, UTF_EIGHT_ENCODING);
 
+        MimeMessageHelper helper = new MimeMessageHelper(message, true, UTF_EIGHT_ENCODING);
         helper.setFrom(serviceMailAccount);
         helper.setTo(toEmail);
         helper.setSubject(subject);
-
-        String htmlContent = generateHtmlContent(templateName, templateModel);
-        helper.setText(htmlContent, true);
+        helper.setText(createHtmlText(templateName, templateModel), true);
 
         return message;
     }
 
-    private String generateHtmlContent(String templateName, Map<String, Object> templateModel) {
+    private String createHtmlText(String templateName, Map<String, Object> templateModel) {
         Context context = new Context();
         templateModel.forEach(context::setVariable);
         return templateEngine.process(templateName, context);
