@@ -121,29 +121,32 @@ public class SSHService {
         }
     }
 
-    public synchronized SSHCommandExecutor getSshExecutor(Long sshInfoId, boolean isFirstExecution) {
-        // 세션이 열려있으면 그대로 반환
-        SSHCommandExecutor executor = executorSession.get(sshInfoId);
-        if(!isFirstExecution && executor != null && executor.isConnected()){
-            return executor;
+    public SSHCommandExecutor getSshExecutor(Long sshInfoId, boolean isFirstExecution) {
+        if (!isFirstExecution) {
+            SSHCommandExecutor executor = executorSession.get(sshInfoId);
+            if (executor != null && executor.isConnected()) {
+                return executor;
+            }
         }
 
-        // SSH 정보 가져오기
-        SshInfoDTO sshInfoDTO = getSshInfo(sshInfoId);
-        if (sshInfoDTO == null) {
-            log.info("SSH 정보가 존재하지 않거나 작동하지 않습니다. SSH 정보 ID: " + sshInfoId);
-            return null;
-        }
+        return executorSession.computeIfAbsent(sshInfoId, id -> {
+            SshInfoDTO sshInfoDTO = getSshInfo(id);
+            if (sshInfoDTO == null) {
+                log.info("SSH 정보가 존재하지 않거나 작동하지 않습니다. SSH 정보 ID: " + id);
+                return null;
+            }
 
-        // 새로운 세션 생성 후 저장
-        try {
-            SSHCommandExecutor newExecutor = new SSHCommandExecutor(sshInfoDTO.remoteHost(), sshInfoDTO.remoteName(), sshInfoDTO.remoteKeyPath());
-            executorSession.put(sshInfoId, newExecutor);
-            return newExecutor;
-        } catch (Exception e) {
-            log.info("SSH 세션 연결 중 예외가 발생했습니다. SSH 정보 ID: " + sshInfoId + " 오류: " + e.getMessage());
-            return null;
-        }
+            try {
+                return new SSHCommandExecutor(
+                        sshInfoDTO.remoteHost(),
+                        sshInfoDTO.remoteName(),
+                        sshInfoDTO.remoteKeyPath()
+                );
+            } catch (Exception e) {
+                log.info("SSH 세션 연결 중 예외가 발생했습니다. SSH 정보 ID: " + id + " 오류: " + e.getMessage());
+                return null;
+            }
+        });
     }
 
     private SshInfoDTO getSshInfo(Long sshInfoId) {
