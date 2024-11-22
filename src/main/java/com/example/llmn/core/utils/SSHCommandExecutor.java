@@ -68,8 +68,8 @@ public class SSHCommandExecutor {
             log.error("<SSHD> ShellChannel에서 '{}' 명령어 실행 실패: {}", command, e.getMessage());
             return FAIL_COMMAND;
         } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
             log.error("<SSHD> 명령어 실행 중 쓰레드에 문제 발생 : {}", String.valueOf(e));
+            Thread.currentThread().interrupt();
             return FAIL_COMMAND;
         }
     }
@@ -91,8 +91,11 @@ public class SSHCommandExecutor {
     public void flushInitialMessage() {
         try {
             readCommandOutput();
-        } catch (IOException | InterruptedException e){
-            log.error("초기 명령어 flush 실패");
+        } catch (IOException e) {
+            log.error("초기 명령어 flush 실패", e);
+        } catch (InterruptedException e) {
+            log.error("초기 명령어 flush 중 인터럽트 발생", e);
+            Thread.currentThread().interrupt();
         }
     }
 
