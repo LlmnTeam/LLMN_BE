@@ -47,6 +47,7 @@ public class SSHCommandExecutor {
     private static final int PTY_HEIGHT = 480;
     private static final int BUFFER_SIZE = 4096;
     private static final int SLEEP_DURATION_MS = 100;
+    private static final String BLANK_STRING = "";
 
     public SSHCommandExecutor(String host, String username, String privateKeyPath) throws Exception {
         this.client = initializeSSHClient();
@@ -73,30 +74,17 @@ public class SSHCommandExecutor {
     }
 
     public String executeCommandOnce(String command)  {
-        StringBuilder resultBuilder = new StringBuilder();
-
         if (!session.isOpen()) {
-            log.info("세션이 닫혀 있어 명령어를 실행할 수 없습니다.");
+            return BLANK_STRING;
         }
 
         try (ClientChannel channel = session.createExecChannel(command)) {
-            ByteArrayOutputStream responseStream = new ByteArrayOutputStream();
-            channel.setOut(responseStream);
-
-            channel.open().verify(5, TimeUnit.SECONDS);
-
-            Set<ClientChannelEvent> events = channel.waitFor(EnumSet.of(ClientChannelEvent.CLOSED), TimeUnit.MINUTES.toMillis(5));
-            if (events.contains(ClientChannelEvent.TIMEOUT)) {
-                throw new CustomException(ExceptionCode.SSH_TIME_OUT);
-            }
-
-            resultBuilder.append(responseStream.toString(StandardCharsets.UTF_8));
+            ByteArrayOutputStream responseStream = executeCommandInExecChannel(channel);
+            return decodeByteArrayStream(responseStream);
         } catch (IOException e){
-            log.info("<SSHD> ClientChannel에서 '" + command + "' 명령어 실행 실패 : " + e);
+            log.error("<SSHD> ClientChannel에서 '{}' 명령어 실행 실패: {}", command, e.getMessage());
             throw new CustomException(ExceptionCode.SSH_COMMAND_FAIL);
         }
-
-        return resultBuilder.toString();
     }
 
     public void close() {
@@ -232,6 +220,31 @@ public class SSHCommandExecutor {
 
     private String decodeToUtf8(byte[] buffer, int bytesRead) {
         return new String(buffer, 0, bytesRead, StandardCharsets.UTF_8);
+    }
+
+    private ByteArrayOutputStream executeCommandInExecChannel(ClientChannel channel) throws IOException {
+        ByteArrayOutputStream responseStream = new ByteArrayOutputStream();
+        channel.setOut(responseStream);
+
+        openChannel(channel);
+        waitForChannelClosure(channel);
+
+        return responseStream;
+    }
+
+    private void openChannel(ClientChannel channel) throws IOException {
+        channel.open().verify(5, TimeUnit.SECONDS);
+    }
+
+    private void waitForChannelClosure(ClientChannel channel) {
+        Set<ClientChannelEvent> events = channel.waitFor(EnumSet.of(ClientChannelEvent.CLOSED), TimeUnit.MINUTES.toMillis(5));
+        if (events.contains(ClientChannelEvent.TIMEOUT)) {
+            throw new CustomException(ExceptionCode.SSH_TIME_OUT);
+        }
+    }
+
+    private String decodeByteArrayStream(ByteArrayOutputStream stream) {
+        return stream.toString(StandardCharsets.UTF_8);
     }
 
     public void flushInitialMessage() {
