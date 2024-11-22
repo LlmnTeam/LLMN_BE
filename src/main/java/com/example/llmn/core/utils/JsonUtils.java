@@ -16,7 +16,7 @@ public class JsonUtils {
 
     private JsonUtils() {}
 
-    private static final String BLANK_STRING = "";
+    private static final String EMPTY_JSON = "{}";
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
     public static String normalizeJson(String jsonValue) {
@@ -24,6 +24,7 @@ public class JsonUtils {
             JsonNode rootNode = objectMapper.readTree(jsonValue);
             return objectMapper.writeValueAsString(rootNode);
         } catch (IOException e) {
+            log.warn("JSON 문자열을 정상화할 수 없습니다: {}", jsonValue, e);
             return jsonValue;
         }
     }
@@ -32,7 +33,8 @@ public class JsonUtils {
         try {
             return objectMapper.writeValueAsString(map);
         } catch (JsonProcessingException e) {
-            return BLANK_STRING;
+            log.error("맵을 JSON 문자열로 변환하는 중 오류 발생", e);
+            return EMPTY_JSON;
         }
     }
 
@@ -40,6 +42,7 @@ public class JsonUtils {
         try {
             return objectMapper.readValue(json, new TypeReference<Map<String, Map<String, String>>>() {});
         } catch (JsonProcessingException e) {
+            log.error("JSON 문자열을 맵으로 변환하는 중 오류 발생: {}", json, e);
             return Collections.emptyMap();
         }
     }
@@ -48,6 +51,7 @@ public class JsonUtils {
         try {
             return objectMapper.readValue(json, MetricResponse.FindCurrentMetricDTO.class);
         } catch (JsonProcessingException e) {
+            log.error("JSON을 MetricDTO로 변환하는 중 오류 발생: {}", json, e);
             return null;
         }
     }
@@ -56,7 +60,12 @@ public class JsonUtils {
         try {
             return objectMapper.writeValueAsString(metricDTO);
         } catch (JsonProcessingException e) {
-            return "";
+            log.error("MetricDTO를 JSON 문자열로 변환하는 중 오류 발생: {}", metricDTO, e);
+            return EMPTY_JSON;
         }
+    }
+
+    public static boolean isNotEmpty(String json) {
+        return !EMPTY_JSON.equals(json);
     }
 }

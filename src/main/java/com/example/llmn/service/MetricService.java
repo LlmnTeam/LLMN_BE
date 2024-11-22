@@ -22,8 +22,7 @@ import java.util.regex.Pattern;
 
 import static com.example.llmn.core.utils.ConverterUtils.convertStringToLong;
 import static com.example.llmn.core.utils.DateTimeUtils.*;
-import static com.example.llmn.core.utils.JsonUtils.convertJsonToMetricDTO;
-import static com.example.llmn.core.utils.JsonUtils.convertMetricDtoToJson;
+import static com.example.llmn.core.utils.JsonUtils.*;
 
 @Service
 @RequiredArgsConstructor
@@ -231,7 +230,7 @@ public class MetricService {
     private void cacheMetric(Long sshInfoId, MetricResponse.FindCurrentMetricDTO metricDTO) {
         String value = convertMetricDtoToJson(metricDTO);
 
-        if (!value.isBlank()) {
+        if (isNotEmpty(value)) {
             redisService.storeValue(METRIC_KEY, sshInfoId.toString(), value, METRIC_EXP);
         }
     }

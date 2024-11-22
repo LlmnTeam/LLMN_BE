@@ -12,8 +12,7 @@ import org.springframework.stereotype.Service;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static com.example.llmn.core.utils.JsonUtils.convertJsonToMap;
-import static com.example.llmn.core.utils.JsonUtils.convertMapToJson;
+import static com.example.llmn.core.utils.JsonUtils.*;
 
 @Service
 @RequiredArgsConstructor
@@ -143,7 +142,8 @@ public class DockerService {
 
     private void cacheResourceUsage(Long userId, Map<String, Map<String, String>> resourceUsage) {
         String value = convertMapToJson(resourceUsage);
-        if (!value.isBlank()) {
+
+        if (isNotEmpty(value)) {
             redisService.storeValue(RESOURCE_KEY, userId.toString(), value, RESOURCE_EXP);
         }
     }
