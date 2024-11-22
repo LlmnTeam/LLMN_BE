@@ -45,6 +45,8 @@ public class SSHCommandExecutor {
     private static final int PTY_LINES = 24;
     private static final int PTY_WIDTH = 640;
     private static final int PTY_HEIGHT = 480;
+    private static final int BUFFER_SIZE = 4096;
+    private static final int SLEEP_DURATION_MS = 100;
 
     public SSHCommandExecutor(String host, String username, String privateKeyPath) throws Exception {
         this.client = initializeSSHClient();
@@ -55,35 +57,17 @@ public class SSHCommandExecutor {
         this.pipedOut = shellChannel.getInvertedOut();
     }
 
-    // 각 스레드가 동시에 동일한 SSH 세션에 접근하여 명령어를 실행하고, 동일한 pipedIn과 pipedOut 스트림에 동시 접근할 수 있는 문제 방지를 위해 syschronizrd 사용
     public synchronized String executeCommandInShell(String command) {
         try {
             clearOutputStream();
-
-            // 명령어를 지속적으로 입력받아 실행
-            pipedIn.write((command + "\n").getBytes());
-            pipedIn.flush();
-
-            // 결과를 비동기적으로 읽음 => 응답이 완료될 때까지
-            StringBuilder resultBuilder = new StringBuilder();
-            byte[] buffer = new byte[4096];
-            boolean commandCompleted = false;
-
-            while (!commandCompleted) {
-                readAvailableOutput(resultBuilder, buffer);
-
-                // 결과값을 통해 완료 여부 체크 => 프롬프트가 나타나면 완료된 것으로 간주
-                commandCompleted = checkIfCommandCompleted(resultBuilder.toString());
-                if (!commandCompleted) {
-                    Thread.sleep(100); // CPU 자원 낭비 방지
-                }
-            }
-            return resultBuilder.toString();
+            writeCommand(command);
+            return readCommandOutput();
         } catch (IOException e){
-            log.error("<SSHD> ShellChannel에서 '" + command + "' 명령어 실행 실패 : " + e);
+            log.error("<SSHD> ShellChannel에서 '{}' 명령어 실행 실패: {}", command, e.getMessage());
             return FAIL_COMMAND;
         } catch (InterruptedException e) {
-            log.error("<SSHD> 명령어 실행 중 쓰레드에 문제 발생 : " + e);
+            Thread.currentThread().interrupt();
+            log.error("<SSHD> 명령어 실행 중 쓰레드에 문제 발생 : {}", String.valueOf(e));
             return FAIL_COMMAND;
         }
     }
@@ -132,7 +116,6 @@ public class SSHCommandExecutor {
         log.info("SSH 세션 및 Shell 채널, Redis 연결 종료.");
     }
 
-    // SSH 세션이 연결되어 있는지 확인
     public boolean isConnected() {
         return client != null && client.isOpen() && session != null && session.isOpen();
     }
@@ -142,7 +125,7 @@ public class SSHCommandExecutor {
             pipedIn.write(3); // ASCII 0x03을 전송하여 SIGINT 신호 보내기
             pipedIn.flush();
         } catch (IOException e) {
-            log.error("SIGINT 신호 전송 실패: " + e.getMessage());
+            log.error("SIGINT 신호 전송 실패: {}", e.getMessage());
         }
     }
 
@@ -202,26 +185,53 @@ public class SSHCommandExecutor {
         if (pipedOut.available() > 0) {
             byte[] buffer = new byte[4096];
 
-            // 데이터를 읽어 버림
             while (pipedOut.available() > 0) {
                 pipedOut.read(buffer);
             }
         }
     }
 
+    private void writeCommand(String command) throws IOException {
+        pipedIn.write((command + "\n").getBytes(StandardCharsets.UTF_8));
+        pipedIn.flush();
+    }
+
+    private String readCommandOutput() throws IOException, InterruptedException {
+        StringBuilder resultBuilder = new StringBuilder();
+        byte[] buffer = new byte[BUFFER_SIZE];
+
+        while (true) {
+            readAvailableOutput(resultBuilder, buffer);
+            if (checkIfCommandCompleted(resultBuilder.toString())) {
+                break;
+            }
+
+            Thread.sleep(SLEEP_DURATION_MS); // CPU 자원 낭비 방지
+        }
+
+        return resultBuilder.toString();
+    }
+
     private void readAvailableOutput(StringBuilder resultBuilder, byte[] buffer) throws IOException {
         while (pipedOut.available() > 0) {
             int bytesRead = pipedOut.read(buffer);
 
-            if (bytesRead != -1) {
-                String output = new String(buffer, 0, bytesRead, StandardCharsets.UTF_8);
-                System.out.println(output);
-                resultBuilder.append(output);
-
-                // Redis에 읽고 있는 데이터 전송
-                jedis.publish(REDIS_CHANNEL, output);
+            if (isEndOfStream(bytesRead)) {
+                break;
             }
+
+            String output = decodeToUtf8(buffer, bytesRead);
+            resultBuilder.append(output);
+            jedis.publish(REDIS_CHANNEL, output);
         }
+    }
+
+    private boolean isEndOfStream(int bytesRead) {
+        return bytesRead == -1;
+    }
+
+    private String decodeToUtf8(byte[] buffer, int bytesRead) {
+        return new String(buffer, 0, bytesRead, StandardCharsets.UTF_8);
     }
 
     public void flushInitialMessage() {
@@ -239,9 +249,9 @@ public class SSHCommandExecutor {
                 }
             }
         } catch (IOException e){
-            log.info("<SSHD> ShellChannel에서 명령어 실행 실패 : " + e);
+            log.info("<SSHD> ShellChannel에서 명령어 실행 실패 : {}", String.valueOf(e));
         } catch (InterruptedException e) {
-            log.info("<SSHD> 명령어 실행 중 쓰레드에 문제 발생 : " + e);
+            log.info("<SSHD> 명령어 실행 중 쓰레드에 문제 발생 : {}", String.valueOf(e));
         }
     }
 
