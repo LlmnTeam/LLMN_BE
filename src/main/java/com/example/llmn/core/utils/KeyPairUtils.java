@@ -27,11 +27,13 @@ public class KeyPairUtils {
 
     private static File validatePemKey(String pemKeyPath) throws IOException {
         File pemKey = new File(pemKeyPath);
-
         if (!pemKey.exists()) {
-            throw new IOException("Pem 키 파일이 존재하지 않음: " + pemKeyPath);
+            throw new IOException("Pem 키 파일이 존재하지 않습니다: " + pemKeyPath);
         }
-
+        if (!pemKey.canRead()) {
+            throw new IOException("Pem 키 파일을 읽을 수 없습니다: " + pemKeyPath);
+        }
+        
         return pemKey;
     }
 
@@ -42,7 +44,6 @@ public class KeyPairUtils {
         Collection<KeyPair> keyPairs = parser.loadKeyPairs(null, resourceKey, DEFAULT_PASSWORD_PROVIDER, inputStream);
 
         validateKeyPairs(keyPairs);
-
         return getFirstKeyPair(keyPairs);
     }
 
