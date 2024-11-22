@@ -22,6 +22,7 @@ import org.springframework.security.web.authentication.www.BasicAuthenticationFi
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Set;
 
 @Slf4j
 public class JwtAuthenticationFilter extends BasicAuthenticationFilter {
@@ -82,7 +83,8 @@ public class JwtAuthenticationFilter extends BasicAuthenticationFilter {
         redisService.addSetElement(createVisitKey(), user.getId());
 
         // Request 쿠키와 Response 쿠키 동기화
-        CookieUtils.syncHttpResponseCookiesFromHttpRequest(request, response, ACCESS_TOKEN_COOKIE_KEY, REFRESH_TOKEN_COOKIE_KEY);
+        Set<String> excludedCookies = Set.of(ACCESS_TOKEN_COOKIE_KEY, REFRESH_TOKEN_COOKIE_KEY);
+        CookieUtils.syncRequestCookiesToResponse(request, response, excludedCookies);
 
         // 엑세스 토큰은 HTTP Header로 리턴
         response.setHeader(HttpHeaders.AUTHORIZATION, JWTProvider.TOKEN_PREFIX + accessToken);
