@@ -48,6 +48,7 @@ public class SSHCommandExecutor {
     private static final int BUFFER_SIZE = 4096;
     private static final int SLEEP_DURATION_MS = 100;
     private static final String BLANK_STRING = "";
+    private static final int ASCII_0x03 = 3;
 
     public SSHCommandExecutor(String host, String username, String privateKeyPath) throws Exception {
         this.client = initializeSSHClient();
@@ -89,28 +90,15 @@ public class SSHCommandExecutor {
 
     public void flushInitialMessage() {
         try {
-            StringBuilder resultBuilder = new StringBuilder();
-            byte[] buffer = new byte[4096];
-            boolean commandCompleted = false;
-
-            while (!commandCompleted) {
-                readAvailableOutput(resultBuilder, buffer);
-
-                commandCompleted = checkIfCommandCompleted(resultBuilder.toString());
-                if (!commandCompleted) {
-                    Thread.sleep(100); // CPU 자원 낭비 방지
-                }
-            }
-        } catch (IOException e){
-            log.info("<SSHD> ShellChannel에서 명령어 실행 실패 : {}", String.valueOf(e));
-        } catch (InterruptedException e) {
-            log.info("<SSHD> 명령어 실행 중 쓰레드에 문제 발생 : {}", String.valueOf(e));
+            readCommandOutput();
+        } catch (IOException | InterruptedException e){
+            log.error("초기 명령어 flush 실패");
         }
     }
 
     public void sendSigint() {
         try {
-            pipedIn.write(3); // ASCII 0x03을 전송하여 SIGINT 신호 보내기
+            pipedIn.write(ASCII_0x03); // ASCII 0x03은 SIGINT 신호
             pipedIn.flush();
         } catch (IOException e) {
             log.error("SIGINT 신호 전송 실패: {}", e.getMessage());
