@@ -33,18 +33,24 @@ public class KeyPairUtils {
         if (!pemKey.canRead()) {
             throw new IOException("Pem 키 파일을 읽을 수 없습니다: " + pemKeyPath);
         }
-        
+
         return pemKey;
     }
 
     private static KeyPair parseKeyPair(File pemKey, InputStream inputStream) throws GeneralSecurityException, IOException {
-        NamedResource resourceKey = pemKey::getName;
-
         KeyPairResourceParser parser = SecurityUtils.getKeyPairResourceParser();
-        Collection<KeyPair> keyPairs = parser.loadKeyPairs(null, resourceKey, DEFAULT_PASSWORD_PROVIDER, inputStream);
+        if (parser == null) {
+            throw new GeneralSecurityException("등록된 KeyPair 파서를 찾을 수 없습니다.");
+        }
 
+        Collection<KeyPair> keyPairs = parser.loadKeyPairs(null, createResourceKey(pemKey), DEFAULT_PASSWORD_PROVIDER, inputStream);
         validateKeyPairs(keyPairs);
+
         return getFirstKeyPair(keyPairs);
+    }
+
+    private static NamedResource createResourceKey(File pemKey) {
+        return pemKey::getName;
     }
 
     private static void validateKeyPairs(Collection<KeyPair> keyPairs) throws IOException {
