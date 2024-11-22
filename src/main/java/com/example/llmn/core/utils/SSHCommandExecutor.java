@@ -130,19 +130,24 @@ public class SSHCommandExecutor {
         return sshClient;
     }
 
-    private ClientSession connectToSession(String host, String username, String privateKeyPath) throws Exception {
-        if (privateKeyPath.startsWith("file://")) {
-            privateKeyPath = Paths.get(URI.create(privateKeyPath)).toString();
+    private ClientSession connectToSession(String host, String username, String privateKeyPath) {
+        try {
+            if (privateKeyPath.startsWith("file://")) {
+                privateKeyPath = Paths.get(URI.create(privateKeyPath)).toString();
+            }
+
+            ConnectFuture connectFuture = client.connect(username, host, SSH_PORT);
+            ClientSession clientSession = connectFuture.verify(CONNECTION_TIMEOUT, TimeUnit.SECONDS).getSession();
+
+            KeyPair keyPair = KeyPairUtils.loadKeyPair(privateKeyPath);
+            clientSession.addPublicKeyIdentity(keyPair);
+            clientSession.auth().verify(AUTH_TIMEOUT, TimeUnit.SECONDS);
+
+            return clientSession;
+        } catch (Exception e) {
+            log.error("SSH 세션 연결 실패: host={}, username={}", host, username, e);
+            throw new CustomException(ExceptionCode.SSH_CONNECT_FAIL);
         }
-
-        ConnectFuture connectFuture = client.connect(username, host, SSH_PORT);
-        ClientSession newSession = connectFuture.verify(CONNECTION_TIMEOUT, TimeUnit.SECONDS).getSession();
-
-        KeyPair keyPair = KeyPairUtils.loadKeyPair(privateKeyPath);
-        newSession.addPublicKeyIdentity(keyPair);
-        newSession.auth().verify(AUTH_TIMEOUT, TimeUnit.SECONDS);
-
-        return newSession;
     }
 
     private ClientChannel configureShellChannel() throws Exception {

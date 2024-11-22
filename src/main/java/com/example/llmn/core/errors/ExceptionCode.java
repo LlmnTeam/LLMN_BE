@@ -38,10 +38,10 @@ public enum ExceptionCode {
     SSH_INFO_EMPTY(HttpStatus.BAD_REQUEST, "SSH 정보는 적어도 하나 이상 입력해야 합니다."),
     MONITORING_SSH_NOT_SELECT(HttpStatus.BAD_REQUEST, "모니터링 할 클라우드 인스턴스 호스트명이 잘못됐습니다."),
     DUPLICATE_SSH_HOST(HttpStatus.BAD_REQUEST, "SSH 호스트 이름이 중복됩니다."),
-    SSH_SESSION_CONNECT_FAIL(HttpStatus.BAD_REQUEST, "SSH 세션 연결을 실패하였습니다. 호스트, 유저, 키를 다시 확인해주세요."),
     SSH_COMMAND_FAIL(HttpStatus.INTERNAL_SERVER_ERROR, "SSH 명령어 실행에 실패하였습니다."),
     SSH_TIME_OUT(HttpStatus.INTERNAL_SERVER_ERROR, "SSH 명령어 실행 중 타임아웃이 발생하였습니다."),
     SSH_INFO_WRONG(HttpStatus.BAD_REQUEST, "현재 해당 SSH가 연결되어 있지 않으니 설정에서 다시 연결해주세요."),
+    SSH_CONNECT_FAIL(HttpStatus.BAD_REQUEST, "SSH 세션 연결을 실패했습니다. 호스트, 유저, 키를 다시 확인해주세요."),
 
     // ElasticSearch 오류
     ELASTIC_SEARCH_ERROR(HttpStatus.NOT_FOUND, "ElasticSearch에 문제가 발생했습니다."),
