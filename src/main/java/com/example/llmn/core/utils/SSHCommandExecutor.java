@@ -50,10 +50,10 @@ public class SSHCommandExecutor {
     private static final String BLANK_STRING = "";
     private static final int ASCII_0x03 = 3;
 
-    public SSHCommandExecutor(String host, String username, String privateKeyPath) throws Exception {
+    public SSHCommandExecutor(String host, String username, String privateKeyPath) {
         this.client = initializeSSHClient();
         this.session = connectToSession(host, username, privateKeyPath);
-        this.shellChannel = configureShellChannel();
+        this.shellChannel = createShellChannel();
         this.jedis = initializeJedis();
         this.pipedIn = shellChannel.getInvertedIn();
         this.pipedOut = shellChannel.getInvertedOut();
@@ -150,14 +150,16 @@ public class SSHCommandExecutor {
         }
     }
 
-    private ClientChannel configureShellChannel() throws Exception {
-        PtyChannelConfiguration ptyConfig = createPtyChannelConfiguration();
+    private ClientChannel createShellChannel() {
+        try {
+            PtyChannelConfiguration ptyConfig = createPtyChannelConfiguration();
 
-        ClientChannel channel = session.createShellChannel(ptyConfig, Collections.emptyMap());
-        if (channel != null) {
-            channel.open().verify(SHELL_CHANNEL_TIMEOUT, TimeUnit.SECONDS);
+            ClientChannel channel = session.createShellChannel(ptyConfig, Collections.emptyMap());
+            verifyChannelOpened(channel);
+
             return channel;
-        } else {
+        } catch (IOException e) {
+            log.error("Shell 채널 생성 중 오류 발생", e);
             throw new CustomException(ExceptionCode.SHELL_CONNECT_FAIL);
         }
     }
@@ -175,6 +177,10 @@ public class SSHCommandExecutor {
         ptyConfig.setPtyModes(terminalModes);
 
         return ptyConfig;
+    }
+
+    private void verifyChannelOpened(ClientChannel channel) throws IOException {
+        channel.open().verify(SHELL_CHANNEL_TIMEOUT, TimeUnit.SECONDS);
     }
 
     private Jedis initializeJedis() {

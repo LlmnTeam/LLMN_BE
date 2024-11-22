@@ -42,6 +42,7 @@ public enum ExceptionCode {
     SSH_TIME_OUT(HttpStatus.INTERNAL_SERVER_ERROR, "SSH 명령어 실행 중 타임아웃이 발생하였습니다."),
     SSH_INFO_WRONG(HttpStatus.BAD_REQUEST, "현재 해당 SSH가 연결되어 있지 않으니 설정에서 다시 연결해주세요."),
     SSH_CONNECT_FAIL(HttpStatus.BAD_REQUEST, "SSH 세션 연결을 실패했습니다. 호스트, 유저, 키를 다시 확인해주세요."),
+    SHELL_CONNECT_FAIL(HttpStatus.INTERNAL_SERVER_ERROR, "Shell 채널 생섵 실패"),
 
     // ElasticSearch 오류
     ELASTIC_SEARCH_ERROR(HttpStatus.NOT_FOUND, "ElasticSearch에 문제가 발생했습니다."),
@@ -60,10 +61,7 @@ public enum ExceptionCode {
     // 프로젝트 관련 에러
     PROJECT_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 프로젝트를 찾을 수 없습니다."),
     SSH_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 SSH 정보를 찾을 수 없습니다."),
-    MONITORING_SSH_NOT_FOUND(HttpStatus.NOT_FOUND, "모니터링 중인 SSH 정보가 설정되지 않았습니다."),
-
-    // 셀 관련 에러
-    SHELL_CONNECT_FAIL(HttpStatus.INTERNAL_SERVER_ERROR, "Shell 채널 초기화 실패");
+    MONITORING_SSH_NOT_FOUND(HttpStatus.NOT_FOUND, "모니터링 중인 SSH 정보가 설정되지 않았습니다.");
 
     private final HttpStatus httpStatus;
     private final String message;
