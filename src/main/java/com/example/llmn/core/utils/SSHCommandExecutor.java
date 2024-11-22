@@ -87,6 +87,36 @@ public class SSHCommandExecutor {
         }
     }
 
+    public void flushInitialMessage() {
+        try {
+            StringBuilder resultBuilder = new StringBuilder();
+            byte[] buffer = new byte[4096];
+            boolean commandCompleted = false;
+
+            while (!commandCompleted) {
+                readAvailableOutput(resultBuilder, buffer);
+
+                commandCompleted = checkIfCommandCompleted(resultBuilder.toString());
+                if (!commandCompleted) {
+                    Thread.sleep(100); // CPU 자원 낭비 방지
+                }
+            }
+        } catch (IOException e){
+            log.info("<SSHD> ShellChannel에서 명령어 실행 실패 : {}", String.valueOf(e));
+        } catch (InterruptedException e) {
+            log.info("<SSHD> 명령어 실행 중 쓰레드에 문제 발생 : {}", String.valueOf(e));
+        }
+    }
+
+    public void sendSigint() {
+        try {
+            pipedIn.write(3); // ASCII 0x03을 전송하여 SIGINT 신호 보내기
+            pipedIn.flush();
+        } catch (IOException e) {
+            log.error("SIGINT 신호 전송 실패: {}", e.getMessage());
+        }
+    }
+
     public void close() {
         if (shellChannel != null) {
             shellChannel.close(false);
@@ -100,39 +130,16 @@ public class SSHCommandExecutor {
         if (jedis != null) {
             jedis.close();
         }
-
-        log.info("SSH 세션 및 Shell 채널, Redis 연결 종료.");
     }
 
     public boolean isConnected() {
         return client != null && client.isOpen() && session != null && session.isOpen();
     }
 
-    public void sendSigint() {
-        try {
-            pipedIn.write(3); // ASCII 0x03을 전송하여 SIGINT 신호 보내기
-            pipedIn.flush();
-        } catch (IOException e) {
-            log.error("SIGINT 신호 전송 실패: {}", e.getMessage());
-        }
-    }
-
     private SshClient initializeSSHClient() {
         SshClient sshClient = SshClient.setUpDefaultClient();
         sshClient.start();
         return sshClient;
-    }
-
-    private ClientChannel configureShellChannel() throws Exception {
-        PtyChannelConfiguration ptyConfig = createPtyChannelConfiguration();
-
-        ClientChannel channel = session.createShellChannel(ptyConfig, Collections.emptyMap());
-        if (channel != null) {
-            channel.open().verify(SHELL_CHANNEL_TIMEOUT, TimeUnit.SECONDS);
-            return channel;
-        } else {
-            throw new CustomException(ExceptionCode.SHELL_CONNECT_FAIL);
-        }
     }
 
     private ClientSession connectToSession(String host, String username, String privateKeyPath) throws Exception {
@@ -148,6 +155,18 @@ public class SSHCommandExecutor {
         newSession.auth().verify(AUTH_TIMEOUT, TimeUnit.SECONDS);
 
         return newSession;
+    }
+
+    private ClientChannel configureShellChannel() throws Exception {
+        PtyChannelConfiguration ptyConfig = createPtyChannelConfiguration();
+
+        ClientChannel channel = session.createShellChannel(ptyConfig, Collections.emptyMap());
+        if (channel != null) {
+            channel.open().verify(SHELL_CHANNEL_TIMEOUT, TimeUnit.SECONDS);
+            return channel;
+        } else {
+            throw new CustomException(ExceptionCode.SHELL_CONNECT_FAIL);
+        }
     }
 
     private PtyChannelConfiguration createPtyChannelConfiguration() {
@@ -245,27 +264,6 @@ public class SSHCommandExecutor {
 
     private String decodeByteArrayStream(ByteArrayOutputStream stream) {
         return stream.toString(StandardCharsets.UTF_8);
-    }
-
-    public void flushInitialMessage() {
-        try {
-            StringBuilder resultBuilder = new StringBuilder();
-            byte[] buffer = new byte[4096];
-            boolean commandCompleted = false;
-
-            while (!commandCompleted) {
-                readAvailableOutput(resultBuilder, buffer);
-
-                commandCompleted = checkIfCommandCompleted(resultBuilder.toString());
-                if (!commandCompleted) {
-                    Thread.sleep(100); // CPU 자원 낭비 방지
-                }
-            }
-        } catch (IOException e){
-            log.info("<SSHD> ShellChannel에서 명령어 실행 실패 : {}", String.valueOf(e));
-        } catch (InterruptedException e) {
-            log.info("<SSHD> 명령어 실행 중 쓰레드에 문제 발생 : {}", String.valueOf(e));
-        }
     }
 
     private boolean checkIfCommandCompleted(String result) {
