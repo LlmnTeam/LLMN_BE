@@ -17,6 +17,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.io.BufferedWriter;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -134,7 +135,7 @@ public class LogService {
     }
 
     public String getRecentLogs(String containerName){
-        List<String> logFiles = getFileList(LOGS_DIRECTORY);
+        List<String> logFiles = getTextFiles(LOGS_DIRECTORY);
 
         String latestLogFile = logFiles.stream()
                 .filter(logFile -> logFile.startsWith(containerName + "-log"))
@@ -337,7 +338,7 @@ public class LogService {
     }
 
     private void writeLogsToFile(String fileTitle, List<Map<String, Object>> logMaps, String timestamp) {
-        try (BufferedWriter writer = getBufferedWriter(fileTitle, true)) {
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(fileTitle, true))) {
             for (Map<String, Object> logMap : logMaps) {
                 String logContent = convertLogMapToString(logMap, timestamp);
 
