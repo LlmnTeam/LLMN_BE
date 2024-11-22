@@ -36,28 +36,15 @@ public class FileUtils {
 
     public static String readFileAsString(String fileName) {
         Path path = Paths.get(LOGS_DIRECTORY, fileName);
-        if (!Files.exists(path)) {
-            throw new CustomException(ExceptionCode.FILE_NOT_FOUND);
-        }
+        validateFileExists(path);
 
-        // 파일 내용을 읽어서, 하나의 문자열로 변환 (각 줄을 \n\n으로 구분)
-        try {
-            List<String> lines = Files.readAllLines(path);
-            return String.join("\n\n", lines);
-        } catch (IOException e) {
-            log.error(path + "의 " + fileName + " 파일 읽기 실패");
-            throw new CustomException(ExceptionCode.FILE_READ_FAIL);
-        }
+        return readAllLinesAsString(path);
     }
 
     public static Resource getFileAsResource(String directoryName, String fileName) {
         try {
             Path filePath = Paths.get(directoryName, fileName);
-
-            // 파일이 존재하는지 확인
-            if (!Files.exists(filePath)) {
-                throw new CustomException(ExceptionCode.FILE_NOT_FOUND);
-            }
+            validateFileExists(filePath);
 
             return new UrlResource(filePath.toUri());
         } catch (IOException e){
@@ -97,6 +84,16 @@ public class FileUtils {
         }
     }
 
+    private static String readAllLinesAsString(Path path) {
+        try {
+            List<String> lines = Files.readAllLines(path);
+            return String.join("\n\n", lines);
+        } catch (IOException e) {
+            log.error("파일 읽기 실패: {}", path, e);
+            throw new CustomException(ExceptionCode.FILE_READ_FAIL);
+        }
+    }
+
     private static List<String> listTextFiles(Path filePath) {
         try (Stream<Path> fileListStream = Files.list(filePath)) {
             return fileListStream
@@ -112,5 +109,11 @@ public class FileUtils {
 
     private static boolean isDirectoryValid(Path directoryPath) {
         return Files.exists(directoryPath) && Files.isDirectory(directoryPath);
+    }
+
+    private static void validateFileExists(Path path) {
+        if (!Files.exists(path)) {
+            throw new CustomException(ExceptionCode.FILE_NOT_FOUND);
+        }
     }
 }

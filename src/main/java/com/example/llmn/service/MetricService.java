@@ -1,6 +1,7 @@
 package com.example.llmn.service;
 
 import com.example.llmn.controller.DTO.MetricResponse;
+import com.example.llmn.core.utils.DateTimeUtils;
 import com.example.llmn.domain.Metric;
 
 import com.example.llmn.domain.SshInfo;
@@ -94,7 +95,7 @@ public class MetricService {
         List<Metric> metrics = metricRepository.findMetricsAfter(startTime, sshInfoId);
 
         metrics.forEach(metric -> {
-            String time = formatDateTime(metric.getCreatedDate(), FORMATTER_HOUR_MINUTE);
+            String time = DateTimeUtils.formatLocalDateTime(metric.getCreatedDate(), FORMATTER_HOUR_MINUTE);
             cpuMetricDTOS.add(createCpuMetricDTO(metric, time));
             memoryMetricDTOS.add(createMemoryMetricDTO(metric, time));
             networkInMetricDTOS.add(createNetworkInMetricDTO(metric, time));

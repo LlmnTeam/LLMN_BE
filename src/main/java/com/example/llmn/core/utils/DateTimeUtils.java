@@ -20,7 +20,7 @@ public class DateTimeUtils {
         return new SimpleDateFormat(format).format(date);
     }
 
-    public static String formatDateTime(LocalDateTime localDateTime, DateTimeFormatter formatter){
+    public static String formatLocalDateTime(LocalDateTime localDateTime, DateTimeFormatter formatter){
         return localDateTime.format(formatter);
     }
 
@@ -59,8 +59,8 @@ public class DateTimeUtils {
             return false;
         }
 
-        boolean isAfterOrEqualStart = !dateTime.isBefore(startDate); // 시작일자와 같거나 이후
-        boolean isBeforeOrEqualEnd = !dateTime.isAfter(endDate);    // 종료일자와 같거나 이전
+        boolean isAfterOrEqualStart = !dateTime.isBefore(startDate);
+        boolean isBeforeOrEqualEnd = !dateTime.isAfter(endDate);
 
         return isAfterOrEqualStart && isBeforeOrEqualEnd;
     }
