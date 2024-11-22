@@ -13,20 +13,6 @@ public class CookieUtils {
 
     private CookieUtils() {}
 
-    public static String getCookieFromRequest(String name, HttpServletRequest request) {
-        Cookie[] cookies = request.getCookies();
-
-        if (cookies == null) {
-            return null;
-        }
-
-        return Arrays.stream(cookies)
-                .filter(cookie -> name.equals(cookie.getName()))
-                .map(Cookie::getValue)
-                .findFirst()
-                .orElse(null);
-    }
-
     public static void setCookieToResponse(String name, String value, Long maxAgeSec, boolean secure, boolean httpOnly, HttpServletResponse response) {
         ResponseCookie cookie = ResponseCookie.from(name, value)
                 .httpOnly(httpOnly)
@@ -41,7 +27,6 @@ public class CookieUtils {
 
     public static void syncRequestCookiesToResponse(HttpServletRequest request, HttpServletResponse response, Set<String> excludedCookies) {
         Cookie[] cookies = request.getCookies();
-
         if (cookies == null) {
             return;
         }
@@ -50,6 +35,19 @@ public class CookieUtils {
                 .filter(cookie -> isCookieIncluded(cookie, excludedCookies))
                 .map(CookieUtils::convertToResponseCookie)
                 .forEach(responseCookie -> response.addHeader(HttpHeaders.SET_COOKIE, responseCookie.toString()));
+    }
+
+    public static String getCookieFromRequest(String name, HttpServletRequest request) {
+        Cookie[] cookies = request.getCookies();
+        if (cookies == null) {
+            return null;
+        }
+
+        return Arrays.stream(cookies)
+                .filter(targetCookie -> isCookieSame(name, targetCookie))
+                .map(Cookie::getValue)
+                .findFirst()
+                .orElse(null);
     }
 
     private static boolean isCookieIncluded(Cookie cookie, Set<String> excludedCookies) {
@@ -64,5 +62,9 @@ public class CookieUtils {
                 .path("/")
                 .sameSite("None")
                 .build();
+    }
+
+    private static boolean isCookieSame(String cookieName, Cookie targetCookie) {
+        return cookieName.equals(targetCookie.getName());
     }
 }
