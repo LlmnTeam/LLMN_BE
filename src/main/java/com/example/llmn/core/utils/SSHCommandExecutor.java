@@ -48,7 +48,7 @@ public class SSHCommandExecutor {
     private static final int BUFFER_SIZE = 4096;
     private static final int SLEEP_DURATION_MS = 100;
     private static final String BLANK_STRING = "";
-    private static final int ASCII_0x03 = 3;
+    private static final int ASCII_SIGINT_SIGNAL = 3; // ASCII 0x03은 SIGINT 신호
 
     public SSHCommandExecutor(String host, String username, String privateKeyPath) {
         this.client = initializeSSHClient();
@@ -98,7 +98,7 @@ public class SSHCommandExecutor {
 
     public void sendSigint() {
         try {
-            pipedIn.write(ASCII_0x03); // ASCII 0x03은 SIGINT 신호
+            pipedIn.write(ASCII_SIGINT_SIGNAL);
             pipedIn.flush();
         } catch (IOException e) {
             log.error("SIGINT 신호 전송 실패: {}", e.getMessage());
@@ -172,7 +172,7 @@ public class SSHCommandExecutor {
         ptyConfig.setPtyWidth(PTY_WIDTH);
         ptyConfig.setPtyHeight(PTY_HEIGHT);
 
-        Map<PtyMode, Integer> terminalModes = new HashMap<>();
+        Map<PtyMode, Integer> terminalModes = new EnumMap<>(PtyMode.class);
         terminalModes.put(PtyMode.ECHO, 0);
         ptyConfig.setPtyModes(terminalModes);
 
