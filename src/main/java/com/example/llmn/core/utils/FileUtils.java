@@ -29,7 +29,7 @@ public class FileUtils {
         try {
             Files.write(path, file.getBytes());
         } catch (IOException e) {
-            log.error(path + "에 파일 저장 실패");
+            log.error("{}에 파일 저장 실패", path);
             throw new CustomException(ExceptionCode.SAVE_FILE_FAIL);
         }
     }
@@ -42,11 +42,11 @@ public class FileUtils {
     }
 
     public static Resource getFileAsResource(String directoryName, String fileName) {
-        try {
-            Path filePath = Paths.get(directoryName, fileName);
-            validateFileExists(filePath);
+        Path path = Paths.get(directoryName, fileName);
+        validateFileExists(path);
 
-            return new UrlResource(filePath.toUri());
+        try {
+            return new UrlResource(path.toUri());
         } catch (IOException e){
             throw new CustomException(ExceptionCode.CONVERT_TO_FILE_FAIL);
         }
@@ -55,7 +55,7 @@ public class FileUtils {
     public static List<String> getFileList(String directoryName) {
         Path path = Paths.get(directoryName);
 
-        if (isDirectoryValid(path)) {
+        if (isDirectoryInvalid(path)) {
             return Collections.emptyList();
         }
 
@@ -72,14 +72,16 @@ public class FileUtils {
     }
 
     public static void createDirIfNotExist(String directoryName) {
-        Path uploadPath = Paths.get(directoryName);
+        Path path = Paths.get(directoryName);
+
+        if (Files.exists(path)) {
+            return;
+        }
 
         try {
-            if (!Files.exists(uploadPath)) {
-                Files.createDirectories(uploadPath);
-            }
+            Files.createDirectories(path);
         } catch (IOException e){
-            log.error(directoryName + "에 대한 디렉토리 생성 실패");
+            log.error("{}에 대한 디렉토리 생성 실패", directoryName);
             throw new CustomException(ExceptionCode.CREATE_DIR_FAIL);
         }
     }
@@ -107,8 +109,8 @@ public class FileUtils {
         }
     }
 
-    private static boolean isDirectoryValid(Path directoryPath) {
-        return Files.exists(directoryPath) && Files.isDirectory(directoryPath);
+    private static boolean isDirectoryInvalid(Path directoryPath) {
+        return !(Files.exists(directoryPath) && Files.isDirectory(directoryPath));
     }
 
     private static void validateFileExists(Path path) {
