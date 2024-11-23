@@ -128,26 +128,25 @@ public class LogService {
         }
     }
 
-    private List<Map<String, Object>> refineLogFields(List<Map<String, Object>> logs) {
-        return logs.stream()
-                .map(log -> {
-                    // 컨테이너 이름, 메시지, 로그 레벨 추출
-                    String containerName = extractContainerNameFromLogMap(log);
-                    String message = extractMessageFromLogMap(log);
+    private List<Map<String, Object>> refineLogFields(List<Map<String, Object>> logMaps) {
+        return logMaps.stream()
+                .map(logMap -> {
+                    String containerName = extractContainerNameFromLogMap(logMap);
+                    String message = extractMessageFromLogMap(logMap);
                     String logLevel = extractLogLevelFromLog(message);
 
-                    // 맵에 필드 추가
-                    log.put(LOG_KEY_LEVEL, logLevel);
-                    log.put(LOG_KEY_CONTAINER_NAME, containerName);
-                    log.put(LOG_KEY_PROCESSED, true);
-                    log.put(LOG_KEY_MESSAGE, message);
-
-                    // container 필드는 삭제
-                    log.remove(LOG_KEY_CONTAINER);
-
-                    return log;
+                    updateLogFields(logMap, logLevel, containerName, message);
+                    return logMap;
                 })
-                .collect(Collectors.toList());
+                .toList();
+    }
+
+    private void updateLogFields(Map<String, Object> log, String logLevel, String containerName, String message) {
+        log.put(LOG_KEY_LEVEL, logLevel);
+        log.put(LOG_KEY_CONTAINER_NAME, containerName);
+        log.put(LOG_KEY_PROCESSED, true);
+        log.put(LOG_KEY_MESSAGE, message);
+        log.remove(LOG_KEY_CONTAINER);
     }
 
     private void updateLogToElasticSearch(List<Map<String, Object>> updatedLogMaps, String elasticSearchHost) {
