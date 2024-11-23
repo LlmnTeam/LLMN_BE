@@ -29,30 +29,17 @@ public class InsightService {
     @Transactional(readOnly = true)
     public InsightResponse.FindInsightHomeDTO findInsightList() {
         List<SummaryType> types = List.of(SummaryType.PERFORMANCE, SummaryType.DAILY, SummaryType.TEND, SummaryType.RECOMMENDATION);
-        List<Summary> latestSummaries = summaryRepository.findLatestByTypes(types);
-
-        // SummaryType을 키로 하고 Summary의 content를 값으로 하는 Map
-        Map<SummaryType, Summary> summaryMap = latestSummaries.stream()
-                .collect(Collectors.toMap(Summary::getSummaryType, summary -> summary));
-
-        Function<SummaryType, String> getContent = type -> Optional.ofNullable(summaryMap.get(type))
-                .map(Summary::getContent)
-                .orElse("");
-
-        Function<SummaryType, String> getUpdatedDate = type -> Optional.ofNullable(summaryMap.get(type))
-                .map(Summary::getUpdatedDate)
-                .map(DateTimeUtils::formatLocalDateTime)
-                .orElse("");
+        Map<SummaryType, Summary> summaryMap = getSummaryMapByTypes(types);
 
         return new InsightResponse.FindInsightHomeDTO(
-                getContent.apply(SummaryType.PERFORMANCE),
-                getUpdatedDate.apply(SummaryType.PERFORMANCE),
-                getContent.apply(SummaryType.DAILY),
-                getUpdatedDate.apply(SummaryType.DAILY),
-                getContent.apply(SummaryType.TEND),
-                getUpdatedDate.apply(SummaryType.TEND),
-                getContent.apply(SummaryType.RECOMMENDATION),
-                getUpdatedDate.apply(SummaryType.RECOMMENDATION)
+                extractContent(summaryMap, SummaryType.PERFORMANCE),
+                extractUpdatedDate(summaryMap, SummaryType.PERFORMANCE),
+                extractContent(summaryMap, SummaryType.DAILY),
+                extractUpdatedDate(summaryMap, SummaryType.DAILY),
+                extractContent(summaryMap, SummaryType.TEND),
+                extractUpdatedDate(summaryMap, SummaryType.TEND),
+                extractContent(summaryMap, SummaryType.RECOMMENDATION),
+                extractUpdatedDate(summaryMap, SummaryType.RECOMMENDATION)
         );
     }
 
@@ -61,12 +48,33 @@ public class InsightService {
         List<Summary> performanceSummaries = summaryRepository.findByType(type, userId, pageable).getContent();
 
         return performanceSummaries.stream()
-                .map(summary -> new InsightResponse.SummaryDTO(
-                        summary.getId(),
-                        formatLocalDateTime(summary.getCreatedDate()),
-                        summary.getContent(),
-                        summary.isChecked()
-                ))
+                .map(this::createSummaryDTO)
                 .toList();
+    }
+
+    private Map<SummaryType, Summary> getSummaryMapByTypes(List<SummaryType> types) {
+        return summaryRepository.findLatestByTypes(types).stream()
+                .collect(Collectors.toMap(Summary::getSummaryType, summary -> summary));
+    }
+
+    private String extractContent(Map<SummaryType, Summary> summaryMap, SummaryType type) {
+        return Optional.ofNullable(summaryMap.get(type))
+                .map(Summary::getContent)
+                .orElse("");
+    }
+
+    private String extractUpdatedDate(Map<SummaryType, Summary> summaryMap, SummaryType type) {
+        return Optional.ofNullable(summaryMap.get(type))
+                .map(Summary::getUpdatedDate)
+                .map(DateTimeUtils::formatLocalDateTime)
+                .orElse("");
+    }
+
+    private InsightResponse.SummaryDTO createSummaryDTO(Summary summary){
+        return new InsightResponse.SummaryDTO(
+                summary.getId(),
+                formatLocalDateTime(summary.getCreatedDate()),
+                summary.getContent(),
+                summary.isChecked());
     }
 }
