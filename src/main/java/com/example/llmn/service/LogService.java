@@ -80,7 +80,7 @@ public class LogService {
         }
     }
 
-    public List<LogDataDTO> searchLogData(Instant startTime, Instant endTime, String logLevel, String containerName, String elasticSearchHost) {
+    public List<LogDataDTO> searchLog(Instant startTime, Instant endTime, String logLevel, String containerName, String elasticSearchHost) {
         try {
             SearchRequest searchRequest = buildSearchRequest(startTime, endTime, logLevel, containerName);
             ElasticsearchClient client = elasticsearchConfig.createElasticsearchClient(elasticSearchHost);
@@ -90,24 +90,6 @@ public class LogService {
         } catch (IOException e) {
             log.error("<ElasticSearch> {} 어플리케이션에 대해 검색 실패", containerName);
             return new ArrayList<>();
-        }
-    }
-
-    public String searchLogInStr(Instant startTime, Instant endTime, String logLevel, String containerName, String elasticSearchHost) {
-        try {
-            ElasticsearchClient client = elasticsearchConfig.createElasticsearchClient(elasticSearchHost);
-
-            SearchRequest searchRequest = buildSearchRequest(startTime, endTime, logLevel, containerName);
-            SearchResponse<Map> response = client.search(searchRequest, Map.class);
-
-            List<String> logContents = response.hits().hits().stream()
-                    .map(hit -> convertResponseToLog(hit.source()))
-                    .toList();
-
-            return String.join("\n", logContents);  // 각 로그 사이에 줄 바꿈 추가
-        } catch (IOException e) {
-            log.info("<ElasticSearch> " + containerName + " 어플리케이션에 대해 검색 실패");
-            return "";
         }
     }
 
@@ -209,13 +191,23 @@ public class LogService {
         return new LogDataDTO(containerName, timestamp, formattedMessage, isProcessed, logLevel);
     }
 
-    private String formatLogMessage(Map<String, Object> map) {
-        return Optional.ofNullable((String) map.get(LOG_KEY_MESSAGE))
+
+    private String formatLogMessage(Map<String, Object> responseMap) {
+        return Optional.ofNullable((String) responseMap.get(LOG_KEY_MESSAGE))
                 .map(JsonUtils::normalizeJson)
                 .orElse(NO_MESSAGE);
     }
 
-    private String convertResponseToLog(Map<String, Object> responseMap) {
+    // 나중에 searchLog() 반환 타입을 List<LogDataDTO>이 아닌 String으로 받고 싶을 때 사용
+    private String convertSearchHitsToString(SearchResponse<Map> response) {
+        List<String> logContents = response.hits().hits().stream()
+                .map(hit -> convertResponseMapToString(hit.source()))
+                .toList();
+
+        return String.join("\n", logContents);
+    }
+
+    private String convertResponseMapToString(Map<String, Object> responseMap) {
         String logContent = (String) responseMap.get(LOG_KEY_MESSAGE);
         return logContent != null ? logContent : "";
     }
