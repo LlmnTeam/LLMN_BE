@@ -43,6 +43,7 @@ public enum ExceptionCode {
     SSH_INFO_WRONG(HttpStatus.BAD_REQUEST, "현재 해당 SSH가 연결되어 있지 않으니 설정에서 다시 연결해주세요."),
     SSH_CONNECT_FAIL(HttpStatus.BAD_REQUEST, "SSH 세션 연결을 실패했습니다. 호스트, 유저, 키를 다시 확인해주세요."),
     SHELL_CONNECT_FAIL(HttpStatus.INTERNAL_SERVER_ERROR, "Shell 채널 생섵 실패"),
+    SSH_EXECUTOR_GET_FAIL(HttpStatus.INTERNAL_SERVER_ERROR, "SSH Executor를 획득하는 데 실패하였습니다."),
 
     // ElasticSearch 오류
     ELASTIC_SEARCH_ERROR(HttpStatus.NOT_FOUND, "ElasticSearch에 문제가 발생했습니다."),

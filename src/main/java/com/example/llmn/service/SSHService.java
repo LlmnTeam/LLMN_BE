@@ -23,6 +23,8 @@ import java.util.concurrent.ConcurrentHashMap;
 @Slf4j
 public class SSHService {
 
+    public static final String UPTIME_COMMAND = "uptime";
+    public static final String UPTIME_COMMAND_RESPONSE = "load average";
     private final RedisService redisService;
     private final UserRepository userRepository;
     private final SshInfoRepository sshInfoRepository;
@@ -30,8 +32,6 @@ public class SSHService {
     private static final String REDIS_SSH_KEY = "SSH";
     public static final Long REDIS_SSH_KEY_EXP = 60L * 60 * 24 * 30; // 30일
     private static final String DELIMITER = "-";
-    private static final String EXECUTE_FAIL_BY_SESSION = "세션이 연결되지 않아 명령어 실행을 실패하였습니다.";
-    private static final String BLANK_STRING = "";
 
     @Transactional
     public void initCommend(Long userId){
@@ -40,10 +40,6 @@ public class SSHService {
         );
 
         SSHCommandExecutor executor = getSshExecutor(monitoringSshId, true);
-        if(executor == null){
-            return;
-        }
-
         executor.flushInitialMessage();
     }
 
@@ -54,22 +50,12 @@ public class SSHService {
         );
 
         SSHCommandExecutor executor = getSshExecutor(monitoringSshId, isFirstExecution);
-
-        if(executor == null){
-            return EXECUTE_FAIL_BY_SESSION;
-        }
-
         return executor.executeCommandInShell(command);
     }
 
     @Transactional
     public String executeCommandOnce(String command, Long sshInfoId) {
         SSHCommandExecutor executor = getSshExecutor(sshInfoId, false);
-
-        if(executor == null){
-            return BLANK_STRING;
-        }
-
         return executor.executeCommandOnce(command);
     }
 
@@ -93,27 +79,28 @@ public class SSHService {
         );
 
         SSHCommandExecutor executor = getSshExecutor(monitoringSshId, false);
-        if (executor != null && executor.isConnected()) {
-            executor.sendSigint();
-        }
+        executor.sendSigint();
     }
 
     @Scheduled(cron = "0 32 12 * * *")
     public void checkSshConnection(){
         List<SshInfo> sshInfos = sshInfoRepository.findAll();
-
-        sshInfos.forEach(sshInfo -> sshInfo.updateIsWorking(checkConnectionValid(sshInfo.getRemoteHost(), sshInfo.getRemoteName(), sshInfo.getRemoteKeyPath())));
+        sshInfos.forEach(sshInfo -> sshInfo.updateIsWorking(checkConnectionValid(sshInfo.getId())));
     }
 
     public boolean checkConnectionValid(String remoteHost, String remoteName, String remoteKeyPath) {
-        try {
-            SSHCommandExecutor executor = new SSHCommandExecutor(remoteHost, remoteName, remoteKeyPath);
-            String response = executor.executeCommandOnce("uptime");
-            executor.close();
-            return response.contains("load average");
-        } catch (Exception e) {
-            return false;
-        }
+        SSHCommandExecutor executor = new SSHCommandExecutor(remoteHost, remoteName, remoteKeyPath);
+        String response = executor.executeCommandOnce(UPTIME_COMMAND);
+        executor.close();
+
+        return response.contains(UPTIME_COMMAND_RESPONSE);
+    }
+
+    public boolean checkConnectionValid(Long sshInfoId) {
+        SSHCommandExecutor executor = getSshExecutor(sshInfoId, false);
+        String response = executor.executeCommandOnce(UPTIME_COMMAND);
+
+        return response.contains(UPTIME_COMMAND_RESPONSE);
     }
 
     public SSHCommandExecutor getSshExecutor(Long sshInfoId, boolean isFirstExecution) {
@@ -137,10 +124,6 @@ public class SSHService {
     private SSHCommandExecutor initializeExecutor(Long sshInfoId) {
         return executorSession.computeIfAbsent(sshInfoId, id -> {
             SshInfoDTO sshInfoDTO = getSshInfo(id);
-            if (sshInfoDTO == null) {
-                return null;
-            }
-
             return createExecutor(sshInfoDTO);
         });
     }
