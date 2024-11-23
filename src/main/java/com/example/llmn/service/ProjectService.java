@@ -227,7 +227,7 @@ public class ProjectService {
     }
 
     private String findRecentLog(Project project){
-        String latestLogFile = FileUtils.findTextFiles(LOGS_DIRECTORY).stream()
+        String latestLogFile = findTextFiles(LOGS_DIRECTORY).stream()
                 .filter(logFile -> logFile.startsWith(project.getContainerName() + "-log"))
                 .max(this::compareLogFileDates) // 최신 파일 찾기
                 .orElse(null);
@@ -351,7 +351,7 @@ public class ProjectService {
     }
 
     private List<String> findLogFilesForContainer(String containerName) {
-        return FileUtils.findTextFiles(LOGS_DIRECTORY).stream()
+        return findTextFiles(LOGS_DIRECTORY).stream()
                 .filter(logFile -> logFile.startsWith(containerName + LOG_FILE_SUFFIX))
                 .toList();
     }

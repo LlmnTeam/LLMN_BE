@@ -104,20 +104,11 @@ public class LogService {
         }
     }
 
-    public String findRecentLogs(String containerName){
-        List<String> logFiles = FileUtils.findTextFiles(LOGS_DIRECTORY);
-
-        String latestLogFile = logFiles.stream()
-                .filter(logFile -> logFile.startsWith(containerName + "-log"))
-                .max(this::compareLogFileDates)
-                .orElse(null);
-
-        if(latestLogFile == null){
-            return BLANK_STRING;
-        }
-
-        String fileContent = readFileAsString(latestLogFile);
-        return extractRecentLogFromContent(fileContent);
+    public String findRecentLogs(String containerName) {
+        return findLatestLogFile(containerName)
+                .map(FileUtils::readFileAsString)
+                .map(this::extractRecentLogFrom)
+                .orElse(BLANK_STRING);
     }
 
     private SearchResponse<Map> searchLogsInElasticSearch(String elasticSearchHost) {
@@ -243,7 +234,15 @@ public class LogService {
                         .orElse(LOG_LEVEL_INFO);
     }
 
-    private String extractRecentLogFromContent(String fileContent) {
+    private Optional<String> findLatestLogFile(String containerName) {
+        List<String> logFiles = findTextFiles(LOGS_DIRECTORY);
+
+        return logFiles.stream()
+                .filter(logFile -> logFile.startsWith(containerName + "-log"))
+                .max(this::compareLogFileDates);
+    }
+
+    private String extractRecentLogFrom(String fileContent) {
         LocalDateTime cutoffTime = getThirtyMinutesAgoTime();
 
         String[] logs = fileContent.split("(?=\\[\\d{4}-\\d{2}-\\d{2}_\\d{2}:\\d{2}\\])");
