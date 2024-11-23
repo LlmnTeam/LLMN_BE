@@ -61,29 +61,19 @@ public class LogService {
     private static final String LOG_TIMESTAMP_FORMAT = "yyyy-MM-dd_HH:mm";
     private static final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH");
     private static final DateTimeFormatter formatterWithMinute = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH:mm");
+    private static final int MAX_LOG_SIZE = 1000;
 
-    @Scheduled(fixedRate = 60000)  // 1분마다 실행
+    @Scheduled(fixedRate = 60000)
     public void processAndUpdateLogs() {
         List<SshInfo> sshInfos = sshInfoRepository.findAll();
 
         for(SshInfo sshInfo : sshInfos) {
-            // 1. Elasticsearch에서 아직 처리되지 않은 로그 데이터를 검색
-            SearchResponse<Map> searchResponse = searchUnprocessedLogs(sshInfo.getRemoteHost());
-            if (searchResponse == null) {
-                log.warn("Elasticsearch 응답이 null입니다. 검색에 실패했습니다.");
-                return;
-            }
+            SearchResponse<Map> searchResponse = searchLogsInElasticSearch(sshInfo.getRemoteHost());
 
-            // 2. 검색 결과를 맵으로 변환
             List<Map<String, Object>> logMaps = convertResponseToMap(searchResponse);
-
-            // 2. map의 필드 원하는 형태로 재조립
             List<Map<String, Object>> refinedLogMaps = refineLogFields(logMaps);
 
-            // 3. 필드 업데이트 한 데이터를 Elasticsearch에도 반영
             updateLogToElasticSearch(refinedLogMaps, sshInfo.getRemoteHost());
-
-            // 4. .txt 파일로도 로그 저장
             saveLogMapsToFile(refinedLogMaps, sshInfo.getId());
         }
     }
@@ -150,20 +140,20 @@ public class LogService {
         return extractRecentLogFromContent(fileContent);
     }
 
-    private SearchResponse<Map> searchUnprocessedLogs(String elasticSearchHost) {
-        String index = getLogIndex();
+    private SearchResponse<Map> searchLogsInElasticSearch(String elasticSearchHost) {
+        String index = createLogIndex();
 
         try {
+            SearchRequest searchRequest = buildSearchRequest(index);
             ElasticsearchClient client = elasticsearchConfig.createElasticsearchClient(elasticSearchHost);
 
-            SearchRequest searchRequest = buildSearchRequest(index); // is_processed가 false인 데이터 검색
             return client.search(searchRequest, Map.class);
         } catch (ElasticsearchException e) {
             createElasticSearchIndex(index, elasticSearchHost);
             return new SearchResponse.Builder<Map>().build();
         } catch (IOException e){
-            log.info("<ElasticSearch> "+index + "에 대한 검색 실패");
-            return null;
+            log.error("<ElasticSearch> {}에 대한 검색 실패", index);
+            return new SearchResponse.Builder<Map>().build();
         }
     }
 
@@ -190,7 +180,7 @@ public class LogService {
     }
 
     private void updateLogToElasticSearch(List<Map<String, Object>> updatedLogMaps, String elasticSearchHost) {
-        String logIndex = getLogIndex();
+        String logIndex = createLogIndex();
 
         try {
             ElasticsearchClient client = elasticsearchConfig.createElasticsearchClient(elasticSearchHost);
@@ -201,7 +191,7 @@ public class LogService {
                 client.update(updateRequest, Map.class);
             }
         } catch (IOException e){
-            log.info("<ElasticSearch> "+logIndex + "에 대한 업데이트 실패");
+            log.error("<ElasticSearch> {}에 대한 업데이트 실패", logIndex);
         }
     }
 
@@ -300,7 +290,7 @@ public class LogService {
                 .orElse(NO_MESSAGE);
     }
 
-    private String getLogIndex() {
+    private String createLogIndex() {
         // 오늘 날짜를 기반으로 인덱스 이름 생성
         return "docker-logs-" + getTodayDateInString();
     }
@@ -412,7 +402,7 @@ public class LogService {
                         .should(s -> s.term(t -> t.field(LOG_KEY_PROCESSED).value(false)))  // is_processed가 false인 로그
                         .should(s -> s.bool(bs -> bs.mustNot(mn -> mn.exists(e -> e.field(LOG_KEY_PROCESSED)))))  // is_processed 필드가 없는 로그
                 ))
-                .size(1000)  // 최대 1000개의 로그를 가져옴
+                .size(MAX_LOG_SIZE)
                 .build();
     }
 

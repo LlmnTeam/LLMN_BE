@@ -17,16 +17,15 @@ import java.util.concurrent.ConcurrentHashMap;
 public class ElasticsearchConfig {
 
     private final Map<String, ElasticsearchClient> clientCache = new ConcurrentHashMap<>();
-    private static final String HTTP_PROTOCOL = "http";
 
+    private static final String HTTP_PROTOCOL = "http";
+    private static final int ELASTIC_SEARCH_PORT = 9200;
 
     public ElasticsearchClient createElasticsearchClient(String host) {
         return clientCache.computeIfAbsent(host, h -> {
-            // REST 클라이언트를 생성
-            RestClient restClient = RestClient.builder(new HttpHost(h, 9200, HTTP_PROTOCOL)).build();
+            RestClient client = RestClient.builder(new HttpHost(h, ELASTIC_SEARCH_PORT, HTTP_PROTOCOL)).build();
+            ElasticsearchTransport transport = new RestClientTransport(client, new JacksonJsonpMapper());
 
-            // JSONP Mapper를 설정
-            ElasticsearchTransport transport = new RestClientTransport(restClient, new JacksonJsonpMapper());
             return new ElasticsearchClient(transport);
         });
     }
