@@ -4,6 +4,7 @@ import com.example.llmn.controller.DTO.ProjectRequest;
 import com.example.llmn.controller.DTO.ProjectResponse;
 import com.example.llmn.core.errors.CustomException;
 import com.example.llmn.core.errors.ExceptionCode;
+import com.example.llmn.core.utils.FileUtils;
 import com.example.llmn.domain.*;
 import com.example.llmn.repository.ProjectRepository;
 import com.example.llmn.repository.SshInfoRepository;
@@ -226,7 +227,7 @@ public class ProjectService {
     }
 
     private String findRecentLog(Project project){
-        String latestLogFile = getTextFiles(LOGS_DIRECTORY).stream()
+        String latestLogFile = FileUtils.findTextFiles(LOGS_DIRECTORY).stream()
                 .filter(logFile -> logFile.startsWith(project.getContainerName() + "-log"))
                 .max(this::compareLogFileDates) // 최신 파일 찾기
                 .orElse(null);
@@ -350,7 +351,7 @@ public class ProjectService {
     }
 
     private List<String> findLogFilesForContainer(String containerName) {
-        return getTextFiles(LOGS_DIRECTORY).stream()
+        return FileUtils.findTextFiles(LOGS_DIRECTORY).stream()
                 .filter(logFile -> logFile.startsWith(containerName + LOG_FILE_SUFFIX))
                 .toList();
     }

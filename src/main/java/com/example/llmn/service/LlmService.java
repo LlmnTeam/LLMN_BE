@@ -155,7 +155,7 @@ public class LlmService {
 
     private LogDTO.SummaryResponseDTO fetchLogSummary(String containerName) {
         // 로그 메시지는 ElasticSearch에서 조회
-        String logContent = logService.getRecentLogs(containerName);
+        String logContent = logService.findRecentLogs(containerName);
         if (logContent.isBlank()) {
             return null;
         }

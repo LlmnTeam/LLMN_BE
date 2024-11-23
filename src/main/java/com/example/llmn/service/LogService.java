@@ -8,6 +8,7 @@ import co.elastic.clients.elasticsearch.indices.CreateIndexRequest;
 import co.elastic.clients.json.JsonData;
 import com.example.llmn.controller.DTO.LogDataDTO;
 import com.example.llmn.core.config.ElasticsearchConfig;
+import com.example.llmn.core.utils.FileUtils;
 import com.example.llmn.core.utils.JsonUtils;
 import com.example.llmn.domain.SshInfo;
 import com.example.llmn.repository.SshInfoRepository;
@@ -95,17 +96,16 @@ public class LogService {
 
     public void deleteLogsBefore(Instant cutoffTime, String elasticSearchHost) {
         try {
-            ElasticsearchClient client = elasticsearchConfig.createElasticsearchClient(elasticSearchHost);
-
             DeleteByQueryRequest deleteRequest = buildDeleteRequest(cutoffTime);
+            ElasticsearchClient client = elasticsearchConfig.createElasticsearchClient(elasticSearchHost);
             client.deleteByQuery(deleteRequest);
         } catch (IOException e){
             log.info("<ElasticSearch> 데이터 삭제 실패");
         }
     }
 
-    public String getRecentLogs(String containerName){
-        List<String> logFiles = getTextFiles(LOGS_DIRECTORY);
+    public String findRecentLogs(String containerName){
+        List<String> logFiles = FileUtils.findTextFiles(LOGS_DIRECTORY);
 
         String latestLogFile = logFiles.stream()
                 .filter(logFile -> logFile.startsWith(containerName + "-log"))
@@ -261,12 +261,6 @@ public class LogService {
         return log.substring(1, 17);
     }
 
-    private LocalDateTime extractDateTimeFromLogFile(String file) {
-        // 파일 이름에서 "log-" 뒤부터 ".txt" 앞까지의 부분 추출
-        String dateTimePart = file.substring(file.indexOf("log-") + 4, file.indexOf("-", file.indexOf("_")));
-        return LocalDateTime.parse(dateTimePart, formatter);
-    }
-
     private String extractContainerNameFromLogMap(Map<String, Object> log) {
         Map<String, Object> container = (Map<String, Object>) log.get(LOG_KEY_CONTAINER);
         return Optional.ofNullable(container)
@@ -417,6 +411,12 @@ public class LogService {
         LocalDateTime fileDateTime1 = extractDateTimeFromLogFile(file1);
         LocalDateTime fileDateTime2 = extractDateTimeFromLogFile(file2);
         return fileDateTime1.compareTo(fileDateTime2);
+    }
+
+    private LocalDateTime extractDateTimeFromLogFile(String file) {
+        // 파일 이름에서 "log-" 뒤부터 ".txt" 앞까지의 부분 추출
+        String dateTimePart = file.substring(file.indexOf("log-") + 4, file.indexOf("-", file.indexOf("_")));
+        return LocalDateTime.parse(dateTimePart, formatter);
     }
 
     private boolean isLogWithinLast30Minutes(String log, LocalDateTime cutoffTime) {

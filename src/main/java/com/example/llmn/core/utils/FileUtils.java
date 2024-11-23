@@ -64,14 +64,14 @@ public class FileUtils {
         }
     }
 
-    public static List<String> getTextFiles(String directoryName) {
+    public static List<String> findTextFiles(String directoryName) {
         Path path = Paths.get(directoryName);
 
         if (isDirectoryInvalid(path)) {
             return Collections.emptyList();
         }
 
-        return findTextFiles(path);
+        return listTextFilesInDirectory(path);
     }
 
     public static Path getFilePath(String directoryName, MultipartFile file){
@@ -94,10 +94,10 @@ public class FileUtils {
         return !(Files.exists(directoryPath) && Files.isDirectory(directoryPath));
     }
 
-    private static List<String> findTextFiles(Path path) {
+    private static List<String> listTextFilesInDirectory(Path path) {
         try (Stream<Path> fileStream = Files.list(path)) {
             return fileStream
-                    .filter(Files::isRegularFile) 
+                    .filter(Files::isRegularFile)
                     .filter(FileUtils::isTextFile)
                     .map(FileUtils::getFileName)
                     .toList();

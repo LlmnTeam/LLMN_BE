@@ -17,7 +17,7 @@ import java.util.stream.Collectors;
 
 import static com.example.llmn.core.utils.DateTimeUtils.*;
 import static com.example.llmn.core.utils.FileUtils.LOGS_DIRECTORY;
-import static com.example.llmn.core.utils.FileUtils.getTextFiles;
+import static com.example.llmn.core.utils.FileUtils.findTextFiles;
 
 @Service
 @RequiredArgsConstructor
@@ -33,7 +33,7 @@ public class SearchService {
         List<Project> projects = projectRepository.findByUserId(userId);
         Map<String, Long> containerNameToProjectIdMap = createContainerNameToProjectIdMap(projects);
 
-        List<String> logFiles = getTextFiles(LOGS_DIRECTORY);
+        List<String> logFiles = findTextFiles(LOGS_DIRECTORY);
         List<SearchResponse.LogFileDTO> searchedLogDTOS = searchLogFiles(logFiles, keyword.toLowerCase(), startDate, endDate, containerNameToProjectIdMap);
 
         List<SearchResponse.InsightDTO> searchedInsightDTOS = searchInsights(projects, keyword.toLowerCase(), startDate, endDate);
