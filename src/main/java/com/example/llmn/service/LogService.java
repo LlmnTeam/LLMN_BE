@@ -62,6 +62,7 @@ public class LogService {
     public static final String LOG_INDEX_PREFIX = "docker-logs-";
     public static final String LOG_FILE_CONTENT_REGEX = "(?=\\[\\d{4}-\\d{2}-\\d{2}_\\d{2}:\\d{2}\\])";
     public static final String BLANKE_STRING = "";
+    public static final String NO_LOG_RECORD = "로그 기록이 존재하지 않습니다.";
 
     @Scheduled(fixedRate = 60000)
     public void processAndUpdateLogs() {
@@ -258,29 +259,21 @@ public class LogService {
     private void writeLogsToFile(String fileName, List<Map<String, Object>> logMaps, String timestamp) {
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(fileName, true))) {
             for (Map<String, Object> logMap : logMaps) {
-                String logContent = convertLogMapToString(logMap, timestamp);
-
-                if (logContent != null) {
-                    writer.write(logContent);
-                    writer.newLine();
-                    writer.newLine();
-                }
+                String logContent = extractLogContentInMap(logMap, timestamp);
+                writer.write(logContent);
+                writer.newLine();
+                writer.newLine();
             }
         } catch (IOException e) {
             log.error("로그 파일에 기록하는 중 오류 발생", e);
         }
     }
 
-    private String convertLogMapToString(Map<String, Object> logMap, String timestamp) {
-        String logContent = Optional.ofNullable(logMap.get(LOG_KEY_MESSAGE))
+    private String extractLogContentInMap(Map<String, Object> logMap, String timestamp) {
+        return Optional.ofNullable(logMap.get(LOG_KEY_MESSAGE))
                 .map(Object::toString)
-                .orElse(null);
-
-        if (logContent == null) {
-            return null;
-        }
-
-        return String.format(LOG_FORMAT, timestamp, logContent);
+                .map(logMessage -> String.format(LOG_FORMAT, timestamp, logMessage))
+                .orElse(NO_LOG_RECORD);
     }
 
     private DeleteByQueryRequest buildDeleteRequest(Instant cutoffTime) {
