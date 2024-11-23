@@ -65,6 +65,7 @@ public class LogService {
     private static final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH");
     private static final DateTimeFormatter formatterWithMinute = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH:mm");
     private static final int MAX_LOG_SIZE = 1000;
+    public static final String LOG_INDEX = "docker-logs-*";
 
     @Scheduled(fixedRate = 60000)
     public void processAndUpdateLogs() {
@@ -255,10 +256,6 @@ public class LogService {
         return recentLogs.isEmpty() ? BLANK_STRING : recentLogs;
     }
 
-    private String extractHeaderFromLog(String log) {
-        return log.substring(1, 17);
-    }
-
     private String extractContainerNameFromLogMap(Map<String, Object> log) {
         Map<String, Object> container = (Map<String, Object>) log.get(LOG_KEY_CONTAINER);
         return Optional.ofNullable(container)
@@ -347,33 +344,29 @@ public class LogService {
     private SearchRequest buildSearchRequest(Instant startTime, Instant endTime, String logLevel, String containerName) {
         BoolQuery.Builder boolQuery = new BoolQuery.Builder();
 
-        // 시간 범위 필터 추가
+        addTimeRangeFilter(boolQuery, startTime, endTime);
+        if (logLevel != null) addTermFilter(boolQuery, LOG_KEY_LEVEL, logLevel);
+        if (containerName != null) addTermFilter(boolQuery, LOG_KEY_CONTAINER_NAME, containerName);
+
+        return new SearchRequest.Builder()
+                .index(LOG_INDEX)
+                .query(q -> q.bool(boolQuery.build()))
+                .build();
+    }
+
+    private void addTimeRangeFilter(BoolQuery.Builder boolQuery, Instant startTime, Instant endTime) {
         boolQuery.must(m -> m.range(r -> r
                 .field(LOG_KEY_TIMESTAMP)
                 .gte(JsonData.of(startTime.toString()))
                 .lte(JsonData.of(endTime.toString()))
         ));
+    }
 
-        // 로그 레벨 필터 (필터 값이 null이 아닐 때만 추가)
-        if (logLevel != null) {
-            boolQuery.filter(f -> f.term(t -> t
-                    .field(LOG_KEY_LEVEL)
-                    .value(logLevel)
-            ));
-        }
-
-        // 서비스 이름 필터
-        if (containerName != null) {
-            boolQuery.filter(f -> f.term(t -> t
-                    .field(LOG_KEY_CONTAINER_NAME)
-                    .value(containerName)
-            ));
-        }
-
-        return new SearchRequest.Builder()
-                .index("docker-logs-*")
-                .query(q -> q.bool(boolQuery.build()))
-                .build();
+    private void addTermFilter(BoolQuery.Builder boolQuery, String field, String value) {
+        boolQuery.filter(f -> f.term(t -> t
+                .field(field)
+                .value(value)
+        ));
     }
 
     private SearchRequest buildSearchRequest(String index) {
@@ -421,6 +414,10 @@ public class LogService {
         String header = extractHeaderFromLog(log);
         LocalDateTime logTime = LocalDateTime.parse(header, formatterWithMinute);
         return logTime.isAfter(cutoffTime);
+    }
+
+    private String extractHeaderFromLog(String log) {
+        return log.substring(1, 17);
     }
 
     private Map<String, List<Map<String, Object>>> groupLogsByContainerName(List<Map<String, Object>> logMaps) {
