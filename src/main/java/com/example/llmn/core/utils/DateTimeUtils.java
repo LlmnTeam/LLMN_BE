@@ -1,6 +1,7 @@
 package com.example.llmn.core.utils;
 
 import java.text.SimpleDateFormat;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -32,18 +33,22 @@ public class DateTimeUtils {
         return localDateTime.format(FORMATTER_DATE_TIME);
     }
 
-    public static String getTodayDateInString() {
-        return LocalDate.now().format(FORMATTER_SIMPLE_DATE);
-    }
-
-    public static LocalDateTime getThirtyMinutesAgoTime(){
-        return LocalDateTime.now().minus(30, ChronoUnit.MINUTES);
+    public static Instant parseInstant(String timestamp) {
+        return timestamp != null ? Instant.parse(timestamp) : null;
     }
 
     public static LocalDateTime parseDateTimeFromLogFile(String file) {
         // 파일 이름에서 "log-" 뒤부터 ".txt" 앞까지의 부분 추출
         String dateTimePart = file.substring(file.indexOf("log-") + 4, file.lastIndexOf("-"));
         return LocalDateTime.parse(dateTimePart, FORMATTER_LOG_FILE);
+    }
+
+    public static String getTodayDateInString() {
+        return LocalDate.now().format(FORMATTER_SIMPLE_DATE);
+    }
+
+    public static LocalDateTime getThirtyMinutesAgoTime(){
+        return LocalDateTime.now().minus(30, ChronoUnit.MINUTES);
     }
 
     public static LocalDateTime getCurrentHourStartMinusHours(int minusHour){

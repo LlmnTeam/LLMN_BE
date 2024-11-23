@@ -29,6 +29,8 @@ import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static com.example.llmn.core.utils.MapUtils.extractBooleanFromMap;
+import static com.example.llmn.core.utils.MapUtils.extractStringFromMap;
 import static com.example.llmn.core.utils.DateTimeUtils.*;
 import static com.example.llmn.core.utils.FileUtils.*;
 
@@ -80,17 +82,16 @@ public class LogService {
 
     public List<LogDataDTO> searchLogData(Instant startTime, Instant endTime, String logLevel, String containerName, String elasticSearchHost) {
         try {
-            ElasticsearchClient client = elasticsearchConfig.createElasticsearchClient(elasticSearchHost);
-
-            // Elasticsearch 쿼리 생성 후 실행
             SearchRequest searchRequest = buildSearchRequest(startTime, endTime, logLevel, containerName);
+
+            ElasticsearchClient client = elasticsearchConfig.createElasticsearchClient(elasticSearchHost);
             SearchResponse<Map> response = client.search(searchRequest, Map.class);
 
             return response.hits().hits().stream()
                     .map(hit -> convertResponseToLogData(hit.source())) // 검색 결과를 LogData로 변환하여 반환
-                    .collect(Collectors.toList());
+                    .toList();
         } catch (IOException e) {
-            log.info("<ElasticSearch> "+ containerName +" 어플리케이션에 대해 검색 실패");
+            log.error("<ElasticSearch> {} 어플리케이션에 대해 검색 실패", containerName);
             return new ArrayList<>();
         }
     }
@@ -195,27 +196,20 @@ public class LogService {
         }
     }
 
-    private LogDataDTO convertResponseToLogData(Map<String, Object> source) {
-        String containerName = Optional.ofNullable((String) source.get(LOG_KEY_CONTAINER_NAME))
-                .orElse(UNKNOWN_CONTAINER);
-
-        Instant timestamp = convertStringToInstant((String) source.get(LOG_KEY_TIMESTAMP));
-
-        String formattedMessage = Optional.ofNullable((String) source.get(LOG_KEY_MESSAGE))
-                .map(JsonUtils::normalizeJson)
-                .orElse(NO_MESSAGE);
-
-        boolean isProcessed = Optional.ofNullable((Boolean) source.get(LOG_KEY_PROCESSED))
-                .orElse(false);
-
-        String logLevel = Optional.ofNullable((String) source.get(LOG_KEY_LEVEL))
-                .orElse(LOG_LEVEL_UNKNOWN);
+    private LogDataDTO convertResponseToLogData(Map<String, Object> responseMap) {
+        String containerName = extractStringFromMap(responseMap, LOG_KEY_CONTAINER_NAME, UNKNOWN_CONTAINER);
+        Instant timestamp = parseInstant((String) responseMap.get(LOG_KEY_TIMESTAMP));
+        String formattedMessage = formatLogMessage(responseMap);
+        boolean isProcessed = extractBooleanFromMap(responseMap, LOG_KEY_PROCESSED, false);
+        String logLevel = extractStringFromMap(responseMap, LOG_KEY_LEVEL, LOG_LEVEL_UNKNOWN);
 
         return new LogDataDTO(containerName, timestamp, formattedMessage, isProcessed, logLevel);
     }
 
-    private Instant convertStringToInstant(String timestamp) {
-        return timestamp != null ? Instant.parse(timestamp) : null;
+    private String formatLogMessage(Map<String, Object> map) {
+        return Optional.ofNullable((String) map.get(LOG_KEY_MESSAGE))
+                .map(JsonUtils::normalizeJson)
+                .orElse(NO_MESSAGE);
     }
 
     private String convertResponseToLog(Map<String, Object> responseMap) {
