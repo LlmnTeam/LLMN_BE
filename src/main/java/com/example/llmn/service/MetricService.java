@@ -94,7 +94,7 @@ public class MetricService {
         List<Metric> metrics = metricRepository.findMetricsAfter(startTime, sshInfoId);
 
         metrics.forEach(metric -> {
-            String time = DateTimeUtils.formatLocalDateTime(metric.getCreatedDate(), FORMATTER_HOUR_MINUTE);
+            String time = DateTimeUtils.formatLocalDateTime(metric.getCreatedDate(), HOUR_MINUTE_FORMATTER);
             cpuMetricDTOS.add(createCpuMetricDTO(metric, time));
             memoryMetricDTOS.add(createMemoryMetricDTO(metric, time));
             networkInMetricDTOS.add(createNetworkInMetricDTO(metric, time));

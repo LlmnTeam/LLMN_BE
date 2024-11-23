@@ -151,7 +151,7 @@ public class UserService {
         }
 
         // SSH Key를 저장하는 디렉토리가 없으면 생성
-        createDirIfNotExist(SSH_DIRECTORY);
+        createDirectoryIfNotExist(SSH_DIRECTORY);
         Path path = getFilePath(SSH_DIRECTORY, file);
         writeFile(file, path);
 

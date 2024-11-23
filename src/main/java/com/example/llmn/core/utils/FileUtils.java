@@ -32,14 +32,13 @@ public class FileUtils {
         }
     }
 
-    public static void createDirIfNotExist(String directoryName) {
-        Path path = Paths.get(directoryName);
-        if (Files.exists(path)) {
-            return;
-        }
-
+    public static void createDirectoryIfNotExist(String directoryName) {
         try {
-            Files.createDirectories(path);
+            Path path = Paths.get(directoryName);
+
+            if (!Files.exists(path)) {
+                Files.createDirectories(path);
+            }
         } catch (IOException e){
             log.error("{}에 대한 디렉토리 생성 실패", directoryName);
             throw new CustomException(ExceptionCode.CREATE_DIR_FAIL);

@@ -20,9 +20,6 @@ import org.springframework.stereotype.Service;
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -60,8 +57,6 @@ public class LogService {
     private static final String NO_MESSAGE = "No message";
     private static final String BLANK_STRING = "";
     private static final String LOG_FORMAT = "[%s]\n%s";
-    private static final String FILE_TIMESTAMP_FORMAT = "yyyy-MM-dd_HH";
-    private static final String LOG_TIMESTAMP_FORMAT = "yyyy-MM-dd_HH:mm";
     private static final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH");
     private static final DateTimeFormatter formatterWithMinute = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH:mm");
     private static final int MAX_LOG_SIZE = 1000;
@@ -223,7 +218,7 @@ public class LogService {
                     logMap.put(LOG_KEY_ID, hit.id());
                     return logMap;
                 })
-                .collect(Collectors.toList());
+                .toList();
     }
 
     private String extractLogLevelFromLog(String logContent) {
@@ -274,39 +269,30 @@ public class LogService {
     }
 
     private void saveLogMapsToFile(List<Map<String, Object>> logMaps, Long sshId) {
-        if (logMaps.isEmpty()) {
-            return;
-        }
+        createDirectoryIfNotExist(LOGS_DIRECTORY);
 
-        // 1st 로그를 저장할 디렉토리가 없으면 생성
-        createLogDirectoryIfNotExist();
+        Date now = new Date();
+        String timestampForFileName = formatDate(now, LOG_TITLE_FORMAT);
+        String timestampForText = formatDate(now, LOG_TEXT_FORMAT);
 
-        // 2nd 서비스별로 로그를 그룹화
-        Map<String, List<Map<String, Object>>> logsGroupedByContainer = groupLogsByContainerName(logMaps);
-
-        // 3rd 로그 파일 저장
-        String timestampForTitle = formatDate(new Date(), FILE_TIMESTAMP_FORMAT);
-        String timestampForText = formatDate(new Date(), LOG_TIMESTAMP_FORMAT);
-
-        logsGroupedByContainer.forEach((containerName, maps) -> {
-            String fileTitle = String.format("logs/%s-log-%s-%d.txt", containerName, timestampForTitle, sshId);
-            writeLogsToFile(fileTitle, maps, timestampForText);
+        Map<String, List<Map<String, Object>>> groupedLogMap = groupByContainerName(logMaps);
+        groupedLogMap.forEach((containerName, maps) -> {
+            String fileName = buildLogFileName(containerName, timestampForFileName, sshId);
+            writeLogsToFile(fileName, maps, timestampForText);
         });
     }
 
-    private void createLogDirectoryIfNotExist() {
-        try {
-            Path logDirPath = Paths.get(LOGS_DIRECTORY);
-            if (!Files.exists(logDirPath)) {
-                Files.createDirectories(logDirPath);
-            }
-        } catch (IOException e){
-            log.error("로그 파일 저장을 위한 디렉토리 생성 실패.", e);
-        }
+    private Map<String, List<Map<String, Object>>> groupByContainerName(List<Map<String, Object>> logMaps) {
+        return logMaps.stream()
+                .collect(Collectors.groupingBy(log -> (String) log.getOrDefault(LOG_KEY_CONTAINER_NAME, UNKNOWN_CONTAINER)));
     }
 
-    private void writeLogsToFile(String fileTitle, List<Map<String, Object>> logMaps, String timestamp) {
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(fileTitle, true))) {
+    private String buildLogFileName(String containerName, String timestampForTitle, Long sshId) {
+        return String.format("logs/%s-log-%s-%d.txt", containerName, timestampForTitle, sshId);
+    }
+
+    private void writeLogsToFile(String fileName, List<Map<String, Object>> logMaps, String timestamp) {
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(fileName, true))) {
             for (Map<String, Object> logMap : logMaps) {
                 String logContent = convertLogMapToString(logMap, timestamp);
 
@@ -382,7 +368,7 @@ public class LogService {
 
     private DeleteByQueryRequest buildDeleteRequest(Instant cutoffTime) {
         return DeleteByQueryRequest.of(d -> d
-                .index("docker-logs-*")
+                .index(LOG_INDEX)
                 .query(q -> q.range(r -> r
                         .field(LOG_KEY_TIMESTAMP)
                         .lte(JsonData.of(cutoffTime.toString()))
@@ -418,10 +404,5 @@ public class LogService {
 
     private String extractHeaderFromLog(String log) {
         return log.substring(1, 17);
-    }
-
-    private Map<String, List<Map<String, Object>>> groupLogsByContainerName(List<Map<String, Object>> logMaps) {
-        return logMaps.stream()
-                .collect(Collectors.groupingBy(log -> (String) log.getOrDefault(LOG_KEY_CONTAINER_NAME, UNKNOWN_CONTAINER)));
     }
 }
