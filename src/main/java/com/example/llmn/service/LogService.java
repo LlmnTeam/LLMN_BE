@@ -77,6 +77,16 @@ public class LogService {
         }
     }
 
+    public void deleteLogsBefore(Instant cutoffTime, String elasticSearchHost) {
+        try {
+            DeleteByQueryRequest deleteRequest = buildDeleteRequest(cutoffTime);
+            ElasticsearchClient client = elasticsearchConfig.createElasticsearchClient(elasticSearchHost);
+            client.deleteByQuery(deleteRequest);
+        } catch (IOException e){
+            log.info("<ElasticSearch> 데이터 삭제 실패");
+        }
+    }
+
     public List<LogDataDTO> searchLog(Instant startTime, Instant endTime, String logLevel, String containerName, String elasticSearchHost) {
         try {
             SearchRequest searchRequest = buildSearchRequest(startTime, endTime, logLevel, containerName);
@@ -87,16 +97,6 @@ public class LogService {
         } catch (IOException e) {
             log.error("<ElasticSearch> {} 어플리케이션에 대해 검색 실패", containerName);
             return new ArrayList<>();
-        }
-    }
-
-    public void deleteLogsBefore(Instant cutoffTime, String elasticSearchHost) {
-        try {
-            DeleteByQueryRequest deleteRequest = buildDeleteRequest(cutoffTime);
-            ElasticsearchClient client = elasticsearchConfig.createElasticsearchClient(elasticSearchHost);
-            client.deleteByQuery(deleteRequest);
-        } catch (IOException e){
-            log.info("<ElasticSearch> 데이터 삭제 실패");
         }
     }
 
@@ -124,6 +124,48 @@ public class LogService {
         }
     }
 
+    private SearchRequest buildSearchRequest(String index) {
+        return new SearchRequest.Builder()
+                .index(index)
+                .query(q -> q.bool(b -> b
+                        .should(s -> s.term(t -> t.field(LOG_KEY_PROCESSED).value(false)))  // is_processed가 false인 로그
+                        .should(s -> s.bool(bs -> bs.mustNot(mn -> mn.exists(e -> e.field(LOG_KEY_PROCESSED)))))  // is_processed 필드가 없는 로그
+                ))
+                .size(MAX_LOG_SIZE)
+                .build();
+    }
+
+    private void createElasticSearchIndex(String indexName, String elasticSearchHost)  {
+        try {
+            CreateIndexRequest createIndexRequest = new CreateIndexRequest.Builder()
+                    .index(indexName)
+                    .mappings(m -> m
+                            .properties(LOG_KEY_PROCESSED, p -> p.boolean_(b -> b))
+                            .properties(LOG_KEY_TIMESTAMP, p -> p.date(d -> d))
+                            .properties(LOG_KEY_LEVEL, p -> p.keyword(k -> k))
+                            .properties(LOG_KEY_CONTAINER_NAME, p -> p.keyword(k -> k))
+                            .properties(LOG_KEY_MESSAGE, p -> p.text(t -> t))
+                    )
+                    .build();
+
+            ElasticsearchClient client = elasticsearchConfig.createElasticsearchClient(elasticSearchHost);
+            client.indices().create(createIndexRequest);
+        } catch (IOException e) {
+            log.info("ElasticSearch 인덱스 생성 실패!");
+        }
+    }
+
+    private List<Map<String, Object>> convertResponseToMap(SearchResponse<Map> searchResponse){
+        return searchResponse
+                .hits().hits().stream()
+                .map(hit -> {
+                    Map<String, Object> logMap = hit.source();
+                    logMap.put(LOG_KEY_ID, hit.id());
+                    return logMap;
+                })
+                .toList();
+    }
+
     private List<Map<String, Object>> refineLogFields(List<Map<String, Object>> logMaps) {
         return logMaps.stream()
                 .map(logMap -> {
@@ -135,6 +177,26 @@ public class LogService {
                     return logMap;
                 })
                 .toList();
+    }
+
+    private String extractContainerNameFromLogMap(Map<String, Object> log) {
+        Map<String, Object> container = (Map<String, Object>) log.get(LOG_KEY_CONTAINER);
+        return Optional.ofNullable(container)
+                .map(c -> (String) c.get(CONTAINER_KEY_NAME))
+                .orElse(UNKNOWN_CONTAINER);
+    }
+
+    private String extractMessageFromLogMap(Map<String, Object> log) {
+        return Optional.ofNullable((String) log.get(LOG_KEY_MESSAGE))
+                .orElse(NO_MESSAGE);
+    }
+
+    private String extractLogLevelFromLog(String logContent) {
+        return (logContent == null) ? LOG_LEVEL_UNKNOWN :
+                Stream.of(LOG_LEVEL_INFO, LOG_LEVEL_ERROR, LOG_LEVEL_WARN)
+                        .filter(logContent::contains)
+                        .findFirst()
+                        .orElse(LOG_LEVEL_INFO);
     }
 
     private void updateLogFields(Map<String, Object> log, String logLevel, String containerName, String message) {
@@ -161,111 +223,12 @@ public class LogService {
         }
     }
 
-    private List<LogDataDTO> convertSearchHitsToDTOs(SearchResponse<Map> response) {
-        return response.hits().hits().stream()
-                .map(hit -> convertResponseMapToDTO(hit.source()))
-                .toList();
-    }
-
-    private LogDataDTO convertResponseMapToDTO(Map<String, Object> responseMap) {
-        String containerName = extractStringFromMap(responseMap, LOG_KEY_CONTAINER_NAME, UNKNOWN_CONTAINER);
-        Instant timestamp = parseInstant((String) responseMap.get(LOG_KEY_TIMESTAMP));
-        String formattedMessage = formatLogMessage(responseMap);
-        boolean isProcessed = extractBooleanFromMap(responseMap, LOG_KEY_PROCESSED, false);
-        String logLevel = extractStringFromMap(responseMap, LOG_KEY_LEVEL, LOG_LEVEL_UNKNOWN);
-
-        return new LogDataDTO(containerName, timestamp, formattedMessage, isProcessed, logLevel);
-    }
-
-
-    private String formatLogMessage(Map<String, Object> responseMap) {
-        return Optional.ofNullable((String) responseMap.get(LOG_KEY_MESSAGE))
-                .map(JsonUtils::normalizeJson)
-                .orElse(NO_MESSAGE);
-    }
-
-    // 나중에 searchLog() 반환 타입을 List<LogDataDTO>이 아닌 String으로 받고 싶을 때 사용
-    private String convertSearchHitsToString(SearchResponse<Map> response) {
-        List<String> logContents = response.hits().hits().stream()
-                .map(hit -> convertResponseMapToString(hit.source()))
-                .toList();
-
-        return String.join("\n", logContents);
-    }
-
-    private String convertResponseMapToString(Map<String, Object> responseMap) {
-        String logContent = (String) responseMap.get(LOG_KEY_MESSAGE);
-        return logContent != null ? logContent : "";
-    }
-
-    private String convertLogMapToString(Map<String, Object> logMap, String timestamp) {
-        String logContent = Optional.ofNullable(logMap.get(LOG_KEY_MESSAGE))
-                .map(Object::toString)
-                .orElse(null);
-
-        if (logContent == null) {
-            return null;
-        }
-
-        return String.format(LOG_FORMAT, timestamp, logContent);
-    }
-
-    private List<Map<String, Object>> convertResponseToMap(SearchResponse<Map> searchResponse){
-        return searchResponse
-                .hits().hits().stream()
-                .map(hit -> {
-                    Map<String, Object> logMap = hit.source();
-                    logMap.put(LOG_KEY_ID, hit.id());
-                    return logMap;
-                })
-                .toList();
-    }
-
-    private String extractLogLevelFromLog(String logContent) {
-        return (logContent == null) ? LOG_LEVEL_UNKNOWN :
-                Stream.of(LOG_LEVEL_INFO, LOG_LEVEL_ERROR, LOG_LEVEL_WARN)
-                        .filter(logContent::contains)
-                        .findFirst()
-                        .orElse(LOG_LEVEL_INFO);
-    }
-
-    private Optional<String> findLatestLogFile(String containerName) {
-        List<String> logFiles = findTextFiles(LOGS_DIRECTORY);
-
-        return logFiles.stream()
-                .filter(logFile -> logFile.startsWith(containerName + "-log"))
-                .max(this::compareLogFileDates);
-    }
-
-    private String extractRecentLogFrom(String fileContent) {
-        LocalDateTime cutoffTime = getThirtyMinutesAgoTime();
-
-        String[] logs = fileContent.split("(?=\\[\\d{4}-\\d{2}-\\d{2}_\\d{2}:\\d{2}\\])");
-
-        String recentLogs = Arrays.stream(logs)
-                .map(String::trim)
-                .filter(log -> !log.isEmpty())
-                .filter(log -> isLogWithinLast30Minutes(log, cutoffTime))
-                .collect(Collectors.joining("\n\n"));
-
-        return recentLogs.isEmpty() ? BLANK_STRING : recentLogs;
-    }
-
-    private String extractContainerNameFromLogMap(Map<String, Object> log) {
-        Map<String, Object> container = (Map<String, Object>) log.get(LOG_KEY_CONTAINER);
-        return Optional.ofNullable(container)
-                .map(c -> (String) c.get(CONTAINER_KEY_NAME))
-                .orElse(UNKNOWN_CONTAINER);
-    }
-
-    private String extractMessageFromLogMap(Map<String, Object> log) {
-        return Optional.ofNullable((String) log.get(LOG_KEY_MESSAGE))
-                .orElse(NO_MESSAGE);
-    }
-
-    private String createLogIndex() {
-        // 오늘 날짜를 기반으로 인덱스 이름 생성
-        return "docker-logs-" + getTodayDateInString();
+    private UpdateRequest<Map<String, Object>, Map<String, Object>> buildUpdateRequest(String index, Map<String, Object> logMap, String id) {
+        return new UpdateRequest.Builder<Map<String, Object>, Map<String, Object>>()
+                .index(index)
+                .id(id)
+                .doc(logMap)
+                .build();
     }
 
     private void saveLogMapsToFile(List<Map<String, Object>> logMaps, Long sshId) {
@@ -307,24 +270,107 @@ public class LogService {
         }
     }
 
-    private void createElasticSearchIndex(String indexName, String elasticSearchHost)  {
-        try {
-            CreateIndexRequest createIndexRequest = new CreateIndexRequest.Builder()
-                    .index(indexName)
-                    .mappings(m -> m
-                            .properties(LOG_KEY_PROCESSED, p -> p.boolean_(b -> b))
-                            .properties(LOG_KEY_TIMESTAMP, p -> p.date(d -> d))
-                            .properties(LOG_KEY_LEVEL, p -> p.keyword(k -> k))
-                            .properties(LOG_KEY_CONTAINER_NAME, p -> p.keyword(k -> k))
-                            .properties(LOG_KEY_MESSAGE, p -> p.text(t -> t))
-                    )
-                    .build();
+    private String convertLogMapToString(Map<String, Object> logMap, String timestamp) {
+        String logContent = Optional.ofNullable(logMap.get(LOG_KEY_MESSAGE))
+                .map(Object::toString)
+                .orElse(null);
 
-            ElasticsearchClient client = elasticsearchConfig.createElasticsearchClient(elasticSearchHost);
-            client.indices().create(createIndexRequest);
-        } catch (IOException e) {
-            log.info("ElasticSearch 인덱스 생성 실패!");
+        if (logContent == null) {
+            return null;
         }
+
+        return String.format(LOG_FORMAT, timestamp, logContent);
+    }
+
+    private DeleteByQueryRequest buildDeleteRequest(Instant cutoffTime) {
+        return DeleteByQueryRequest.of(d -> d
+                .index(LOG_INDEX)
+                .query(q -> q.range(r -> r
+                        .field(LOG_KEY_TIMESTAMP)
+                        .lte(JsonData.of(cutoffTime.toString()))
+                ))
+        );
+    }
+
+    private List<LogDataDTO> convertSearchHitsToDTOs(SearchResponse<Map> response) {
+        return response.hits().hits().stream()
+                .map(hit -> convertResponseMapToDTO(hit.source()))
+                .toList();
+    }
+
+    private LogDataDTO convertResponseMapToDTO(Map<String, Object> responseMap) {
+        String containerName = extractStringFromMap(responseMap, LOG_KEY_CONTAINER_NAME, UNKNOWN_CONTAINER);
+        Instant timestamp = parseInstant((String) responseMap.get(LOG_KEY_TIMESTAMP));
+        String formattedMessage = formatLogMessage(responseMap);
+        boolean isProcessed = extractBooleanFromMap(responseMap, LOG_KEY_PROCESSED, false);
+        String logLevel = extractStringFromMap(responseMap, LOG_KEY_LEVEL, LOG_LEVEL_UNKNOWN);
+
+        return new LogDataDTO(containerName, timestamp, formattedMessage, isProcessed, logLevel);
+    }
+
+
+    private String formatLogMessage(Map<String, Object> responseMap) {
+        return Optional.ofNullable((String) responseMap.get(LOG_KEY_MESSAGE))
+                .map(JsonUtils::normalizeJson)
+                .orElse(NO_MESSAGE);
+    }
+
+    // 나중에 searchLog() 반환 타입을 List<LogDataDTO>이 아닌 String으로 받고 싶을 때 사용
+    private String convertSearchHitsToString(SearchResponse<Map> response) {
+        List<String> logContents = response.hits().hits().stream()
+                .map(hit -> convertResponseMapToString(hit.source()))
+                .toList();
+
+        return String.join("\n", logContents);
+    }
+
+    private String convertResponseMapToString(Map<String, Object> responseMap) {
+        String logContent = (String) responseMap.get(LOG_KEY_MESSAGE);
+        return logContent != null ? logContent : "";
+    }
+
+    private Optional<String> findLatestLogFile(String containerName) {
+        List<String> logFiles = findTextFiles(LOGS_DIRECTORY);
+
+        return logFiles.stream()
+                .filter(logFile -> logFile.startsWith(containerName + "-log"))
+                .max(this::compareLogFileDates);
+    }
+
+    private int compareLogFileDates(String file1, String file2) {
+        LocalDateTime fileDateTime1 = extractDateTimeFromLogFile(file1);
+        LocalDateTime fileDateTime2 = extractDateTimeFromLogFile(file2);
+        return fileDateTime1.compareTo(fileDateTime2);
+    }
+
+    private LocalDateTime extractDateTimeFromLogFile(String file) {
+        // 파일 이름에서 "log-" 뒤부터 ".txt" 앞까지의 부분 추출
+        String dateTimePart = file.substring(file.indexOf("log-") + 4, file.indexOf("-", file.indexOf("_")));
+        return LocalDateTime.parse(dateTimePart, formatter);
+    }
+
+    private String extractRecentLogFrom(String fileContent) {
+        LocalDateTime cutoffTime = getThirtyMinutesAgoTime();
+
+        String[] logs = fileContent.split("(?=\\[\\d{4}-\\d{2}-\\d{2}_\\d{2}:\\d{2}\\])");
+
+        String recentLogs = Arrays.stream(logs)
+                .map(String::trim)
+                .filter(log -> !log.isEmpty())
+                .filter(log -> isLogWithinLast30Minutes(log, cutoffTime))
+                .collect(Collectors.joining("\n\n"));
+
+        return recentLogs.isEmpty() ? BLANK_STRING : recentLogs;
+    }
+
+    private boolean isLogWithinLast30Minutes(String log, LocalDateTime cutoffTime) {
+        String header = extractHeaderFromLog(log);
+        LocalDateTime logTime = LocalDateTime.parse(header, formatterWithMinute);
+        return logTime.isAfter(cutoffTime);
+    }
+
+    private String extractHeaderFromLog(String log) {
+        return log.substring(1, 17);
     }
 
     private SearchRequest buildSearchRequest(Instant startTime, Instant endTime, String logLevel, String containerName) {
@@ -355,54 +401,8 @@ public class LogService {
         ));
     }
 
-    private SearchRequest buildSearchRequest(String index) {
-        return new SearchRequest.Builder()
-                .index(index)
-                .query(q -> q.bool(b -> b
-                        .should(s -> s.term(t -> t.field(LOG_KEY_PROCESSED).value(false)))  // is_processed가 false인 로그
-                        .should(s -> s.bool(bs -> bs.mustNot(mn -> mn.exists(e -> e.field(LOG_KEY_PROCESSED)))))  // is_processed 필드가 없는 로그
-                ))
-                .size(MAX_LOG_SIZE)
-                .build();
-    }
-
-    private DeleteByQueryRequest buildDeleteRequest(Instant cutoffTime) {
-        return DeleteByQueryRequest.of(d -> d
-                .index(LOG_INDEX)
-                .query(q -> q.range(r -> r
-                        .field(LOG_KEY_TIMESTAMP)
-                        .lte(JsonData.of(cutoffTime.toString()))
-                ))
-        );
-    }
-
-    private UpdateRequest<Map<String, Object>, Map<String, Object>> buildUpdateRequest(String index, Map<String, Object> logMap, String id) {
-        return new UpdateRequest.Builder<Map<String, Object>, Map<String, Object>>()
-                .index(index)
-                .id(id)
-                .doc(logMap)
-                .build();
-    }
-
-    private int compareLogFileDates(String file1, String file2) {
-        LocalDateTime fileDateTime1 = extractDateTimeFromLogFile(file1);
-        LocalDateTime fileDateTime2 = extractDateTimeFromLogFile(file2);
-        return fileDateTime1.compareTo(fileDateTime2);
-    }
-
-    private LocalDateTime extractDateTimeFromLogFile(String file) {
-        // 파일 이름에서 "log-" 뒤부터 ".txt" 앞까지의 부분 추출
-        String dateTimePart = file.substring(file.indexOf("log-") + 4, file.indexOf("-", file.indexOf("_")));
-        return LocalDateTime.parse(dateTimePart, formatter);
-    }
-
-    private boolean isLogWithinLast30Minutes(String log, LocalDateTime cutoffTime) {
-        String header = extractHeaderFromLog(log);
-        LocalDateTime logTime = LocalDateTime.parse(header, formatterWithMinute);
-        return logTime.isAfter(cutoffTime);
-    }
-
-    private String extractHeaderFromLog(String log) {
-        return log.substring(1, 17);
+    private String createLogIndex() {
+        // 오늘 날짜를 기반으로 인덱스 이름 생성
+        return "docker-logs-" + getTodayDateInString();
     }
 }
