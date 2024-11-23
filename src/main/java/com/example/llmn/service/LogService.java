@@ -83,13 +83,10 @@ public class LogService {
     public List<LogDataDTO> searchLogData(Instant startTime, Instant endTime, String logLevel, String containerName, String elasticSearchHost) {
         try {
             SearchRequest searchRequest = buildSearchRequest(startTime, endTime, logLevel, containerName);
-
             ElasticsearchClient client = elasticsearchConfig.createElasticsearchClient(elasticSearchHost);
             SearchResponse<Map> response = client.search(searchRequest, Map.class);
 
-            return response.hits().hits().stream()
-                    .map(hit -> convertResponseToLogData(hit.source())) // 검색 결과를 LogData로 변환하여 반환
-                    .toList();
+            return convertSearchHitsToDTOs(response);
         } catch (IOException e) {
             log.error("<ElasticSearch> {} 어플리케이션에 대해 검색 실패", containerName);
             return new ArrayList<>();
@@ -196,7 +193,13 @@ public class LogService {
         }
     }
 
-    private LogDataDTO convertResponseToLogData(Map<String, Object> responseMap) {
+    private List<LogDataDTO> convertSearchHitsToDTOs(SearchResponse<Map> response) {
+        return response.hits().hits().stream()
+                .map(hit -> convertResponseMapToDTO(hit.source()))
+                .toList();
+    }
+
+    private LogDataDTO convertResponseMapToDTO(Map<String, Object> responseMap) {
         String containerName = extractStringFromMap(responseMap, LOG_KEY_CONTAINER_NAME, UNKNOWN_CONTAINER);
         Instant timestamp = parseInstant((String) responseMap.get(LOG_KEY_TIMESTAMP));
         String formattedMessage = formatLogMessage(responseMap);
