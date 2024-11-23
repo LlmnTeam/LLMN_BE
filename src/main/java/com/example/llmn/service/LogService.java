@@ -57,10 +57,11 @@ public class LogService {
     private static final String NO_MESSAGE = "No message";
     private static final String BLANK_STRING = "";
     private static final String LOG_FORMAT = "[%s]\n%s";
-    private static final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH");
-    private static final DateTimeFormatter formatterWithMinute = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH:mm");
     private static final int MAX_LOG_SIZE = 1000;
     public static final String LOG_INDEX = "docker-logs-*";
+    public static final String LOG_INDEX_PREFIX = "docker-logs-";
+    public static final String LOG_FILE_CONTENT_REGEX = "(?=\\[\\d{4}-\\d{2}-\\d{2}_\\d{2}:\\d{2}\\])";
+    public static final String BLANKE_STRING = "";
 
     @Scheduled(fixedRate = 60000)
     public void processAndUpdateLogs() {
@@ -326,7 +327,7 @@ public class LogService {
 
     private String convertResponseMapToString(Map<String, Object> responseMap) {
         String logContent = (String) responseMap.get(LOG_KEY_MESSAGE);
-        return logContent != null ? logContent : "";
+        return logContent != null ? logContent : BLANKE_STRING;
     }
 
     private Optional<String> findLatestLogFile(String containerName) {
@@ -346,18 +347,16 @@ public class LogService {
     private LocalDateTime extractDateTimeFromLogFile(String file) {
         // 파일 이름에서 "log-" 뒤부터 ".txt" 앞까지의 부분 추출
         String dateTimePart = file.substring(file.indexOf("log-") + 4, file.indexOf("-", file.indexOf("_")));
-        return LocalDateTime.parse(dateTimePart, formatter);
+        return LocalDateTime.parse(dateTimePart, LOG_FILE_FORMATTER);
     }
 
     private String extractRecentLogFrom(String fileContent) {
-        LocalDateTime cutoffTime = getThirtyMinutesAgoTime();
-
-        String[] logs = fileContent.split("(?=\\[\\d{4}-\\d{2}-\\d{2}_\\d{2}:\\d{2}\\])");
+        String[] logs = fileContent.split(LOG_FILE_CONTENT_REGEX);
 
         String recentLogs = Arrays.stream(logs)
                 .map(String::trim)
                 .filter(log -> !log.isEmpty())
-                .filter(log -> isLogWithinLast30Minutes(log, cutoffTime))
+                .filter(log -> isLogWithinLast30Minutes(log, getThirtyMinutesAgoTime()))
                 .collect(Collectors.joining("\n\n"));
 
         return recentLogs.isEmpty() ? BLANK_STRING : recentLogs;
@@ -365,7 +364,7 @@ public class LogService {
 
     private boolean isLogWithinLast30Minutes(String log, LocalDateTime cutoffTime) {
         String header = extractHeaderFromLog(log);
-        LocalDateTime logTime = LocalDateTime.parse(header, formatterWithMinute);
+        LocalDateTime logTime = LocalDateTime.parse(header, LOG_TEXT_FORMATTER);
         return logTime.isAfter(cutoffTime);
     }
 
@@ -403,6 +402,6 @@ public class LogService {
 
     private String createLogIndex() {
         // 오늘 날짜를 기반으로 인덱스 이름 생성
-        return "docker-logs-" + getTodayDateInString();
+        return LOG_INDEX_PREFIX + getTodayDateInString();
     }
 }

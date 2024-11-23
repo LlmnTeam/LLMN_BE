@@ -12,12 +12,13 @@ public class DateTimeUtils {
 
     private DateTimeUtils() {}
 
-    public static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
-    public static final DateTimeFormatter LOG_FILE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH");
-    public static final DateTimeFormatter SIMPLE_DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy.MM.dd");
-    public static final DateTimeFormatter HOUR_MINUTE_FORMATTER = DateTimeFormatter.ofPattern("HH:mm");
     public static final String LOG_TITLE_FORMAT = "yyyy-MM-dd_HH";
     public static final String LOG_TEXT_FORMAT = "yyyy-MM-dd_HH:mm";
+    public static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+    public static final DateTimeFormatter LOG_FILE_FORMATTER = DateTimeFormatter.ofPattern(LOG_TITLE_FORMAT);
+    public static final DateTimeFormatter LOG_TEXT_FORMATTER = DateTimeFormatter.ofPattern(LOG_TEXT_FORMAT);
+    public static final DateTimeFormatter SIMPLE_DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy.MM.dd");
+    public static final DateTimeFormatter HOUR_MINUTE_FORMATTER = DateTimeFormatter.ofPattern("HH:mm");
 
     public static String formatDate(Date date, String format) {
         return new SimpleDateFormat(format).format(date);
