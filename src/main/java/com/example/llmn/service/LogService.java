@@ -22,7 +22,6 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -81,8 +80,8 @@ public class LogService {
 
     public void deleteLogsBefore(Instant cutoffTime, String elasticSearchHost) {
         try {
-            DeleteByQueryRequest deleteRequest = buildDeleteRequest(cutoffTime);
             ElasticsearchClient client = elasticsearchConfig.createElasticsearchClient(elasticSearchHost);
+            DeleteByQueryRequest deleteRequest = buildDeleteRequest(cutoffTime);
             client.deleteByQuery(deleteRequest);
         } catch (IOException e){
             log.info("<ElasticSearch> 데이터 삭제 실패");
@@ -91,8 +90,8 @@ public class LogService {
 
     public List<LogDataDTO> searchLog(Instant startTime, Instant endTime, String logLevel, String containerName, String elasticSearchHost) {
         try {
-            SearchRequest searchRequest = buildSearchRequest(startTime, endTime, logLevel, containerName);
             ElasticsearchClient client = elasticsearchConfig.createElasticsearchClient(elasticSearchHost);
+            SearchRequest searchRequest = buildSearchRequest(startTime, endTime, logLevel, containerName);
             SearchResponse<Map> response = client.search(searchRequest, Map.class);
 
             return convertSearchHitsToDTOs(response);
@@ -110,18 +109,15 @@ public class LogService {
     }
 
     private SearchResponse<Map> searchLogsInElasticSearch(String elasticSearchHost) {
-        String index = createLogIndex();
-
         try {
-            SearchRequest searchRequest = buildSearchRequest(index);
             ElasticsearchClient client = elasticsearchConfig.createElasticsearchClient(elasticSearchHost);
-
+            SearchRequest searchRequest = buildSearchRequest(getLogIndex());
             return client.search(searchRequest, Map.class);
         } catch (ElasticsearchException e) {
-            createElasticSearchIndex(index, elasticSearchHost);
+            createElasticSearchIndex(getLogIndex(), elasticSearchHost);
             return new SearchResponse.Builder<Map>().build();
         } catch (IOException e){
-            log.error("<ElasticSearch> {}에 대한 검색 실패", index);
+            log.error("<ElasticSearch> {}에 대한 검색 실패", getLogIndex());
             return new SearchResponse.Builder<Map>().build();
         }
     }
@@ -181,15 +177,16 @@ public class LogService {
                 .toList();
     }
 
-    private String extractContainerNameFromLogMap(Map<String, Object> log) {
-        Map<String, Object> container = (Map<String, Object>) log.get(LOG_KEY_CONTAINER);
+    @SuppressWarnings("unchecked")
+    private String extractContainerNameFromLogMap(Map<String, Object> logMap) {
+        Map<String, Object> container = (Map<String, Object>) logMap.get(LOG_KEY_CONTAINER);
         return Optional.ofNullable(container)
-                .map(c -> (String) c.get(CONTAINER_KEY_NAME))
+                .map(map -> (String) map.get(CONTAINER_KEY_NAME))
                 .orElse(UNKNOWN_CONTAINER);
     }
 
-    private String extractMessageFromLogMap(Map<String, Object> log) {
-        return Optional.ofNullable((String) log.get(LOG_KEY_MESSAGE))
+    private String extractMessageFromLogMap(Map<String, Object> logMap) {
+        return Optional.ofNullable((String) logMap.get(LOG_KEY_MESSAGE))
                 .orElse(NO_MESSAGE);
     }
 
@@ -209,20 +206,25 @@ public class LogService {
         log.remove(LOG_KEY_CONTAINER);
     }
 
-    private void updateLogToElasticSearch(List<Map<String, Object>> updatedLogMaps, String elasticSearchHost) {
-        String logIndex = createLogIndex();
-
+    private void updateLogToElasticSearch(List<Map<String, Object>> logMaps, String elasticSearchHost) {
         try {
             ElasticsearchClient client = elasticsearchConfig.createElasticsearchClient(elasticSearchHost);
+            for (Map<String, Object> logMap : logMaps) {
+                String documentId = extractDocumentId(logMap);
+                if (documentId == null) {
+                    return;
+                }
 
-            for (Map<String, Object> logMap : updatedLogMaps) {
-                String id = (String) logMap.remove(LOG_KEY_ID);
-                UpdateRequest<Map<String, Object>, Map<String, Object>> updateRequest = buildUpdateRequest(logIndex, logMap, id);
+                UpdateRequest<Map<String, Object>, Map<String, Object>> updateRequest = buildUpdateRequest(getLogIndex(), logMap, documentId);
                 client.update(updateRequest, Map.class);
             }
         } catch (IOException e){
-            log.error("<ElasticSearch> {}에 대한 업데이트 실패", logIndex);
+            log.error("<ElasticSearch> {}에 대한 업데이트 실패", getLogIndex());
         }
+    }
+
+    private String extractDocumentId(Map<String, Object> logMap) {
+        return (String) logMap.remove(LOG_KEY_ID);
     }
 
     private UpdateRequest<Map<String, Object>, Map<String, Object>> buildUpdateRequest(String index, Map<String, Object> logMap, String id) {
@@ -393,7 +395,7 @@ public class LogService {
         ));
     }
 
-    private String createLogIndex() {
+    private String getLogIndex() {
         // 오늘 날짜를 기반으로 인덱스 이름 생성
         return LOG_INDEX_PREFIX + getTodayDateInString();
     }
