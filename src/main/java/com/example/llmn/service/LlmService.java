@@ -212,16 +212,21 @@ public class LlmService {
     }
 
     private LogDTO.RecommendationDTO fetchRecommendation(Long userId) {
-        // 6시간 전의 요약들을 인풋으로
         LocalDateTime startOfTime = LocalDateTime.now().minusHours(6);
         List<Summary> performanceSummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.PERFORMANCE), userId, startOfTime);
         List<Summary> logSummaries = summaryRepository.findByTypeWithinDateWithProject(List.of(SummaryType.LOG), userId, startOfTime);
 
+        String summaryRequestBody = buildRecommendRequestBody(performanceSummaries, logSummaries);
+
+        return sendSummaryRequest(recommendUri, summaryRequestBody, LogDTO.RecommendationDTO.class);
+    }
+
+    private String buildRecommendRequestBody(List<Summary> performanceSummaries, List<Summary> logSummaries) {
         StringBuilder summaryRequestBody = new StringBuilder();
         appendSummaryWithHeader(summaryRequestBody, PERFORMANCE_SUMMARY_HEADER, performanceSummaries);
         appendLogSummary(summaryRequestBody, logSummaries);
 
-        return sendSummaryRequest(recommendUri, summaryRequestBody.toString(), LogDTO.RecommendationDTO.class);
+        return summaryRequestBody.toString();
     }
 
     private void appendSummaryWithHeader(StringBuilder summaryRequestBody, String header, List<Summary> summaries) {
