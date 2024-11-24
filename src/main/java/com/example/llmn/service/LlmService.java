@@ -150,12 +150,7 @@ public class LlmService {
     }
 
     private LogDTO.SummaryResponseDTO fetchLogSummary(String containerName) {
-        // 로그 메시지는 ElasticSearch에서 조회
         String logContent = logService.findRecentLogs(containerName);
-        if (logContent.isBlank()) {
-            return null;
-        }
-
         String summaryRequestBody = buildSummaryRequestBody(containerName, logContent);
 
         return sendSummaryRequest(logSummeryUri, summaryRequestBody, LogDTO.SummaryResponseDTO.class);
@@ -267,23 +262,30 @@ public class LlmService {
     }
 
     private void processProjectLogSummary(Project project) {
-        // 1st 로그를 요약해서 사져옴
         LogDTO.SummaryResponseDTO summaryDTO = fetchLogSummary(project.getContainerName());
-        if(summaryDTO == null){
+        if(isSummaryContentEmpty(summaryDTO)){
             return;
         }
 
-        // 2nd 로그 요약 저장
         saveSummary(project.getUser(), project, summaryDTO.logSummary(), SummaryType.LOG);
 
-        // 3rd 긴급 체크 여부 업데이트
+        checkUrgency(project, summaryDTO);
+        generateAlarm(project);
+    }
+
+    private boolean isSummaryContentEmpty(LogDTO.SummaryResponseDTO summaryDTO) {
+        return summaryDTO.logSummary().isBlank();
+    }
+
+    private void checkUrgency(Project project, LogDTO.SummaryResponseDTO summaryDTO) {
         if(summaryDTO.isUrgent()) {
             project.updateIsUrgent(true);
             String emergencyAlarmContent = project.getProjectName() + LOG_EMERGENCY_ALARM_SUFFIX;
             alarmService.generateAlarm(project.getUser().getId(), emergencyAlarmContent, AlarmType.EMERGENCY);
         }
+    }
 
-        // 4th 업데이트 알람 생성
+    private void generateAlarm(Project project) {
         String updateAlarmContent = project.getProjectName() + LOG_UPDATE_ALARM_SUFFIX;
         alarmService.generateAlarm(project.getUser().getId(), updateAlarmContent, AlarmType.UPDATE);
     }
