@@ -153,6 +153,7 @@ public class LogService {
         }
     }
 
+    @SuppressWarnings("unchecked")
     private List<Map<String, Object>> convertResponseToMap(SearchResponse<Map> searchResponse){
         return searchResponse
                 .hits().hits().stream()
@@ -165,16 +166,15 @@ public class LogService {
     }
 
     private List<Map<String, Object>> refineLogFields(List<Map<String, Object>> logMaps) {
-        return logMaps.stream()
-                .map(logMap -> {
-                    String containerName = extractContainerNameFromLogMap(logMap);
-                    String message = extractMessageFromLogMap(logMap);
-                    String logLevel = extractLogLevelFromLog(message);
+        logMaps.forEach(logMap -> {
+            String containerName = extractContainerNameFromLogMap(logMap);
+            String message = extractMessageFromLogMap(logMap);
+            String logLevel = extractLogLevelFromLog(message);
 
-                    updateLogFields(logMap, logLevel, containerName, message);
-                    return logMap;
-                })
-                .toList();
+            updateLogFields(logMap, logLevel, containerName, message);
+        });
+
+        return logMaps;
     }
 
     @SuppressWarnings("unchecked")
@@ -198,12 +198,12 @@ public class LogService {
                         .orElse(LOG_LEVEL_INFO);
     }
 
-    private void updateLogFields(Map<String, Object> log, String logLevel, String containerName, String message) {
-        log.put(LOG_KEY_LEVEL, logLevel);
-        log.put(LOG_KEY_CONTAINER_NAME, containerName);
-        log.put(LOG_KEY_PROCESSED, true);
-        log.put(LOG_KEY_MESSAGE, message);
-        log.remove(LOG_KEY_CONTAINER);
+    private void updateLogFields(Map<String, Object> logMap, String logLevel, String containerName, String message) {
+        logMap.put(LOG_KEY_LEVEL, logLevel);
+        logMap.put(LOG_KEY_CONTAINER_NAME, containerName);
+        logMap.put(LOG_KEY_PROCESSED, true);
+        logMap.put(LOG_KEY_MESSAGE, message);
+        logMap.remove(LOG_KEY_CONTAINER);
     }
 
     private void updateLogToElasticSearch(List<Map<String, Object>> logMaps, String elasticSearchHost) {
@@ -288,6 +288,7 @@ public class LogService {
         );
     }
 
+    @SuppressWarnings("unchecked")
     private List<LogDataDTO> convertSearchHitsToDTOs(SearchResponse<Map> response) {
         return response.hits().hits().stream()
                 .map(hit -> convertResponseMapToDTO(hit.source()))
@@ -303,7 +304,6 @@ public class LogService {
 
         return new LogDataDTO(containerName, timestamp, formattedMessage, isProcessed, logLevel);
     }
-
 
     private String formatLogMessage(Map<String, Object> responseMap) {
         return Optional.ofNullable((String) responseMap.get(LOG_KEY_MESSAGE))
