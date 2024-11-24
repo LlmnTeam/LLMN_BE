@@ -312,6 +312,7 @@ public class LogService {
     }
 
     // 나중에 searchLog() 반환 타입을 List<LogDataDTO>이 아닌 String으로 받고 싶을 때 사용
+    @SuppressWarnings("unchecked")
     private String convertSearchHitsToString(SearchResponse<Map> response) {
         List<String> logContents = response.hits().hits().stream()
                 .map(hit -> convertResponseMapToString(hit.source()))
@@ -321,8 +322,9 @@ public class LogService {
     }
 
     private String convertResponseMapToString(Map<String, Object> responseMap) {
-        String logContent = (String) responseMap.get(LOG_KEY_MESSAGE);
-        return logContent != null ? logContent : BLANKE_STRING;
+        return responseMap == null
+                ? NO_LOG_RECORD
+                : (String) Optional.ofNullable(responseMap.get(LOG_KEY_MESSAGE)).orElse(BLANKE_STRING);
     }
 
     private Optional<String> findLatestLogFile(String containerName) {
