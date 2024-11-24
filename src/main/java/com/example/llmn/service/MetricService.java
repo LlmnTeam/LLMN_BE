@@ -62,25 +62,19 @@ public class MetricService {
         List<User> users = userRepository.findByMonitoringSshIdIsNotNull();
 
         List<Metric> allMetrics = collectAllMetrics(users);
-
-        if (!allMetrics.isEmpty()) {
-            metricRepository.saveAll(allMetrics);
-        }
+        metricRepository.saveAll(allMetrics);
     }
 
     public MetricResponse.FindCurrentMetricDTO findCurrentMetric(Long sshInfoId) {
-        MetricResponse.FindCurrentMetricDTO cachedMetric = getCachedMetric(sshInfoId);
-        if (cachedMetric != null) {
-            return cachedMetric;
-        }
+        return retrieveCachedMetric(sshInfoId)
+                .orElseGet(() -> {
+                    Map<String, Double> cpuAndMemoryMetrics = collectCpuAndMemoryMetrics(sshInfoId);
+                    Map<String, Double> networkMetrics = collectNetworkMetrics(sshInfoId);
+                    MetricResponse.FindCurrentMetricDTO metricDTO = createFindCurrentMetricDTO(cpuAndMemoryMetrics, networkMetrics);
 
-        Map<String, Double> cpuAndMemoryMetrics = collectCpuAndMemoryMetrics(sshInfoId);
-        Map<String, Double> networkMetrics = collectNetworkMetrics(sshInfoId);
-        MetricResponse.FindCurrentMetricDTO metricDTO = createFindCurrentMetricDTO(cpuAndMemoryMetrics, networkMetrics);
-
-        cacheMetric(sshInfoId, metricDTO);
-
-        return metricDTO;
+                    cacheMetric(sshInfoId, metricDTO);
+                    return metricDTO;
+                });
     }
 
     @Transactional(readOnly = true)
@@ -218,13 +212,13 @@ public class MetricService {
         );
     }
 
-    private MetricResponse.FindCurrentMetricDTO getCachedMetric(Long sshInfoId) {
+    private Optional<MetricResponse.FindCurrentMetricDTO> retrieveCachedMetric(Long sshInfoId) {
         String cachedValue = redisService.getValueInString(METRIC_KEY, sshInfoId.toString());
         if (cachedValue == null) {
-            return null;
+            return Optional.empty();
         }
 
-        return convertJsonToMetricDTO(cachedValue);
+        return Optional.ofNullable(convertJsonToMetricDTO(cachedValue));
     }
 
     private void cacheMetric(Long sshInfoId, MetricResponse.FindCurrentMetricDTO metricDTO) {

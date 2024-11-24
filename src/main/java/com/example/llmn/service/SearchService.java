@@ -35,7 +35,6 @@ public class SearchService {
 
         List<String> logFiles = findTextFiles(LOGS_DIRECTORY);
         List<SearchResponse.LogFileDTO> searchedLogDTOS = searchLogFiles(logFiles, keyword.toLowerCase(), startDate, endDate, containerNameToProjectIdMap);
-
         List<SearchResponse.InsightDTO> searchedInsightDTOS = searchInsights(projects, keyword.toLowerCase(), startDate, endDate);
 
         return new SearchResponse.SearchDTO(searchedLogDTOS, searchedInsightDTOS);
