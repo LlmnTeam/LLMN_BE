@@ -81,14 +81,10 @@ public class LlmService {
         List<User> users = userRepository.findAll();
 
         for(User user : users) {
-            // 1st 요약 패치 요청
             Long monitoringSshInfoId = user.getMonitoringSshId();
             LogDTO.PerformanceSummaryResponseDTO performanceSummaryDTO = fetchMetricSummary(monitoringSshInfoId);
-
-            // 2nd 요약 결과 저장
             saveSummary(user, performanceSummaryDTO.performanceSummary(), SummaryType.PERFORMANCE);
 
-            // 3rd 업데이트 알람 생성
             alarmService.generateAlarm(user.getId(), PERFORMANCE_SUMMARY_ALARM, AlarmType.UPDATE);
         }
     }
@@ -166,19 +162,21 @@ public class LlmService {
     }
 
     private LogDTO.PerformanceSummaryResponseDTO fetchMetricSummary(Long sshInfoId){
-        // 1시간 전까지의 성능 지표
         MetricResponse.FindMetricHistoryDTO metricHistory = metricService.findMetricHistory(METRIC_HISTORY_PREVIOUS_HOUR, sshInfoId);
+        String summaryRequestBody = buildSummaryRequestBody(metricHistory);
 
-        // 각 메트릭 정보를 추가
+        return sendSummaryRequest(performanceSummeryUri, summaryRequestBody, LogDTO.PerformanceSummaryResponseDTO.class);
+    }
+
+    private String buildSummaryRequestBody(MetricResponse.FindMetricHistoryDTO metricHistory) {
         StringBuilder summaryRequestBody = new StringBuilder();
         summaryRequestBody.append(PERFORMANCE_SUMMARY_HEADER);
-        
         appendCpuMetrics(summaryRequestBody, metricHistory);
         appendMemoryMetrics(summaryRequestBody, metricHistory);
         appendNetworkInMetrics(summaryRequestBody, metricHistory);
         appendNetworkOutMetrics(summaryRequestBody, metricHistory);
 
-        return sendSummaryRequest(performanceSummeryUri, summaryRequestBody.toString(), LogDTO.PerformanceSummaryResponseDTO.class);
+        return summaryRequestBody.toString();
     }
 
     private LogDTO.HourlySummaryResponseDTO fetchHourlySummary(Long userId) {

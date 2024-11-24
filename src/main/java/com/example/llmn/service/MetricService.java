@@ -270,9 +270,8 @@ public class MetricService {
             String[] parts = line.split("\\s+");
 
             if (parts.length >= 10) {
-                long receivedBytes = convertStringToLong(parts[RECEIVED_BYTES_INDEX]);  // 수신된 바이트
-                long transmittedBytes = convertStringToLong(parts[TRANSMITTED_BYTES_INDEX]);  // 송신된 바이트
-
+                long receivedBytes = convertStringToLong(parts[RECEIVED_BYTES_INDEX]);
+                long transmittedBytes = convertStringToLong(parts[TRANSMITTED_BYTES_INDEX]);
                 networkUsageMap.put(METRIC_MAP_NETWORK_RECEIVED, convertBytesToMB(receivedBytes));
                 networkUsageMap.put(METRIC_MAP_NETWORK_SENT, convertBytesToMB(transmittedBytes));
             }
