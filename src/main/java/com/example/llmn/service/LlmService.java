@@ -150,11 +150,46 @@ public class LlmService {
         }
     }
 
+    private void processProjectLogSummary(Project project) {
+        LogDTO.SummaryResponseDTO summaryDTO = fetchLogSummary(project.getContainerName());
+        if(isSummaryContentEmpty(summaryDTO)){
+            return;
+        }
+
+        saveSummary(project.getUser(), project, summaryDTO.logSummary(), SummaryType.LOG);
+
+        checkUrgency(project, summaryDTO);
+        generateUpdateAlarm(project);
+    }
+
     private LogDTO.SummaryResponseDTO fetchLogSummary(String containerName) {
         String logContent = logService.findRecentLogs(containerName);
         String summaryRequestBody = buildSummaryRequestBody(containerName, logContent);
 
         return sendSummaryRequest(logSummeryUri, summaryRequestBody, LogDTO.SummaryResponseDTO.class);
+    }
+
+    private String buildSummaryRequestBody(String containerName, String logMessage) {
+        return LOG_DATA_HEADER +
+                "Application Name: " + containerName + "\n" +
+                "Log Content: " + logMessage + "\n";
+    }
+
+    private boolean isSummaryContentEmpty(LogDTO.SummaryResponseDTO summaryDTO) {
+        return summaryDTO.logSummary().isBlank();
+    }
+
+    private void checkUrgency(Project project, LogDTO.SummaryResponseDTO summaryDTO) {
+        if(summaryDTO.isUrgent()) {
+            project.updateIsUrgent(true);
+            String emergencyAlarmContent = project.getProjectName() + LOG_EMERGENCY_ALARM_SUFFIX;
+            alarmService.generateAlarm(project.getUser().getId(), emergencyAlarmContent, AlarmType.EMERGENCY);
+        }
+    }
+
+    private void generateUpdateAlarm(Project project) {
+        String updateAlarmContent = project.getProjectName() + LOG_UPDATE_ALARM_SUFFIX;
+        alarmService.generateAlarm(project.getUser().getId(), updateAlarmContent, AlarmType.UPDATE);
     }
 
     private Optional<LogDTO.PerformanceSummaryResponseDTO> fetchMetricSummary(Long sshInfoId){
@@ -175,6 +210,38 @@ public class LlmService {
         appendNetworkOutMetrics(summaryRequestBody, metricHistory);
 
         return summaryRequestBody.toString();
+    }
+
+    private void appendCpuMetrics(StringBuilder builder, MetricResponse.FindMetricHistoryDTO metricHistory) {
+        builder.append("1. CPU Metrics:\n");
+        for (MetricResponse.CpuMetricDTO cpuMetric : metricHistory.cpuMetrics()) {
+            builder.append(String.format("- Time: %s, CPU Usage: %.2f%%", cpuMetric.time(), cpuMetric.cpuUsage()))
+                    .append("\n");
+        }
+    }
+
+    private void appendMemoryMetrics(StringBuilder builder, MetricResponse.FindMetricHistoryDTO metricHistory) {
+        builder.append("\n2. Memory Metrics:\n");
+        for (MetricResponse.MemoryMetricDTO memoryMetric : metricHistory.memoryMetrics()) {
+            builder.append(String.format("- Time: %s, Memory Usage: %.2f MB", memoryMetric.time(), memoryMetric.memoryUsage()))
+                    .append("\n");
+        }
+    }
+
+    private void appendNetworkInMetrics(StringBuilder builder, MetricResponse.FindMetricHistoryDTO metricHistory) {
+        builder.append("\n3. Network In Metrics:\n");
+        for (MetricResponse.NetworkInMetricDTO networkInMetric : metricHistory.networkInMetrics()) {
+            builder.append(String.format("- Time: %s, Network Received: %.2f MB", networkInMetric.time(), networkInMetric.networkReceived()))
+                    .append("\n");
+        }
+    }
+
+    private void appendNetworkOutMetrics(StringBuilder builder, MetricResponse.FindMetricHistoryDTO metricHistory) {
+        builder.append("\n4. Network Out Metrics:\n");
+        for (MetricResponse.NetworkOutMetricDTO networkOutMetric : metricHistory.networkOutMetrics()) {
+            builder.append(String.format("- Time: %s, Network Sent: %.2f MB", networkOutMetric.time(), networkOutMetric.networkSent()))
+                    .append("\n");
+        }
     }
 
     private Optional<LogDTO.HourlySummaryResponseDTO> fetchHourlySummary(Long userId) {
@@ -219,11 +286,17 @@ public class LlmService {
         LocalDateTime startOfDay = LocalDateTime.now().minusWeeks(1).with(LocalTime.MIN);
         List<Summary> dailySummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.DAILY), userId, startOfDay);
 
-        StringBuilder summaryRequestBody = new StringBuilder();
-        appendSummaryWithHeader(summaryRequestBody, WEEKLY_TREND_HEADER, dailySummaries);
-        LogDTO.TrendSummaryResponseDTO responseDTO = sendSummaryRequest(trendSummeryUri, summaryRequestBody.toString(), LogDTO.TrendSummaryResponseDTO.class);
+        String summaryRequestBody = buildTendSummaryRequestBody(dailySummaries);
+        LogDTO.TrendSummaryResponseDTO responseDTO = sendSummaryRequest(trendSummeryUri, summaryRequestBody, LogDTO.TrendSummaryResponseDTO.class);
 
         return Optional.ofNullable(responseDTO);
+    }
+
+    private String buildTendSummaryRequestBody(List<Summary> dailySummaries) {
+        StringBuilder summaryRequestBody = new StringBuilder();
+        appendSummaryWithHeader(summaryRequestBody, WEEKLY_TREND_HEADER, dailySummaries);
+
+        return summaryRequestBody.toString();
     }
 
     private Optional<LogDTO.RecommendationDTO> fetchRecommendation(Long userId) {
@@ -282,67 +355,6 @@ public class LlmService {
         }
     }
 
-    private void processProjectLogSummary(Project project) {
-        LogDTO.SummaryResponseDTO summaryDTO = fetchLogSummary(project.getContainerName());
-        if(isSummaryContentEmpty(summaryDTO)){
-            return;
-        }
-
-        saveSummary(project.getUser(), project, summaryDTO.logSummary(), SummaryType.LOG);
-
-        checkUrgency(project, summaryDTO);
-        generateAlarm(project);
-    }
-
-    private boolean isSummaryContentEmpty(LogDTO.SummaryResponseDTO summaryDTO) {
-        return summaryDTO.logSummary().isBlank();
-    }
-
-    private void checkUrgency(Project project, LogDTO.SummaryResponseDTO summaryDTO) {
-        if(summaryDTO.isUrgent()) {
-            project.updateIsUrgent(true);
-            String emergencyAlarmContent = project.getProjectName() + LOG_EMERGENCY_ALARM_SUFFIX;
-            alarmService.generateAlarm(project.getUser().getId(), emergencyAlarmContent, AlarmType.EMERGENCY);
-        }
-    }
-
-    private void generateAlarm(Project project) {
-        String updateAlarmContent = project.getProjectName() + LOG_UPDATE_ALARM_SUFFIX;
-        alarmService.generateAlarm(project.getUser().getId(), updateAlarmContent, AlarmType.UPDATE);
-    }
-
-    private void appendCpuMetrics(StringBuilder builder, MetricResponse.FindMetricHistoryDTO metricHistory) {
-        builder.append("1. CPU Metrics:\n");
-        for (MetricResponse.CpuMetricDTO cpuMetric : metricHistory.cpuMetrics()) {
-            builder.append(String.format("- Time: %s, CPU Usage: %.2f%%", cpuMetric.time(), cpuMetric.cpuUsage()))
-                    .append("\n");
-        }
-    }
-
-    private void appendMemoryMetrics(StringBuilder builder, MetricResponse.FindMetricHistoryDTO metricHistory) {
-        builder.append("\n2. Memory Metrics:\n");
-        for (MetricResponse.MemoryMetricDTO memoryMetric : metricHistory.memoryMetrics()) {
-            builder.append(String.format("- Time: %s, Memory Usage: %.2f MB", memoryMetric.time(), memoryMetric.memoryUsage()))
-                    .append("\n");
-        }
-    }
-
-    private void appendNetworkInMetrics(StringBuilder builder, MetricResponse.FindMetricHistoryDTO metricHistory) {
-        builder.append("\n3. Network In Metrics:\n");
-        for (MetricResponse.NetworkInMetricDTO networkInMetric : metricHistory.networkInMetrics()) {
-            builder.append(String.format("- Time: %s, Network Received: %.2f MB", networkInMetric.time(), networkInMetric.networkReceived()))
-                    .append("\n");
-        }
-    }
-
-    private void appendNetworkOutMetrics(StringBuilder builder, MetricResponse.FindMetricHistoryDTO metricHistory) {
-        builder.append("\n4. Network Out Metrics:\n");
-        for (MetricResponse.NetworkOutMetricDTO networkOutMetric : metricHistory.networkOutMetrics()) {
-            builder.append(String.format("- Time: %s, Network Sent: %.2f MB", networkOutMetric.time(), networkOutMetric.networkSent()))
-                    .append("\n");
-        }
-    }
-
     private <T> T sendSummaryRequest(String uri, String requestContent, Class<T> responseType) {
         try {
             return webClient.post()
@@ -354,12 +366,6 @@ public class LlmService {
         } catch (Exception e) {
             return null;
         }
-    }
-
-    private String buildSummaryRequestBody(String containerName, String logMessage) {
-        return LOG_DATA_HEADER +
-                "Application Name: " + containerName + "\n" +
-                "Log Content: " + logMessage + "\n";
     }
 
     private void saveSummary(User user, String content, SummaryType summaryType) {
