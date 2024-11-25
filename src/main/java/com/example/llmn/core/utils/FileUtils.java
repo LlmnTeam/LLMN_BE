@@ -45,6 +45,12 @@ public class FileUtils {
         }
     }
 
+    public static void validateFileExist(MultipartFile file) {
+        if (file.isEmpty()) {
+            throw new CustomException(ExceptionCode.NO_FILE);
+        }
+    }
+
     public static String readFileAsString(String fileName) {
         Path path = Paths.get(LOGS_DIRECTORY, fileName);
         validateFileExists(path);

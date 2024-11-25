@@ -61,7 +61,7 @@ public class UserService {
     @Value("${update_env.uri}")
     private String updateEnvUri;
 
-    private static final String KEY_PREFIX_CODE = "code:";
+    private static final String PREFIX_CODE = "code:";
     private static final String MAIL_TEMPLATE_FOR_CODE = "verification_code_email.html";
     private static final String SSH_DIRECTORY = "ssh";
     private static final String REDIS_KEY_SESSION_ID = "sessionId";
@@ -87,7 +87,6 @@ public class UserService {
                 () -> new CustomException(ExceptionCode.USER_ACCOUNT_WRONG)
         );
 
-        // 비밀번호가 일치하지 않음
         if(!passwordEncoder.matches(requestDTO.password(), user.getPassword())){
             throw new CustomException(ExceptionCode.USER_ACCOUNT_WRONG);
         }
@@ -131,7 +130,7 @@ public class UserService {
     }
 
     public UserResponse.VerifyEmailCodeDTO verifyCode(UserRequest.VerifyCodeDTO requestDTO, String codeType){
-        if(redisService.isNotValidValue(buildRedisKey(KEY_PREFIX_CODE, codeType), requestDTO.email(), requestDTO.code()))
+        if(redisService.isNotValidValue(addCodeTypePrefix(codeType), requestDTO.email(), requestDTO.code()))
             return new UserResponse.VerifyEmailCodeDTO(false);
 
         if(CODE_TYPE_RECOVERY.equals(codeType))
@@ -146,12 +145,9 @@ public class UserService {
     }
 
     public Path uploadSSHKey(MultipartFile file) {
-        if (file.isEmpty()) {
-            throw new CustomException(ExceptionCode.NO_FILE_TO_UPLOAD);
-        }
-
-        // SSH Key를 저장하는 디렉토리가 없으면 생성
+        validateFileExist(file);
         createDirectoryIfNotExist(SSH_DIRECTORY);
+
         Path path = getFilePath(SSH_DIRECTORY, file);
         writeFile(file, path);
 
@@ -605,12 +601,12 @@ public class UserService {
         return new UserResponse.CloudInfoDTO(sshInfo.getRemoteName(), sshInfo.getRemoteHost());
     }
 
-    private String buildRedisKey(String prefix, String codeType) {
-        return prefix + codeType;
+    private String addCodeTypePrefix(String codeType) {
+        return UserService.PREFIX_CODE + codeType;
     }
 
     private void checkAlreadySendCode(String email, String codeType) {
-        if(redisService.isValueExist(buildRedisKey(KEY_PREFIX_CODE, codeType), email)){
+        if(redisService.isValueExist(addCodeTypePrefix(codeType), email)){
             throw new CustomException(ExceptionCode.ALREADY_SEND_EMAIL);
         }
     }
@@ -622,6 +618,6 @@ public class UserService {
     }
 
     private void storeVerificationCode(String email, String codeType, String verificationCode) {
-        redisService.storeValue(buildRedisKey(KEY_PREFIX_CODE, codeType), email, verificationCode, VERIFICATION_CODE_EXPIRATION_MS);
+        redisService.storeValue(addCodeTypePrefix(codeType), email, verificationCode, VERIFICATION_CODE_EXPIRATION_MS);
     }
 }
