@@ -168,7 +168,6 @@ public class LlmService {
 
     private String buildSummaryRequestBody(MetricResponse.FindMetricHistoryDTO metricHistory) {
         StringBuilder summaryRequestBody = new StringBuilder();
-
         summaryRequestBody.append(PERFORMANCE_SUMMARY_HEADER);
         appendCpuMetrics(summaryRequestBody, metricHistory);
         appendMemoryMetrics(summaryRequestBody, metricHistory);
@@ -183,12 +182,18 @@ public class LlmService {
         List<Summary> performanceSummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.PERFORMANCE), userId, startOfHour);
         List<Summary> logSummaries = summaryRepository.findByTypeWithinDateWithProject(List.of(SummaryType.LOG), userId, startOfHour);
 
+        String summaryRequestBody = buildHourlySummaryRequestBody(performanceSummaries, logSummaries);
+        LogDTO.HourlySummaryResponseDTO responseDTO = sendSummaryRequest(hourlySummaryUri, summaryRequestBody, LogDTO.HourlySummaryResponseDTO.class);
+
+        return Optional.ofNullable(responseDTO);
+    }
+
+    private String buildHourlySummaryRequestBody(List<Summary> performanceSummaries, List<Summary> logSummaries) {
         StringBuilder summaryRequestBody = new StringBuilder();
         appendSummaryWithHeader(summaryRequestBody, PERFORMANCE_SUMMARY_HEADER, performanceSummaries);
         appendLogSummary(summaryRequestBody, logSummaries);
-        LogDTO.HourlySummaryResponseDTO responseDTO = sendSummaryRequest(hourlySummaryUri, summaryRequestBody.toString(), LogDTO.HourlySummaryResponseDTO.class);
 
-        return Optional.ofNullable(responseDTO);
+        return summaryRequestBody.toString();
     }
 
     private Optional<LogDTO.DailySummaryResponseDTO> fetchDailySummary(Long userId) {
@@ -204,7 +209,6 @@ public class LlmService {
 
     private String buildDailySummaryRequestBody(List<Summary> performanceSummaries, List<Summary> logSummaries) {
         StringBuilder summaryRequestBody = new StringBuilder();
-
         appendSummaryWithHeader(summaryRequestBody, PERFORMANCE_SUMMARY_HEADER, performanceSummaries);
         appendLogSummary(summaryRequestBody, logSummaries);
 
@@ -235,7 +239,6 @@ public class LlmService {
 
     private String buildRecommendRequestBody(List<Summary> performanceSummaries, List<Summary> logSummaries) {
         StringBuilder summaryRequestBody = new StringBuilder();
-
         appendSummaryWithHeader(summaryRequestBody, PERFORMANCE_SUMMARY_HEADER, performanceSummaries);
         appendLogSummary(summaryRequestBody, logSummaries);
 
