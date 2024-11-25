@@ -126,12 +126,12 @@ public class LlmService {
         List<Long> userIds = userRepository.findIds();
 
         for(Long userId: userIds) {
-            LogDTO.TrendSummaryResponseDTO trendSummaryDTO = fetchTrendSummary(userId);
+            fetchTrendSummary(userId).ifPresent(trendSummaryDTO -> {
+                User userRef = userRepository.getReferenceById(userId);
+                saveSummary(userRef, trendSummaryDTO.trendSummary(), SummaryType.TEND);
 
-            User userRef = userRepository.getReferenceById(userId);
-            saveSummary(userRef, trendSummaryDTO.trendSummary(), SummaryType.TEND);
-
-            alarmService.generateAlarm(userId, TREND_SUMMARY_ALARM, AlarmType.UPDATE);
+                alarmService.generateAlarm(userId, TREND_SUMMARY_ALARM, AlarmType.UPDATE);
+            });
         }
     }
 
@@ -203,14 +203,15 @@ public class LlmService {
         return Optional.ofNullable(responseDTO);
     }
 
-    private LogDTO.TrendSummaryResponseDTO fetchTrendSummary(Long userId){
+    private Optional<LogDTO.TrendSummaryResponseDTO> fetchTrendSummary(Long userId){
         LocalDateTime startOfDay = LocalDateTime.now().minusWeeks(1).with(LocalTime.MIN);
         List<Summary> dailySummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.DAILY), userId, startOfDay);
 
         StringBuilder summaryRequestBody = new StringBuilder();
         appendSummaryWithHeader(summaryRequestBody, WEEKLY_TREND_HEADER, dailySummaries);
+        LogDTO.TrendSummaryResponseDTO responseDTO = sendSummaryRequest(trendSummeryUri, summaryRequestBody.toString(), LogDTO.TrendSummaryResponseDTO.class);
 
-        return sendSummaryRequest(trendSummeryUri, summaryRequestBody.toString(), LogDTO.TrendSummaryResponseDTO.class);
+        return Optional.ofNullable(responseDTO);
     }
 
     private Optional<LogDTO.RecommendationDTO> fetchRecommendation(Long userId) {
