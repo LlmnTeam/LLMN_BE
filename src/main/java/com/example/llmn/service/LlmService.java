@@ -159,8 +159,8 @@ public class LlmService {
 
     private Optional<LogDTO.PerformanceSummaryResponseDTO> fetchMetricSummary(Long sshInfoId){
         MetricResponse.FindMetricHistoryDTO metricHistory = metricService.findMetricHistory(METRIC_HISTORY_PREVIOUS_HOUR, sshInfoId);
-        String summaryRequestBody = buildSummaryRequestBody(metricHistory);
 
+        String summaryRequestBody = buildSummaryRequestBody(metricHistory);
         LogDTO.PerformanceSummaryResponseDTO responseDTO = sendSummaryRequest(performanceSummeryUri, summaryRequestBody, LogDTO.PerformanceSummaryResponseDTO.class);
 
         return Optional.ofNullable(responseDTO);
@@ -196,12 +196,19 @@ public class LlmService {
         List<Summary> performanceSummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.PERFORMANCE), userId, startOfDay);
         List<Summary> logSummaries = summaryRepository.findByTypeWithinDateWithProject(List.of(SummaryType.LOG), userId, startOfDay);
 
-        StringBuilder summaryRequestBody = new StringBuilder();
-        appendSummaryWithHeader(summaryRequestBody, PERFORMANCE_SUMMARY_HEADER, performanceSummaries);
-        appendLogSummary(summaryRequestBody, logSummaries);
-        LogDTO.DailySummaryResponseDTO responseDTO = sendSummaryRequest(dailySummeryUri, summaryRequestBody.toString(), LogDTO.DailySummaryResponseDTO.class);
+        String summaryRequestBody = buildDailySummaryRequestBody(performanceSummaries, logSummaries);
+        LogDTO.DailySummaryResponseDTO responseDTO = sendSummaryRequest(dailySummeryUri, summaryRequestBody, LogDTO.DailySummaryResponseDTO.class);
 
         return Optional.ofNullable(responseDTO);
+    }
+
+    private String buildDailySummaryRequestBody(List<Summary> performanceSummaries, List<Summary> logSummaries) {
+        StringBuilder summaryRequestBody = new StringBuilder();
+
+        appendSummaryWithHeader(summaryRequestBody, PERFORMANCE_SUMMARY_HEADER, performanceSummaries);
+        appendLogSummary(summaryRequestBody, logSummaries);
+
+        return summaryRequestBody.toString();
     }
 
     private Optional<LogDTO.TrendSummaryResponseDTO> fetchTrendSummary(Long userId){
@@ -228,6 +235,7 @@ public class LlmService {
 
     private String buildRecommendRequestBody(List<Summary> performanceSummaries, List<Summary> logSummaries) {
         StringBuilder summaryRequestBody = new StringBuilder();
+
         appendSummaryWithHeader(summaryRequestBody, PERFORMANCE_SUMMARY_HEADER, performanceSummaries);
         appendLogSummary(summaryRequestBody, logSummaries);
 
