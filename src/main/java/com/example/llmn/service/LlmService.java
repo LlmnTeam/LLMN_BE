@@ -112,12 +112,11 @@ public class LlmService {
         List<Long> userIds = userRepository.findIds();
 
         for(Long userId: userIds) {
-            LogDTO.DailySummaryResponseDTO dailySummaryDTO = fetchDailySummary(userId);
-
-            User userRef = userRepository.getReferenceById(userId);
-            saveSummary(userRef, dailySummaryDTO.dailySummary(), SummaryType.DAILY);
-
-            alarmService.generateAlarm(userId, DAILY_SUMMARY_ALARM, AlarmType.UPDATE);
+            fetchDailySummary(userId).ifPresent(dailySummaryDTO -> {
+                User userRef = userRepository.getReferenceById(userId);
+                saveSummary(userRef, dailySummaryDTO.dailySummary(), SummaryType.DAILY);
+                alarmService.generateAlarm(userId, DAILY_SUMMARY_ALARM, AlarmType.UPDATE);
+            });
         }
     }
 
@@ -191,7 +190,7 @@ public class LlmService {
         return Optional.ofNullable(responseDTO);
     }
 
-    private LogDTO.DailySummaryResponseDTO fetchDailySummary(Long userId) {
+    private Optional<LogDTO.DailySummaryResponseDTO> fetchDailySummary(Long userId) {
         LocalDateTime startOfDay = LocalDateTime.now().with(LocalTime.MIN);
         List<Summary> performanceSummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.PERFORMANCE), userId, startOfDay);
         List<Summary> logSummaries = summaryRepository.findByTypeWithinDateWithProject(List.of(SummaryType.LOG), userId, startOfDay);
@@ -199,8 +198,9 @@ public class LlmService {
         StringBuilder summaryRequestBody = new StringBuilder();
         appendSummaryWithHeader(summaryRequestBody, PERFORMANCE_SUMMARY_HEADER, performanceSummaries);
         appendLogSummary(summaryRequestBody, logSummaries);
+        LogDTO.DailySummaryResponseDTO responseDTO = sendSummaryRequest(dailySummeryUri, summaryRequestBody.toString(), LogDTO.DailySummaryResponseDTO.class);
 
-        return sendSummaryRequest(dailySummeryUri, summaryRequestBody.toString(), LogDTO.DailySummaryResponseDTO.class);
+        return Optional.ofNullable(responseDTO);
     }
 
     private LogDTO.TrendSummaryResponseDTO fetchTrendSummary(Long userId){
