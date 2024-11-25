@@ -151,32 +151,29 @@ public class LlmService {
     }
 
     private void processProjectLogSummary(Project project) {
-        LogDTO.SummaryResponseDTO summaryDTO = fetchLogSummary(project.getContainerName());
-        if(isSummaryContentEmpty(summaryDTO)){
-            return;
-        }
+        String containerName = project.getContainerName();
 
-        saveSummary(project.getUser(), project, summaryDTO.logSummary(), SummaryType.LOG);
+        fetchLogSummary(containerName).ifPresent(logSummaryDTO -> {
+            saveSummary(project.getUser(), project, logSummaryDTO.logSummary(), SummaryType.LOG);
 
-        checkUrgency(project, summaryDTO);
-        generateUpdateAlarm(project);
+            checkUrgency(project, logSummaryDTO);
+            alarmService.generateAlarm(project.getUser().getId(), createAlarmContent(project), AlarmType.UPDATE);
+        });
     }
 
-    private LogDTO.SummaryResponseDTO fetchLogSummary(String containerName) {
+    private Optional<LogDTO.SummaryResponseDTO> fetchLogSummary(String containerName) {
         String logContent = logService.findRecentLogs(containerName);
-        String summaryRequestBody = buildSummaryRequestBody(containerName, logContent);
 
-        return sendSummaryRequest(logSummeryUri, summaryRequestBody, LogDTO.SummaryResponseDTO.class);
+        String summaryRequestBody = buildSummaryRequestBody(containerName, logContent);
+        LogDTO.SummaryResponseDTO responseDTO = sendSummaryRequest(logSummeryUri, summaryRequestBody, LogDTO.SummaryResponseDTO.class);
+
+        return Optional.ofNullable(responseDTO);
     }
 
     private String buildSummaryRequestBody(String containerName, String logMessage) {
         return LOG_DATA_HEADER +
                 "Application Name: " + containerName + "\n" +
                 "Log Content: " + logMessage + "\n";
-    }
-
-    private boolean isSummaryContentEmpty(LogDTO.SummaryResponseDTO summaryDTO) {
-        return summaryDTO.logSummary().isBlank();
     }
 
     private void checkUrgency(Project project, LogDTO.SummaryResponseDTO summaryDTO) {
@@ -187,9 +184,8 @@ public class LlmService {
         }
     }
 
-    private void generateUpdateAlarm(Project project) {
-        String updateAlarmContent = project.getProjectName() + LOG_UPDATE_ALARM_SUFFIX;
-        alarmService.generateAlarm(project.getUser().getId(), updateAlarmContent, AlarmType.UPDATE);
+    private String createAlarmContent(Project project) {
+        return project.getProjectName() + LOG_UPDATE_ALARM_SUFFIX;
     }
 
     private Optional<LogDTO.PerformanceSummaryResponseDTO> fetchMetricSummary(Long sshInfoId){
