@@ -120,7 +120,7 @@ public class MetricService {
         Map<String, Double> cpuAndMemoryMetrics = collectCpuAndMemoryMetrics(sshInfo.getId());
         Map<String, Double> networkMetrics = collectNetworkMetrics(sshInfo.getId());
 
-        if (cpuAndMemoryMetrics.isEmpty() || networkMetrics.isEmpty()) {
+        if (isMetricEmpty(cpuAndMemoryMetrics, networkMetrics)) {
             return null;
         }
 
@@ -134,6 +134,10 @@ public class MetricService {
                 .totalBytesReceived(networkMetrics.get(METRIC_MAP_NETWORK_RECEIVED))
                 .totalBytesSent(networkMetrics.get(METRIC_MAP_NETWORK_SENT))
                 .build();
+    }
+
+    private boolean isMetricEmpty(Map<String, Double> cpuAndMemoryMetrics, Map<String, Double> networkMetrics) {
+        return cpuAndMemoryMetrics.isEmpty() || networkMetrics.isEmpty();
     }
 
     private Map<String, Double> collectCpuAndMemoryMetrics(Long sshInfoId) {

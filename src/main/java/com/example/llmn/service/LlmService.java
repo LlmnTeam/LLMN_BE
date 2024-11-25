@@ -65,9 +65,8 @@ public class LlmService {
     private static final String NO_SUMMARY_DATA = "- 요약 데이터가 존재하지 않습니다.\n";
 
     @Transactional
-    @Scheduled(cron = "0 0 * * * *") // 매시 0분
+    @Scheduled(cron = "0 0 * * * *")
     public void summaryProjectLog(){
-        // 모든 프로젝트에서 발생한 로그에 대해 요약 진행
         List<Project> projects = projectRepository.findAllWithUser().stream()
                 .filter(Project::isConnected)
                 .toList();
@@ -76,7 +75,7 @@ public class LlmService {
     }
 
     @Transactional
-    @Scheduled(cron = "0 5 * * * *") // 매시 5분에
+    @Scheduled(cron = "0 5 * * * *")
     public void summaryPerformance(){
         List<User> users = userRepository.findAll();
 
@@ -90,7 +89,7 @@ public class LlmService {
     }
 
     @Transactional
-    @Scheduled(cron = "0 10 * * * *") // 매시 10분에
+    @Scheduled(cron = "0 10 * * * *")
     public void summaryHourly(){
         List<Long> userIds = userRepository.findIds();
 
@@ -105,7 +104,7 @@ public class LlmService {
     }
 
     @Transactional
-    @Scheduled(cron = "0 55 23 * * *") // 매일 11시 55분
+    @Scheduled(cron = "0 55 23 * * *")
     public void summaryDaily(){
         List<Long> userIds = userRepository.findIds();
 
@@ -120,7 +119,7 @@ public class LlmService {
     }
 
     @Transactional
-    @Scheduled(cron = "0 45 23 * * 0") // 매주 일요일 11시 45분
+    @Scheduled(cron = "0 45 23 * * 0")
     public void summaryTrend(){
         List<Long> userIds = userRepository.findIds();
 
@@ -135,7 +134,7 @@ public class LlmService {
     }
 
     @Transactional
-    @Scheduled(cron = "0 20 0,6,12,18 * * *") // 6시간 간격으로 20분에
+    @Scheduled(cron = "0 20 0,6,12,18 * * *")
     public void recommend(){
         List<Long> userIds = userRepository.findIds();
 
@@ -298,28 +297,32 @@ public class LlmService {
     private void appendCpuMetrics(StringBuilder builder, MetricResponse.FindMetricHistoryDTO metricHistory) {
         builder.append("1. CPU Metrics:\n");
         for (MetricResponse.CpuMetricDTO cpuMetric : metricHistory.cpuMetrics()) {
-            builder.append(String.format("- Time: %s, CPU Usage: %.2f%%\n", cpuMetric.time(), cpuMetric.cpuUsage()));
+            builder.append(String.format("- Time: %s, CPU Usage: %.2f%%", cpuMetric.time(), cpuMetric.cpuUsage()))
+                    .append("\n");
         }
     }
 
     private void appendMemoryMetrics(StringBuilder builder, MetricResponse.FindMetricHistoryDTO metricHistory) {
         builder.append("\n2. Memory Metrics:\n");
         for (MetricResponse.MemoryMetricDTO memoryMetric : metricHistory.memoryMetrics()) {
-            builder.append(String.format("- Time: %s, Memory Usage: %.2f MB\n", memoryMetric.time(), memoryMetric.memoryUsage()));
+            builder.append(String.format("- Time: %s, Memory Usage: %.2f MB", memoryMetric.time(), memoryMetric.memoryUsage()))
+                    .append("\n");
         }
     }
 
     private void appendNetworkInMetrics(StringBuilder builder, MetricResponse.FindMetricHistoryDTO metricHistory) {
         builder.append("\n3. Network In Metrics:\n");
         for (MetricResponse.NetworkInMetricDTO networkInMetric : metricHistory.networkInMetrics()) {
-            builder.append(String.format("- Time: %s, Network Received: %.2f MB\n", networkInMetric.time(), networkInMetric.networkReceived()));
+            builder.append(String.format("- Time: %s, Network Received: %.2f MB", networkInMetric.time(), networkInMetric.networkReceived()))
+                    .append("\n");
         }
     }
 
     private void appendNetworkOutMetrics(StringBuilder builder, MetricResponse.FindMetricHistoryDTO metricHistory) {
         builder.append("\n4. Network Out Metrics:\n");
         for (MetricResponse.NetworkOutMetricDTO networkOutMetric : metricHistory.networkOutMetrics()) {
-            builder.append(String.format("- Time: %s, Network Sent: %.2f MB\n", networkOutMetric.time(), networkOutMetric.networkSent()));
+            builder.append(String.format("- Time: %s, Network Sent: %.2f MB", networkOutMetric.time(), networkOutMetric.networkSent()))
+                    .append("\n");
         }
     }
 
