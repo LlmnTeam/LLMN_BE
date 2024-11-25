@@ -1,5 +1,6 @@
 package com.example.llmn.controller;
 
+import com.example.llmn.controller.DTO.UserResponse;
 import com.example.llmn.core.security.CustomUserDetails;
 import com.example.llmn.core.utils.ApiUtils;
 import com.example.llmn.service.MetricService;
@@ -18,6 +19,12 @@ import java.util.Map;
 public class MetricController {
 
     private final MetricService metricService;
+
+    @GetMapping("/home")
+    public ResponseEntity<?> findDashboard(@AuthenticationPrincipal CustomUserDetails userDetails) {
+        UserResponse.FindDashboardDTO responseDTO = metricService.findDashboard(userDetails.getUser().getId());
+        return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
+    }
 
     /*@GetMapping("/metrics/history")
     public ResponseEntity<?> findMetricHistory(@AuthenticationPrincipal CustomUserDetails userDetails) {

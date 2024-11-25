@@ -1,16 +1,25 @@
 package com.example.llmn.service;
 
 import com.example.llmn.controller.DTO.MetricResponse;
+import com.example.llmn.controller.DTO.UserResponse;
+import com.example.llmn.core.errors.CustomException;
+import com.example.llmn.core.errors.ExceptionCode;
 import com.example.llmn.core.utils.DateTimeUtils;
 import com.example.llmn.domain.Metric;
 
 import com.example.llmn.domain.SshInfo;
+import com.example.llmn.domain.SummaryType;
 import com.example.llmn.domain.User;
 import com.example.llmn.repository.MetricRepository;
 import com.example.llmn.repository.SshInfoRepository;
+import com.example.llmn.repository.SummaryRepository;
 import com.example.llmn.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,6 +41,7 @@ public class MetricService {
     private final MetricRepository metricRepository;
     private final UserRepository userRepository;
     private final SshInfoRepository sshInfoRepository;
+    private final SummaryRepository summaryRepository;
     private final RedisService redisService;
     private final SSHService sshService;
 
@@ -48,6 +58,9 @@ public class MetricService {
     private static final String METRIC_MAP_DAILY_NET_SENT ="dailySent";
     private static final String COMMAND_TOP = "top -b -n1 | grep \"Cpu(s)\\|Mem\"";
     private static final String COMMAND_NETWORK_USAGE = "cat /proc/net/dev";
+    private static final String NOT_AVAILABLE = "N/A";
+    private static final String SORT_BY_DATE = "createdDate";
+    private static final String NO_SUMMARY_DATA = "요약된 내용이 존재하지 않습니다.";
     private static final double DEFAULT_METRIC_VALUE = 0.0;
     private static final double BYTES_TO_MB_DIVISOR = 1024.0 * 1024.0;
     private static final int RECEIVED_BYTES_INDEX = 1;
@@ -96,6 +109,28 @@ public class MetricService {
         });
 
         return new MetricResponse.FindMetricHistoryDTO(cpuMetricDTOS, memoryMetricDTOS, networkInMetricDTOS, networkOutMetricDTOS);
+    }
+
+    @Transactional
+    public UserResponse.FindDashboardDTO findDashboard(Long userId) {
+        Long sshInfoId = findMonitoringSshId(userId);
+        String remoteHost = findRemoteHost(sshInfoId);
+
+        MetricResponse.FindCurrentMetricDTO currentMetric = findCurrentMetric(sshInfoId);
+        MetricResponse.FindMetricHistoryDTO metricHistory = findMetricHistory(24, sshInfoId);
+        String hourlySummary = findLatestHourlySummary();
+
+        return new UserResponse.FindDashboardDTO(
+                remoteHost,
+                formatCpuUsage(currentMetric),
+                formatMemoryUsage(currentMetric),
+                formatNetworkReceived(currentMetric),
+                formatNetworkSent(currentMetric),
+                hourlySummary,
+                metricHistory.cpuMetrics(),
+                metricHistory.memoryMetrics(),
+                metricHistory.networkInMetrics(),
+                metricHistory.networkOutMetrics());
     }
 
     private List<Metric> collectAllMetrics(List<User> users) {
@@ -303,6 +338,47 @@ public class MetricService {
     private MetricResponse.NetworkOutMetricDTO createNetworkOutMetricDTO(Metric metric, String time) {
         double networkSent = Math.round(metric.getTotalBytesSent() * 1000.0) / 1000.0;
         return new MetricResponse.NetworkOutMetricDTO(time, networkSent);
+    }
+
+    private String formatCpuUsage(MetricResponse.FindCurrentMetricDTO currentMetric) {
+        return Optional.ofNullable(currentMetric)
+                .map(metric -> String.format("%.2f%%", metric.cpuUsage()))
+                .orElse(NOT_AVAILABLE);
+    }
+
+    private String formatMemoryUsage(MetricResponse.FindCurrentMetricDTO currentMetric) {
+        return Optional.ofNullable(currentMetric)
+                .filter(metric -> metric.totalMemory() > 0)
+                .map(metric -> String.format("%.2f%%", (metric.usedMemory() / metric.totalMemory()) * 100))
+                .orElse(NOT_AVAILABLE);
+    }
+
+    private String formatNetworkReceived(MetricResponse.FindCurrentMetricDTO currentMetric) {
+        return Optional.ofNullable(currentMetric)
+                .map(metric -> String.format("%.2f MB", metric.networkReceived()))
+                .orElse(NOT_AVAILABLE);
+    }
+
+    private String formatNetworkSent(MetricResponse.FindCurrentMetricDTO currentMetric) {
+        return Optional.ofNullable(currentMetric)
+                .map(metric -> String.format("%.2f MB", metric.networkSent()))
+                .orElse(NOT_AVAILABLE);
+    }
+
+    private Long findMonitoringSshId(Long userId) {
+        return userRepository.findMonitoringSshId(userId)
+                .orElseThrow(() -> new CustomException(ExceptionCode.USER_NOT_FOUND));
+    }
+
+    private String findRemoteHost(Long sshInfoId) {
+        return sshInfoRepository.findHostById(sshInfoId)
+                .orElseThrow(() -> new CustomException(ExceptionCode.SSH_NOT_FOUND));
+    }
+
+    private String findLatestHourlySummary(){
+        Pageable pageable = PageRequest.of(0, 1, Sort.by(Sort.Direction.DESC, SORT_BY_DATE));
+        Page<String> page = summaryRepository.findContentByType(SummaryType.HOURLY, pageable);
+        return page.hasContent() ? page.getContent().get(0) : NO_SUMMARY_DATA;
     }
 
     private double convertBytesToMB(long bytes) {

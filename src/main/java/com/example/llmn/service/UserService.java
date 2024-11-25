@@ -1,6 +1,5 @@
 package com.example.llmn.service;
 
-import com.example.llmn.controller.DTO.MetricResponse;
 import com.example.llmn.controller.DTO.UserRequest;
 import com.example.llmn.controller.DTO.UserResponse;
 import com.example.llmn.core.errors.CustomException;
@@ -8,16 +7,11 @@ import com.example.llmn.core.errors.ExceptionCode;
 import com.example.llmn.core.security.JWTProvider;
 import com.example.llmn.core.utils.EmailUtils;
 import com.example.llmn.domain.SshInfo;
-import com.example.llmn.domain.SummaryType;
 import com.example.llmn.domain.User;
 import com.example.llmn.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -47,7 +41,6 @@ public class UserService {
     private final SSHService sshService;
     private final RedisService redisService;
     private final SummaryRepository summaryRepository;
-    private final MetricService metricService;
     private final WebClient webClient;
     private final EmailUtils mailUtils;
 
@@ -67,16 +60,13 @@ public class UserService {
     private static final String REDIS_KEY_REFRESH_TOKEN = "refreshToken";
     private static final String REDIS_KEY_ACCESS_TOKEN = "accessToken";
     private static final String REDIS_SSH_KEY = "SSH";
-    private static final String SORT_BY_DATE = "createdDate";
     private static final String MODEL_KEY_CODE = "code";
     private static final String DELIMITER = "-";
     private static final Long REDIS_SSH_KEY_EXP = 60L * 60 * 24 * 180; // 180일
-    private static final String NOT_AVAILABLE = "N/A";
     private static final String ENV_FILE_RELATIVE_PATH = "FastAPI/app/.env";
     private static final String OPEN_API_KEY = "OPENAI_API_KEY";
     private static final String CODE_TO_EMAIL_KEY_PREFIX = "codeToEmail";
     private static final String CODE_TYPE_RECOVERY = "recovery";
-    private static final String NO_SUMMARY_DATA = "요약된 내용이 존재하지 않습니다.";
     private static final long VERIFICATION_CODE_EXPIRATION_MS = 175 * 1000L;
 
     @Transactional
@@ -85,7 +75,7 @@ public class UserService {
                 () -> new CustomException(ExceptionCode.USER_ACCOUNT_WRONG)
         );
 
-        if(!passwordEncoder.matches(requestDTO.password(), user.getPassword())){
+        if (!passwordEncoder.matches(requestDTO.password(), user.getPassword())) {
             throw new CustomException(ExceptionCode.USER_ACCOUNT_WRONG);
         }
 
@@ -93,7 +83,7 @@ public class UserService {
     }
 
     @Transactional
-    public void join(UserRequest.JoinDTO requestDTO){
+    public void join(UserRequest.JoinDTO requestDTO) {
         validateJoinRequest(requestDTO);
 
         User user = saveUser(requestDTO);
@@ -105,13 +95,13 @@ public class UserService {
     }
 
     @Transactional(readOnly = true)
-    public UserResponse.CheckEmailExistDTO checkEmailExist(String email){
+    public UserResponse.CheckEmailExistDTO checkEmailExist(String email) {
         boolean isValid = userRepository.doesNotExistByEmail(email);
         return new UserResponse.CheckEmailExistDTO(isValid);
     }
 
     @Transactional
-    public UserResponse.CheckNickNameDTO checkNickName(UserRequest.CheckNickDTO requestDTO){
+    public UserResponse.CheckNickNameDTO checkNickName(UserRequest.CheckNickDTO requestDTO) {
         boolean isDuplicate = userRepository.existsByNickname(requestDTO.nickName());
         return new UserResponse.CheckNickNameDTO(isDuplicate);
     }
@@ -127,18 +117,18 @@ public class UserService {
         mailUtils.sendMail(email, VERIFICATION_CODE.getSubject(), MAIL_TEMPLATE_FOR_CODE, templateModel);
     }
 
-    public UserResponse.VerifyEmailCodeDTO verifyCode(UserRequest.VerifyCodeDTO requestDTO, String codeType){
-        if(redisService.isNotStoredValue(addCodeTypePrefix(codeType), requestDTO.email(), requestDTO.code()))
+    public UserResponse.VerifyEmailCodeDTO verifyCode(UserRequest.VerifyCodeDTO requestDTO, String codeType) {
+        if (redisService.isNotStoredValue(addCodeTypePrefix(codeType), requestDTO.email(), requestDTO.code()))
             return new UserResponse.VerifyEmailCodeDTO(false);
 
         // 계정 복구를 위해 호출 했다면, 복구 로직에서 요청으로 들어온 코드를 가지고 이메일을 얻기 위해 저장해놓는다 (보안을 위해 요청으로 코드만 받기 위해)
-        if(CODE_TYPE_RECOVERY.equals(codeType))
+        if (CODE_TYPE_RECOVERY.equals(codeType))
             redisService.storeValue(CODE_TO_EMAIL_KEY_PREFIX, requestDTO.code(), requestDTO.email(), 5 * 60 * 1000L);
 
         return new UserResponse.VerifyEmailCodeDTO(true);
     }
 
-    public UserResponse.VerifySshConnectDTO verifySshConnect(UserRequest.VerifySshConnectDTO requestDTO){
+    public UserResponse.VerifySshConnectDTO verifySshConnect(UserRequest.VerifySshConnectDTO requestDTO) {
         boolean isValid = sshService.checkConnectionValid(requestDTO.remoteHost(), requestDTO.remoteName(), requestDTO.remoteKeyPath());
         return new UserResponse.VerifySshConnectDTO(isValid);
     }
@@ -153,7 +143,7 @@ public class UserService {
         return path;
     }
 
-    public UserResponse.ValidateOpenAIKeyDTO validateOpenAIKey(String apiKey){
+    public UserResponse.ValidateOpenAIKeyDTO validateOpenAIKey(String apiKey) {
         return webClient.post()
                 .uri(buildURI(requestValidateKeyUri))
                 .bodyValue(new UserRequest.RequestValidateKeyDTO(apiKey))
@@ -163,10 +153,10 @@ public class UserService {
     }
 
     @Transactional
-    public void resetPassword(UserRequest.ResetPasswordDTO requestDTO){
+    public void resetPassword(UserRequest.ResetPasswordDTO requestDTO) {
         // 요청으로 들어온 코드를 가지고 레디스에서 해당 이메일을 꺼내옴
         String email = redisService.getValueInString(CODE_TO_EMAIL_KEY_PREFIX, requestDTO.code());
-        if(email == null){
+        if (email == null) {
             throw new CustomException(ExceptionCode.BAD_APPROACH);
         }
 
@@ -174,30 +164,9 @@ public class UserService {
         updatePassword(email, requestDTO.newPassword());
     }
 
-    @Transactional
-    public UserResponse.FindDashboardDTO findDashboard(Long userId) {
-        Long sshInfoId = findMonitoringSshId(userId);
-        String remoteHost = findRemoteHost(sshInfoId);
-
-        MetricResponse.FindCurrentMetricDTO currentMetric = metricService.findCurrentMetric(sshInfoId);
-        MetricResponse.FindMetricHistoryDTO metricHistory = metricService.findMetricHistory(24, sshInfoId);
-        String hourlySummary = findLatestHourlySummary();
-
-        return new UserResponse.FindDashboardDTO(
-                remoteHost,
-                formatCpuUsage(currentMetric),
-                formatMemoryUsage(currentMetric),
-                formatNetworkReceived(currentMetric),
-                formatNetworkSent(currentMetric),
-                hourlySummary,
-                metricHistory.cpuMetrics(),
-                metricHistory.memoryMetrics(),
-                metricHistory.networkInMetrics(),
-                metricHistory.networkOutMetrics());
-    }
 
     @Transactional(readOnly = true)
-    public UserResponse.FindCloudInfoDTO findCloudInfo(Long userId){
+    public UserResponse.FindCloudInfoDTO findCloudInfo(Long userId) {
         User user = userRepository.findById(userId).orElseThrow(
                 () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
         );
@@ -212,7 +181,7 @@ public class UserService {
     }
 
     @Transactional
-    public void updateMonitoringSsh(Long userId ,String monitoringSshHost){
+    public void updateMonitoringSsh(Long userId, String monitoringSshHost) {
         User user = userRepository.findById(userId).orElseThrow(
                 () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
         );
@@ -222,7 +191,7 @@ public class UserService {
     }
 
     @Transactional(readOnly = true)
-    public UserResponse.FindConfigurationInfoDTO findConfigurationInfo(Long userId){
+    public UserResponse.FindConfigurationInfoDTO findConfigurationInfo(Long userId) {
         User user = userRepository.findById(userId).orElseThrow(
                 () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
         );
@@ -245,19 +214,19 @@ public class UserService {
     }
 
     @Transactional
-    public void updateConfiguration(UserRequest.UpdateConfigurationDTO requestDTO, Long userId){
+    public void updateConfiguration(UserRequest.UpdateConfigurationDTO requestDTO, Long userId) {
         User user = userRepository.findById(userId).orElseThrow(
                 () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
         );
 
         // SSH Host 중복 방지
-        if(hasDuplicateRemoteHost(requestDTO.sshInfos())){
+        if (hasDuplicateRemoteHost(requestDTO.sshInfos())) {
             throw new CustomException(ExceptionCode.DUPLICATE_SSH_HOST);
         }
 
         // SSH 정보가 비어 있으면 안됨
         List<UserRequest.SshInfoDTO> requestSshInfoDTOS = requestDTO.sshInfos();
-        if(requestSshInfoDTOS.isEmpty()){
+        if (requestSshInfoDTOS.isEmpty()) {
             throw new CustomException(ExceptionCode.SSH_INFO_EMPTY);
         }
 
@@ -297,13 +266,13 @@ public class UserService {
         }
     }
 
-    public Long validateAccessTokenInRedis(String accessToken){
-        if(JWTProvider.isInvalidJwtFormat(accessToken)) {
+    public Long validateAccessTokenInRedis(String accessToken) {
+        if (JWTProvider.isInvalidJwtFormat(accessToken)) {
             throw new CustomException(ExceptionCode.TOKEN_WRONG);
         }
 
         Long userId = JWTProvider.extractUserIdFromToken(accessToken);
-        if(redisService.isNotStoredValue(REDIS_KEY_ACCESS_TOKEN, String.valueOf(userId), accessToken)){
+        if (redisService.isNotStoredValue(REDIS_KEY_ACCESS_TOKEN, String.valueOf(userId), accessToken)) {
             throw new CustomException(ExceptionCode.ACCESS_TOKEN_WRONG);
         }
 
@@ -311,12 +280,12 @@ public class UserService {
     }
 
     @Transactional(readOnly = true)
-    public UserResponse.ValidateAccessTokenDTO findNickName(Long userId){
+    public UserResponse.ValidateAccessTokenDTO findNickName(Long userId) {
         String nickName = userRepository.findNickName(userId).orElse(null);
         return new UserResponse.ValidateAccessTokenDTO(nickName);
     }
 
-    private Map<String, String> createToken(User user){
+    private Map<String, String> createToken(User user) {
         String accessToken = JWTProvider.createAccessToken(user);
         String refreshToken = JWTProvider.createRefreshToken(user);
 
@@ -332,13 +301,13 @@ public class UserService {
     }
 
     @Transactional(readOnly = true)
-    public UserResponse.CheckAccountExistDTO checkLocalAccountExist(UserRequest.EmailDTO requestDTO){
+    public UserResponse.CheckAccountExistDTO checkLocalAccountExist(UserRequest.EmailDTO requestDTO) {
         boolean isValid = userRepository.findByEmail(requestDTO.email()).isPresent();
         return new UserResponse.CheckAccountExistDTO(isValid);
     }
 
     @Transactional
-    public void withdrawMember(Long userId){
+    public void withdrawMember(Long userId) {
         User user = userRepository.findById(userId).orElseThrow(
                 () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
         );
@@ -374,12 +343,12 @@ public class UserService {
     }
 
     private void checkDuplicateNickname(String nickName) {
-        if(userRepository.existsByNickname(nickName))
+        if (userRepository.existsByNickname(nickName))
             throw new CustomException(ExceptionCode.USER_NICKNAME_EXIST);
     }
 
     private void checkAlreadyJoin(String email) {
-        if(userRepository.existsByEmail(email))
+        if (userRepository.existsByEmail(email))
             throw new CustomException(ExceptionCode.USER_EMAIL_EXIST);
     }
 
@@ -389,12 +358,6 @@ public class UserService {
         validateUniqueSshHosts(requestDTO);
         checkAlreadyJoin(requestDTO.email());
         checkDuplicateNickname(requestDTO.nickName());
-    }
-
-    private String findLatestHourlySummary(){
-        Pageable pageable = PageRequest.of(0, 1, Sort.by(Sort.Direction.DESC, SORT_BY_DATE));
-        Page<String> page = summaryRepository.findContentByType(SummaryType.HOURLY, pageable);
-        return page.hasContent() ? page.getContent().get(0) : NO_SUMMARY_DATA;
     }
 
     private List<SshInfo> addNewSshInfos(List<SshInfo> sshInfos, List<UserRequest.SshInfoDTO> requestSshInfoDTOS, User user) {
@@ -517,31 +480,6 @@ public class UserService {
         user.updateMonitoringSshInfoId(monitoringSshInfo.get().getId());
     }
 
-    private String formatCpuUsage(MetricResponse.FindCurrentMetricDTO currentMetric) {
-        return Optional.ofNullable(currentMetric)
-                .map(metric -> String.format("%.2f%%", metric.cpuUsage()))
-                .orElse(NOT_AVAILABLE);
-    }
-
-    private String formatMemoryUsage(MetricResponse.FindCurrentMetricDTO currentMetric) {
-        return Optional.ofNullable(currentMetric)
-                .filter(metric -> metric.totalMemory() > 0)
-                .map(metric -> String.format("%.2f%%", (metric.usedMemory() / metric.totalMemory()) * 100))
-                .orElse(NOT_AVAILABLE);
-    }
-
-    private String formatNetworkReceived(MetricResponse.FindCurrentMetricDTO currentMetric) {
-        return Optional.ofNullable(currentMetric)
-                .map(metric -> String.format("%.2f MB", metric.networkReceived()))
-                .orElse(NOT_AVAILABLE);
-    }
-
-    private String formatNetworkSent(MetricResponse.FindCurrentMetricDTO currentMetric) {
-        return Optional.ofNullable(currentMetric)
-                .map(metric -> String.format("%.2f MB", metric.networkSent()))
-                .orElse(NOT_AVAILABLE);
-    }
-
     private SshInfo findMonitoringSshInfo(Long userId, String monitoringSshHost) {
         return sshInfoRepository.findByUserId(userId).stream()
                 .filter(sshInfo -> sshInfo.getRemoteHost().equals(monitoringSshHost))
@@ -551,16 +489,6 @@ public class UserService {
 
     private boolean isUpdateSuccess(UserResponse.EnvUpdateDTO responseDTO) {
         return responseDTO == null || !responseDTO.success();
-    }
-
-    private Long findMonitoringSshId(Long userId) {
-        return userRepository.findMonitoringSshId(userId)
-                .orElseThrow(() -> new CustomException(ExceptionCode.USER_NOT_FOUND));
-    }
-
-    private String findRemoteHost(Long sshInfoId) {
-        return sshInfoRepository.findHostById(sshInfoId)
-                .orElseThrow(() -> new CustomException(ExceptionCode.SSH_NOT_FOUND));
     }
 
     private UserResponse.CloudInfoDTO findSelectedCloud(List<SshInfo> sshInfos, Long monitoringSshId) {
@@ -580,7 +508,7 @@ public class UserService {
     }
 
     private void checkAlreadySendCode(String email, String codeType) {
-        if(redisService.isValueExist(addCodeTypePrefix(codeType), email)){
+        if (redisService.isValueExist(addCodeTypePrefix(codeType), email)) {
             throw new CustomException(ExceptionCode.ALREADY_SEND_EMAIL);
         }
     }
