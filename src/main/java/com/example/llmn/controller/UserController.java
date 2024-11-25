@@ -138,9 +138,11 @@ public class UserController {
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, null));
     }
 
+    // nickName을 응답으로 주는 이유는, 토큰 검증 시 닉네임도 함께 받고 싶다는 프론트의 요구사항 (SSR을 사용할 때 필요하고 함)
     @PostMapping("/validate/accessToken")
     public ResponseEntity<?> validateAccessToken(@CookieValue String accessToken){
-        UserResponse.ValidateAccessTokenDTO responseDTO = userService.validateAccessToken(accessToken);
+        Long userId = userService.validateAccessTokenInRedis(accessToken);
+        UserResponse.ValidateAccessTokenDTO responseDTO = userService.findNickName(userId);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 }

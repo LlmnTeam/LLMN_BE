@@ -130,9 +130,10 @@ public class UserService {
     }
 
     public UserResponse.VerifyEmailCodeDTO verifyCode(UserRequest.VerifyCodeDTO requestDTO, String codeType){
-        if(redisService.isNotValidValue(addCodeTypePrefix(codeType), requestDTO.email(), requestDTO.code()))
+        if(redisService.isNotStoredValue(addCodeTypePrefix(codeType), requestDTO.email(), requestDTO.code()))
             return new UserResponse.VerifyEmailCodeDTO(false);
 
+        // 계정 복구를 위해 호출 했다면, 복구 로직에서 요청으로 들어온 코드를 가지고 이메일을 얻기 위해 저장해놓는다 (보안을 위해 요청으로 코드만 받기 위해)
         if(CODE_TYPE_RECOVERY.equals(codeType))
             redisService.storeValue(CODE_TO_EMAIL_KEY_PREFIX, requestDTO.code(), requestDTO.email(), 5 * 60 * 1000L);
 
@@ -165,13 +166,12 @@ public class UserService {
 
     @Transactional
     public void resetPassword(UserRequest.ResetPasswordDTO requestDTO){
-        // 전송한 코드로 세션에서 해당 이메일을 꺼내옴 (비밀번호 재설정 시 코드 전송을 거침)
+        // 요청으로 들어온 코드를 가지고 레디스에서 해당 이메일을 꺼내옴
         String email = redisService.getValueInString(CODE_TO_EMAIL_KEY_PREFIX, requestDTO.code());
         if(email == null){
             throw new CustomException(ExceptionCode.BAD_APPROACH);
         }
 
-        // CODE_TO_EMAIL 키 삭제 후 업데이트
         redisService.removeValue(CODE_TO_EMAIL_KEY_PREFIX, requestDTO.code());
         updatePassword(email, requestDTO.newPassword());
     }
@@ -299,19 +299,21 @@ public class UserService {
         }
     }
 
-    @Transactional(readOnly = true)
-    public UserResponse.ValidateAccessTokenDTO validateAccessToken(String accessToken){
-        // 토큰 형식 검증
-        if(JWTProvider.isNotValidToken(accessToken)) {
+    public Long validateAccessTokenInRedis(String accessToken){
+        if(JWTProvider.isInvalidTokenFormat(accessToken)) {
             throw new CustomException(ExceptionCode.TOKEN_WRONG);
         }
 
-        // 레디스에 저장된 값과 비교
         Long userId = JWTProvider.getUserIdFromToken(accessToken);
-        if(redisService.isNotValidValue(REDIS_KEY_ACCESS_TOKEN, String.valueOf(userId), accessToken)){
+        if(redisService.isNotStoredValue(REDIS_KEY_ACCESS_TOKEN, String.valueOf(userId), accessToken)){
             throw new CustomException(ExceptionCode.ACCESS_TOKEN_WRONG);
         }
 
+        return userId;
+    }
+
+    @Transactional(readOnly = true)
+    public UserResponse.ValidateAccessTokenDTO findNickName(Long userId){
         String nickName = userRepository.findNickName(userId).orElse(null);
         return new UserResponse.ValidateAccessTokenDTO(nickName);
     }
@@ -319,17 +321,11 @@ public class UserService {
     private Map<String, String> createToken(User user){
         String accessToken = JWTProvider.createAccessToken(user);
         String refreshToken = JWTProvider.createRefreshToken(user);
-
-        // Access Token 갱신
+        
         redisService.storeValue(REDIS_KEY_ACCESS_TOKEN, String.valueOf(user.getId()), accessToken, JWTProvider.ACCESS_EXP_MILLI);
-
-        // Refresh Token 갱신
         redisService.storeValue(REDIS_KEY_REFRESH_TOKEN, String.valueOf(user.getId()), refreshToken, JWTProvider.REFRESH_EXP_MILLI);
-
-        // 로그인 ID를 세션으로 저장
         redisService.storeValue(REDIS_KEY_SESSION_ID, user.getId().toString());
 
-        // Map으로 토큰들을 담아 반환
         Map<String, String> tokens = new HashMap<>();
         tokens.put(REDIS_KEY_ACCESS_TOKEN, accessToken);
         tokens.put(REDIS_KEY_REFRESH_TOKEN, refreshToken);

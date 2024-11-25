@@ -70,7 +70,7 @@ public class JWTProvider {
         }
     }
 
-    public static boolean isNotValidToken(String token) {
+    public static boolean isInvalidTokenFormat(String token) {
         try {
             token = token.replace(JWTProvider.TOKEN_PREFIX, "");
             JWT.require(Algorithm.HMAC512(SECRET)).build().verify(token);

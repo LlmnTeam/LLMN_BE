@@ -141,7 +141,7 @@ public class JwtAuthenticationFilter extends BasicAuthenticationFilter {
         if (refreshToken != null) {
             User user = getUserFromToken(refreshToken);
 
-            if (user != null && redisService.isValidValue(REDIS_KEY_REFRESH_TOKEN, String.valueOf(user.getId()), refreshToken)) {
+            if (user != null && redisService.isStoredValue(REDIS_KEY_REFRESH_TOKEN, String.valueOf(user.getId()), refreshToken)) {
                 return user;
             }
         }

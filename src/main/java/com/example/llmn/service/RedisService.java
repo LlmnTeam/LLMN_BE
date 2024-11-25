@@ -37,12 +37,12 @@ public class RedisService {
         return Boolean.TRUE.equals(redisTemplate.hasKey(buildKey(type, id)));
     }
 
-    public boolean isValidValue(String type, String id, String value) {
+    public boolean isStoredValue(String type, String id, String value) {
         String storedValue = redisTemplate.opsForValue().get(buildKey(type, id));
         return (storedValue != null) && storedValue.equals(value);
     }
 
-    public boolean isNotValidValue(String type, String id, String value) {
+    public boolean isNotStoredValue(String type, String id, String value) {
         String storedValue = redisTemplate.opsForValue().get(buildKey(type, id));
         return (storedValue == null) || !storedValue.equals(value);
     }
