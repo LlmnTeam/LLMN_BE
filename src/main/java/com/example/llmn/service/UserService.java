@@ -18,7 +18,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
-import org.springframework.http.ResponseCookie;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -299,11 +298,11 @@ public class UserService {
     }
 
     public Long validateAccessTokenInRedis(String accessToken){
-        if(JWTProvider.isInvalidTokenFormat(accessToken)) {
+        if(JWTProvider.isInvalidJwtFormat(accessToken)) {
             throw new CustomException(ExceptionCode.TOKEN_WRONG);
         }
 
-        Long userId = JWTProvider.getUserIdFromToken(accessToken);
+        Long userId = JWTProvider.extractUserIdFromToken(accessToken);
         if(redisService.isNotStoredValue(REDIS_KEY_ACCESS_TOKEN, String.valueOf(userId), accessToken)){
             throw new CustomException(ExceptionCode.ACCESS_TOKEN_WRONG);
         }

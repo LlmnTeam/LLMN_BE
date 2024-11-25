@@ -32,6 +32,7 @@ public class JwtAuthenticationFilter extends BasicAuthenticationFilter {
     private static final String REDIS_KEY_ACCESS_TOKEN = "accessToken";
     public static final String REFRESH_TOKEN_COOKIE_KEY = "refreshToken";
     public static final String ACCESS_TOKEN_COOKIE_KEY = "accessToken";
+    public static final String HEADER_AUTHORIZATION = "Authorization";
 
     public JwtAuthenticationFilter(AuthenticationManager authenticationManager, RedisService redisService) {
         super(authenticationManager);
@@ -41,7 +42,7 @@ public class JwtAuthenticationFilter extends BasicAuthenticationFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain) throws IOException, ServletException {
         // 엑세스 토큰은 '헤더'에서 추출
-        String authorizationHeader = request.getHeader(JWTProvider.AUTHORIZATION);
+        String authorizationHeader = request.getHeader(HEADER_AUTHORIZATION);
         String accessToken = (authorizationHeader != null && authorizationHeader.startsWith(JWTProvider.TOKEN_PREFIX)) ?
                 authorizationHeader.replace(JWTProvider.TOKEN_PREFIX, "") : null;
 
@@ -105,7 +106,7 @@ public class JwtAuthenticationFilter extends BasicAuthenticationFilter {
 
     private User getUserFromToken(String token) {
         try {
-            DecodedJWT decodedJWT = JWTProvider.verify(token);
+            DecodedJWT decodedJWT = JWTProvider.decodeJWT(token);
             Long id = decodedJWT.getClaim("id").asLong();
             String nickName = decodedJWT.getClaim("nickName").asString();
             return User.builder().id(id).nickName(nickName).build();
