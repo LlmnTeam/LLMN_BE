@@ -168,6 +168,7 @@ public class LlmService {
 
     private String buildSummaryRequestBody(MetricResponse.FindMetricHistoryDTO metricHistory) {
         StringBuilder summaryRequestBody = new StringBuilder();
+
         summaryRequestBody.append(PERFORMANCE_SUMMARY_HEADER);
         appendCpuMetrics(summaryRequestBody, metricHistory);
         appendMemoryMetrics(summaryRequestBody, metricHistory);
@@ -345,15 +346,9 @@ public class LlmService {
     }
 
     private String buildSummaryRequestBody(String containerName, String logMessage) {
-        return new StringBuilder()
-                .append(LOG_DATA_HEADER)
-                .append("Application Name: ")
-                .append(containerName)
-                .append("\n")
-                .append("Log Content: ")
-                .append(logMessage)
-                .append("\n")
-                .toString();
+        return LOG_DATA_HEADER +
+                "Application Name: " + containerName + "\n" +
+                "Log Content: " + logMessage + "\n";
     }
 
     private void saveSummary(User user, String content, SummaryType summaryType) {
