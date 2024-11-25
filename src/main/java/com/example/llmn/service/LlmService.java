@@ -7,6 +7,7 @@ import com.example.llmn.repository.ProjectRepository;
 import com.example.llmn.repository.SummaryRepository;
 import com.example.llmn.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -16,12 +17,14 @@ import org.springframework.web.reactive.function.client.WebClient;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Optional;
 
 import static com.example.llmn.core.utils.DateTimeUtils.formatLocalDateTime;
 import static com.example.llmn.core.utils.UriUtils.buildURI;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class LlmService {
 
     private final LogService logService;
@@ -139,12 +142,12 @@ public class LlmService {
         List<Long> userIds = userRepository.findIds();
 
         for(Long userId: userIds) {
-            LogDTO.RecommendationDTO recommendationDTO = fetchRecommendation(userId);
+            fetchRecommendation(userId).ifPresent(recommendation -> {
+                User userRef = userRepository.getReferenceById(userId);
+                saveSummary(userRef, recommendation.recommend(), SummaryType.RECOMMENDATION);
 
-            User userRef = userRepository.getReferenceById(userId);
-            saveSummary(userRef, recommendationDTO.recommend(), SummaryType.RECOMMENDATION);
-
-            alarmService.generateAlarm(userId, RECOMMENDATION_ALARM, AlarmType.UPDATE);
+                alarmService.generateAlarm(userId, RECOMMENDATION_ALARM, AlarmType.UPDATE);
+            });
         }
     }
 
@@ -178,7 +181,6 @@ public class LlmService {
         List<Summary> performanceSummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.PERFORMANCE), userId, startOfHour);
         List<Summary> logSummaries = summaryRepository.findByTypeWithinDateWithProject(List.of(SummaryType.LOG), userId, startOfHour);
 
-        // 성능 요약과 로그 요약 추가 (시간)
         StringBuilder summaryRequestBody = new StringBuilder();
         appendSummaryWithHeader(summaryRequestBody, PERFORMANCE_SUMMARY_HEADER, performanceSummaries);
         appendLogSummary(summaryRequestBody, logSummaries);
@@ -191,7 +193,6 @@ public class LlmService {
         List<Summary> performanceSummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.PERFORMANCE), userId, startOfDay);
         List<Summary> logSummaries = summaryRepository.findByTypeWithinDateWithProject(List.of(SummaryType.LOG), userId, startOfDay);
 
-        // 성능 요약과 로그 요약 추가 (일)
         StringBuilder summaryRequestBody = new StringBuilder();
         appendSummaryWithHeader(summaryRequestBody, PERFORMANCE_SUMMARY_HEADER, performanceSummaries);
         appendLogSummary(summaryRequestBody, logSummaries);
@@ -200,7 +201,6 @@ public class LlmService {
     }
 
     private LogDTO.TrendSummaryResponseDTO fetchTrendSummary(Long userId){
-        // 1주일 전까지의 일일 리포트를 인풋으로 사용
         LocalDateTime startOfDay = LocalDateTime.now().minusWeeks(1).with(LocalTime.MIN);
         List<Summary> dailySummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.DAILY), userId, startOfDay);
 
@@ -210,14 +210,15 @@ public class LlmService {
         return sendSummaryRequest(trendSummeryUri, summaryRequestBody.toString(), LogDTO.TrendSummaryResponseDTO.class);
     }
 
-    private LogDTO.RecommendationDTO fetchRecommendation(Long userId) {
+    private Optional<LogDTO.RecommendationDTO> fetchRecommendation(Long userId) {
         LocalDateTime startOfTime = LocalDateTime.now().minusHours(6);
         List<Summary> performanceSummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.PERFORMANCE), userId, startOfTime);
         List<Summary> logSummaries = summaryRepository.findByTypeWithinDateWithProject(List.of(SummaryType.LOG), userId, startOfTime);
 
         String summaryRequestBody = buildRecommendRequestBody(performanceSummaries, logSummaries);
+        LogDTO.RecommendationDTO response = sendSummaryRequest(recommendUri, summaryRequestBody, LogDTO.RecommendationDTO.class);
 
-        return sendSummaryRequest(recommendUri, summaryRequestBody, LogDTO.RecommendationDTO.class);
+        return Optional.ofNullable(response);
     }
 
     private String buildRecommendRequestBody(List<Summary> performanceSummaries, List<Summary> logSummaries) {
@@ -327,12 +328,16 @@ public class LlmService {
     }
 
     private <T> T sendSummaryRequest(String uri, String requestContent, Class<T> responseType) {
-        return webClient.post()
-                .uri(buildURI(uri))
-                .bodyValue(new LogDTO.SummaryRequestDTO(requestContent))
-                .retrieve()
-                .bodyToMono(responseType)
-                .block();
+        try {
+            return webClient.post()
+                    .uri(buildURI(uri))
+                    .bodyValue(new LogDTO.SummaryRequestDTO(requestContent))
+                    .retrieve()
+                    .bodyToMono(responseType)
+                    .block();
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private String buildSummaryRequestBody(String containerName, String logMessage) {
