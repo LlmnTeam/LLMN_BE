@@ -84,10 +84,11 @@ public class LlmService {
 
         for(User user : users) {
             Long monitoringSshInfoId = user.getMonitoringSshId();
-            LogDTO.PerformanceSummaryResponseDTO performanceSummaryDTO = fetchMetricSummary(monitoringSshInfoId);
-            saveSummary(user, performanceSummaryDTO.performanceSummary(), SummaryType.PERFORMANCE);
 
-            alarmService.generateAlarm(user.getId(), PERFORMANCE_SUMMARY_ALARM, AlarmType.UPDATE);
+            fetchMetricSummary(monitoringSshInfoId).ifPresent(performanceSummaryDTO -> {
+                saveSummary(user, performanceSummaryDTO.performanceSummary(), SummaryType.PERFORMANCE);
+                alarmService.generateAlarm(user.getId(), PERFORMANCE_SUMMARY_ALARM, AlarmType.UPDATE);
+            });
         }
     }
 
@@ -100,7 +101,6 @@ public class LlmService {
             fetchHourlySummary(userId).ifPresent(hourlySummaryDTO -> {
                 User userRef = userRepository.getReferenceById(userId);
                 saveSummary(userRef, hourlySummaryDTO.hourlySummary(), SummaryType.HOURLY);
-
                 alarmService.generateAlarm(userId, HOURLY_SUMMARY_ALARM, AlarmType.UPDATE);
             });
         }
@@ -158,11 +158,13 @@ public class LlmService {
         return sendSummaryRequest(logSummeryUri, summaryRequestBody, LogDTO.SummaryResponseDTO.class);
     }
 
-    private LogDTO.PerformanceSummaryResponseDTO fetchMetricSummary(Long sshInfoId){
+    private Optional<LogDTO.PerformanceSummaryResponseDTO> fetchMetricSummary(Long sshInfoId){
         MetricResponse.FindMetricHistoryDTO metricHistory = metricService.findMetricHistory(METRIC_HISTORY_PREVIOUS_HOUR, sshInfoId);
         String summaryRequestBody = buildSummaryRequestBody(metricHistory);
 
-        return sendSummaryRequest(performanceSummeryUri, summaryRequestBody, LogDTO.PerformanceSummaryResponseDTO.class);
+        LogDTO.PerformanceSummaryResponseDTO responseDTO = sendSummaryRequest(performanceSummeryUri, summaryRequestBody, LogDTO.PerformanceSummaryResponseDTO.class);
+
+        return Optional.ofNullable(responseDTO);
     }
 
     private String buildSummaryRequestBody(MetricResponse.FindMetricHistoryDTO metricHistory) {
