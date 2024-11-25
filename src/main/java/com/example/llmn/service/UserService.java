@@ -68,7 +68,6 @@ public class UserService {
     private static final String REDIS_KEY_REFRESH_TOKEN = "refreshToken";
     private static final String REDIS_KEY_ACCESS_TOKEN = "accessToken";
     private static final String REDIS_SSH_KEY = "SSH";
-    private static final String COOKIE_KEY_REFRESH_TOKEN = "refreshToken";
     private static final String SORT_BY_DATE = "createdDate";
     private static final String MODEL_KEY_CODE = "code";
     private static final String DELIMITER = "-";
@@ -321,7 +320,7 @@ public class UserService {
     private Map<String, String> createToken(User user){
         String accessToken = JWTProvider.createAccessToken(user);
         String refreshToken = JWTProvider.createRefreshToken(user);
-        
+
         redisService.storeValue(REDIS_KEY_ACCESS_TOKEN, String.valueOf(user.getId()), accessToken, JWTProvider.ACCESS_EXP_MILLI);
         redisService.storeValue(REDIS_KEY_REFRESH_TOKEN, String.valueOf(user.getId()), refreshToken, JWTProvider.REFRESH_EXP_MILLI);
         redisService.storeValue(REDIS_KEY_SESSION_ID, user.getId().toString());
@@ -331,16 +330,6 @@ public class UserService {
         tokens.put(REDIS_KEY_REFRESH_TOKEN, refreshToken);
 
         return tokens;
-    }
-
-    public String createRefreshTokenCookie(String refreshToken) {
-        return ResponseCookie.from(COOKIE_KEY_REFRESH_TOKEN, refreshToken)
-                .httpOnly(true)
-                .secure(false)
-                .path("/")
-                .sameSite("Lax")
-                .maxAge(JWTProvider.REFRESH_EXP_SEC)
-                .build().toString();
     }
 
     @Transactional(readOnly = true)
@@ -355,22 +344,12 @@ public class UserService {
                 () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
         );
 
-        // 알람 삭제
         alarmRepository.deleteByUserId(userId);
-
-        // 프로젝트 삭제
         projectRepository.deleteByUserId(userId);
-
-        // 요약 삭제
         summaryRepository.deleteByUserId(userId);
-
-        // 메트릭 삭제
         metricRepository.deleteByUserId(userId);
-
-        // SSH 정보 삭제
         sshInfoRepository.deleteByUserId(userId);
 
-        // 세션에 저장된 토큰 삭제
         redisService.removeValue(REDIS_KEY_ACCESS_TOKEN, userId.toString());
         redisService.removeValue(REDIS_KEY_REFRESH_TOKEN, userId.toString());
 

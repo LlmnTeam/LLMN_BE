@@ -17,6 +17,8 @@ import org.springframework.web.multipart.MultipartFile;
 import java.nio.file.Path;
 import java.util.Map;
 
+import static com.example.llmn.core.utils.CookieUtils.createRefreshTokenCookie;
+
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api")
@@ -24,14 +26,15 @@ public class UserController {
 
     private final UserService userService;
     private static final String CODE_TYPE_JOIN = "join";
-    private static final String CODE_TYPE_RECOVERY = "recovery";
+    private static final String REFRESH_TOKEN = "refreshToken";
+    private static final String ACCESS_TOKEN = "accessToken";
 
     @PostMapping("/auth/login")
     public ResponseEntity<?> login(@RequestBody @Valid UserRequest.LoginDTO requestDTO) {
         Map<String, String> tokens = userService.login(requestDTO);
         return ResponseEntity.ok()
-                .header(HttpHeaders.SET_COOKIE, userService.createRefreshTokenCookie(tokens.get("refreshToken")))
-                .body(ApiUtils.success(HttpStatus.OK, new UserResponse.LoginDTO(tokens.get("accessToken"))));
+                .header(HttpHeaders.SET_COOKIE, createRefreshTokenCookie(tokens.get(REFRESH_TOKEN), true, false))
+                .body(ApiUtils.success(HttpStatus.OK, new UserResponse.LoginDTO(tokens.get(ACCESS_TOKEN))));
     }
 
     @PostMapping("/accounts")

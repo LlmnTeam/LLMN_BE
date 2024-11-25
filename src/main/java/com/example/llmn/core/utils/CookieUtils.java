@@ -1,5 +1,6 @@
 package com.example.llmn.core.utils;
 
+import com.example.llmn.core.security.JWTProvider;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -12,6 +13,19 @@ import java.util.Set;
 public class CookieUtils {
 
     private CookieUtils() {}
+
+    private static final String KEY_REFRESH_TOKEN = "refreshToken";
+
+    public static String createRefreshTokenCookie(String refreshToken, boolean httpOnly, boolean secure) {
+        return ResponseCookie.from(KEY_REFRESH_TOKEN, refreshToken)
+                .httpOnly(httpOnly)
+                .secure(secure)
+                .path("/")
+                .sameSite("Lax")
+                .maxAge(JWTProvider.REFRESH_EXP_SEC)
+                .build()
+                .toString();
+    }
 
     public static void setCookieToResponse(String name, String value, Long maxAgeSec, boolean secure, boolean httpOnly, HttpServletResponse response) {
         ResponseCookie cookie = ResponseCookie.from(name, value)
