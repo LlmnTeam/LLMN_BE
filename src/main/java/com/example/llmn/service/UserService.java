@@ -114,10 +114,10 @@ public class UserService {
         checkMonitoringSshHostSelected(requestDTO);
 
         List<SshInfo> sshInfos = sshInfoRepository.findByUserId(userId);
-        updateOrDeleteSshInfo(sshInfos, requestDTO.sshInfos());
-        List<SshInfo> addedSshHosts = saveNewSshInfos(sshInfos, requestDTO.sshInfos(), user);
+        updateSshInfo(sshInfos, requestDTO.sshInfos());
+        List<SshInfo> newSshHosts = saveNewSshInfos(sshInfos, requestDTO.sshInfos(), user);
 
-        SshInfo monitoringSshInfo = findMonitoringSshInfo(sshInfos, addedSshHosts, requestDTO.monitoringSshHost());
+        SshInfo monitoringSshInfo = findMonitoringSshInfo(sshInfos, newSshHosts, requestDTO.monitoringSshHost());
         user.updateConfiguration(requestDTO.nickName(), requestDTO.receivingAlarm(), monitoringSshInfo.getId());
 
         cacheUserSshInfo(userId, monitoringSshInfo);
@@ -390,19 +390,18 @@ public class UserService {
         }
     }
 
-    private void updateOrDeleteSshInfo(List<SshInfo> storedSshInfos, List<UserRequest.SshInfoDTO> newSshInfoRequests) {
+    private void updateSshInfo(List<SshInfo> storedSshInfos, List<UserRequest.SshInfoDTO> newSshInfoRequests) {
         Map<String, UserRequest.SshInfoDTO> newSshInfoMap = createNewSshInfoMap(newSshInfoRequests);
 
-        for (SshInfo sshInfo : storedSshInfos) {
-            UserRequest.SshInfoDTO foundSshInfoDTO = newSshInfoMap.get(sshInfo.getRemoteHost());
-
-            if (foundSshInfoDTO != null) {
-                updateSshInfo(sshInfo, foundSshInfoDTO);
+        storedSshInfos.forEach(sshInfo -> {
+            if (isIncludedInRequest(sshInfo, newSshInfoMap)) {
+                UserRequest.SshInfoDTO matchingSshInfoDTO = newSshInfoMap.get(sshInfo.getRemoteHost());
+                updateSshInfo(sshInfo, matchingSshInfoDTO);
             } else {
                 metricRepository.deleteBySShInfoId(sshInfo.getId());
                 sshInfoRepository.delete(sshInfo);
             }
-        }
+        });
     }
 
     private Map<String, UserRequest.SshInfoDTO> createNewSshInfoMap(List<UserRequest.SshInfoDTO> newSshInfoRequests) {
@@ -414,8 +413,13 @@ public class UserService {
                 ));
     }
 
+    private boolean isIncludedInRequest(SshInfo sshInfo, Map<String, UserRequest.SshInfoDTO> newSshInfoMap) {
+        return newSshInfoMap.containsKey(sshInfo.getRemoteHost());
+    }
+
     private void updateSshInfo(SshInfo sshInfo, UserRequest.SshInfoDTO sshInfoDTO) {
-        sshInfo.updateSshInfo(sshInfoDTO.remoteHost(),
+        sshInfo.updateSshInfo(
+                sshInfoDTO.remoteHost(),
                 sshInfoDTO.remoteName(),
                 sshInfoDTO.remoteKeyPath(),
                 true);
