@@ -58,7 +58,7 @@ public class UserController {
 
     @PostMapping("/accounts/check/nick")
     public ResponseEntity<?> checkNickname(@RequestBody @Valid UserRequest.CheckNickDTO requestDTO){
-        UserResponse.CheckNickNameDTO responseDTO = userService.checkNickName(requestDTO);
+        UserResponse.CheckNickNameDTO responseDTO = userService.checkNickNameDuplicate(requestDTO);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 
