@@ -21,6 +21,8 @@ import org.springframework.web.reactive.function.client.WebClient;
 
 import java.nio.file.Path;
 import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static com.example.llmn.core.utils.EmailUtils.generateVerificationCode;
 import static com.example.llmn.core.utils.FileUtils.*;
@@ -198,12 +200,7 @@ public class UserService {
 
         List<SshInfo> sshInfos = sshInfoRepository.findByUserId(userId);
         List<UserResponse.SshInfoDTO> sshInfoDTOS = sshInfos.stream()
-                .map(sshInfo -> new UserResponse.SshInfoDTO(
-                        sshInfo.getId(),
-                        sshInfo.getRemoteName(),
-                        sshInfo.getRemoteHost(),
-                        sshInfo.getRemoteKeyPath(),
-                        sshInfo.isWorking()))
+                .map(this::createSshInfoDTO)
                 .toList();
 
         return new UserResponse.FindConfigurationInfoDTO(
@@ -218,39 +215,19 @@ public class UserService {
         User user = userRepository.findById(userId).orElseThrow(
                 () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
         );
+        
+        checkNoDuplicateSshHosts(requestDTO.sshInfos());
+        checkIsSshHostsEmpty(requestDTO.sshInfos());
+        checkMonitoringSshHostSelected(requestDTO);
 
-        // SSH Host 중복 방지
-        if (hasDuplicateRemoteHost(requestDTO.sshInfos())) {
-            throw new CustomException(ExceptionCode.DUPLICATE_SSH_HOST);
-        }
-
-        // SSH 정보가 비어 있으면 안됨
-        List<UserRequest.SshInfoDTO> requestSshInfoDTOS = requestDTO.sshInfos();
-        if (requestSshInfoDTOS.isEmpty()) {
-            throw new CustomException(ExceptionCode.SSH_INFO_EMPTY);
-        }
-
-        // 1. SshInfo 엔티티들 업데이트
         List<SshInfo> sshInfos = sshInfoRepository.findByUserId(userId);
+        updateOrDeleteSshInfo(sshInfos, requestDTO.sshInfos());
+        List<SshInfo> addedSshHosts = saveNewSshInfos(sshInfos, requestDTO.sshInfos(), user);
 
-        updateOrDeleteSshInfo(sshInfos, requestSshInfoDTOS);
-        List<SshInfo> addedSshHosts = addNewSshInfos(sshInfos, requestSshInfoDTOS, user);
-
-        // 2. 모니터링 할 클라우드 인스턴스의 SshInfo 객체 찾기
-        String monitoringSshHost = requestSshInfoDTOS.stream()
-                .filter(sshInfoDTO -> sshInfoDTO.remoteHost().equals(requestDTO.monitoringSshHost()))
-                .findFirst()
-                .orElseThrow(() -> new CustomException(ExceptionCode.MONITORING_SSH_NOT_SELECT))
-                .remoteHost();
-
-        SshInfo monitoringSshInfo = findMonitoringSshInfo(sshInfos, addedSshHosts, monitoringSshHost);
-
-        // 3. 유저 정보 업데이트
+        SshInfo monitoringSshInfo = findMonitoringSshInfo(sshInfos, addedSshHosts, requestDTO.monitoringSshHost());
         user.updateConfiguration(requestDTO.nickName(), requestDTO.receivingAlarm(), monitoringSshInfo.getId());
 
-        // 4. 캐시 업데이트
-        String combinedInfo = String.join(DELIMITER, monitoringSshInfo.getRemoteHost(), monitoringSshInfo.getRemoteName(), monitoringSshInfo.getRemoteKeyPath());
-        redisService.storeValue(REDIS_SSH_KEY, userId.toString(), combinedInfo, REDIS_SSH_KEY_EXP);
+        cacheUserSshInfo(userId, monitoringSshInfo);
     }
 
     public void updateApiKey(String value) {
@@ -330,15 +307,25 @@ public class UserService {
         }
     }
 
-    private void validateSshInfoPresence(UserRequest.JoinDTO requestDTO) {
-        if (requestDTO.sshInfos().isEmpty()) {
-            throw new CustomException(ExceptionCode.SSH_INFO_EMPTY);
+    private void checkNoDuplicateSshHosts(List<UserRequest.SshInfoDTO> sshInfos) {
+        Set<String> remoteHostSet = sshInfos.stream()
+                .map(UserRequest.SshInfoDTO::remoteHost)
+                .collect(Collectors.toSet());
+
+        if (remoteHostSet.size() < sshInfos.size()) {
+            throw new CustomException(ExceptionCode.DUPLICATE_SSH_HOST);
         }
     }
 
-    private void validateUniqueSshHosts(UserRequest.JoinDTO requestDTO) {
-        if (hasDuplicateRemoteHost(requestDTO.sshInfos())) {
-            throw new CustomException(ExceptionCode.DUPLICATE_SSH_HOST);
+    private void cacheUserSshInfo(Long userId, SshInfo monitoringSshInfo) {
+        String combinedInfo = String.join(DELIMITER, monitoringSshInfo.getRemoteHost(), monitoringSshInfo.getRemoteName(), monitoringSshInfo.getRemoteKeyPath());
+        redisService.storeValue(REDIS_SSH_KEY, userId.toString(), combinedInfo, REDIS_SSH_KEY_EXP);
+    }
+
+    private void checkMonitoringSshHostSelected(UserRequest.UpdateConfigurationDTO requestDTO) {
+        if (requestDTO.sshInfos().stream()
+                .noneMatch(sshInfoDTO -> sshInfoDTO.remoteHost().equals(requestDTO.monitoringSshHost()))) {
+            throw new CustomException(ExceptionCode.MONITORING_SSH_NOT_SELECT);
         }
     }
 
@@ -354,50 +341,61 @@ public class UserService {
 
     private void validateJoinRequest(UserRequest.JoinDTO requestDTO) {
         validatePassword(requestDTO);
-        validateSshInfoPresence(requestDTO);
-        validateUniqueSshHosts(requestDTO);
+        checkIsSshHostsEmpty(requestDTO.sshInfos());
+        checkNoDuplicateSshHosts(requestDTO.sshInfos());
         checkAlreadyJoin(requestDTO.email());
         checkDuplicateNickname(requestDTO.nickName());
     }
 
-    private List<SshInfo> addNewSshInfos(List<SshInfo> sshInfos, List<UserRequest.SshInfoDTO> requestSshInfoDTOS, User user) {
-        List<SshInfo> addedSshHosts = new ArrayList<>();
+    private List<SshInfo> saveNewSshInfos(List<SshInfo> existingSshInfos, List<UserRequest.SshInfoDTO> newSshInfoRequests, User user) {
+        List<SshInfo> addedSshInfos = new ArrayList<>();
 
-        // 새로운 SshInfo가 요청으로 들어왔으면 저장
-        for (UserRequest.SshInfoDTO sshInfoDTO : requestSshInfoDTOS) {
-            boolean exists = sshInfos.stream()
-                    .anyMatch(sshInfo -> sshInfo.getRemoteHost().equals(sshInfoDTO.remoteHost()));
+        Set<String> existingRemoteHosts = existingSshInfos.stream()
+                .map(SshInfo::getRemoteHost)
+                .collect(Collectors.toSet());
 
-            if (!exists) {
+        for (UserRequest.SshInfoDTO sshInfoDTO : newSshInfoRequests) {
+            String remoteHost = sshInfoDTO.remoteHost();
+
+            if (!existingRemoteHosts.contains(remoteHost)) {
                 SshInfo newSshInfo = SshInfo.builder()
                         .user(user)
-                        .remoteHost(sshInfoDTO.remoteHost())
+                        .remoteHost(remoteHost)
                         .remoteName(sshInfoDTO.remoteName())
                         .remoteKeyPath(sshInfoDTO.remoteKeyPath())
                         .build();
 
                 sshInfoRepository.save(newSshInfo);
-                addedSshHosts.add(newSshInfo);
+                addedSshInfos.add(newSshInfo);
+                existingRemoteHosts.add(remoteHost);
             }
         }
 
-        return addedSshHosts;
+        return addedSshInfos;
     }
 
-    private void updateOrDeleteSshInfo(List<SshInfo> sshInfos, List<UserRequest.SshInfoDTO> requestSshInfoDTOS) {
-        // 기존의 SshInfo와 요청으로 들어온 값을 비교 => 변경된 부분이 있는지 비교하고 업데이트하거나, 새로운 엔티티는 저장
-        for (SshInfo sshInfo : sshInfos) {
-            Optional<UserRequest.SshInfoDTO> matchingDTO = requestSshInfoDTOS.stream()
-                    .filter(sshInfoDTO -> sshInfoDTO.remoteHost().equals(sshInfo.getRemoteHost()))
-                    .findFirst();
+    private void updateOrDeleteSshInfo(List<SshInfo> storedSshInfos, List<UserRequest.SshInfoDTO> newSshInfoRequests) {
+        Map<String, UserRequest.SshInfoDTO> newSshInfoMap = createNewSshInfoMap(newSshInfoRequests);
 
-            if (matchingDTO.isPresent()) {
-                updateSshInfo(sshInfo, matchingDTO.get());
+        for (SshInfo sshInfo : storedSshInfos) {
+            UserRequest.SshInfoDTO foundSshInfoDTO = newSshInfoMap.get(sshInfo.getRemoteHost());
+
+            if (foundSshInfoDTO != null) {
+                updateSshInfo(sshInfo, foundSshInfoDTO);
             } else {
                 metricRepository.deleteBySShInfoId(sshInfo.getId());
                 sshInfoRepository.delete(sshInfo);
             }
         }
+    }
+
+    private Map<String, UserRequest.SshInfoDTO> createNewSshInfoMap(List<UserRequest.SshInfoDTO> newSshInfoRequests) {
+        return newSshInfoRequests.stream()
+                .collect(Collectors.toMap(
+                        UserRequest.SshInfoDTO::remoteHost,
+                        Function.identity(),
+                        (existing, replacement) -> existing // 중복 키 발생 시 기존 값 유지
+                ));
     }
 
     private void updateSshInfo(SshInfo sshInfo, UserRequest.SshInfoDTO sshInfoDTO) {
@@ -407,7 +405,6 @@ public class UserService {
                 true);
     }
 
-    // monitoringSshHost를 가진 SshInfo 객체 찾기
     private SshInfo findMonitoringSshInfo(List<SshInfo> sshInfos, List<SshInfo> addedSshHosts, String monitoringSshHost) {
         return sshInfos.stream()
                 .filter(sshInfo -> sshInfo.getRemoteHost().equals(monitoringSshHost))
@@ -417,17 +414,6 @@ public class UserService {
                         .findFirst()
                         .orElseThrow(() -> new CustomException(ExceptionCode.MONITORING_SSH_NOT_SELECT))
                 );
-    }
-
-    private boolean hasDuplicateRemoteHost(List<UserRequest.SshInfoDTO> sshInfos) {
-        Set<String> remoteHostSet = new HashSet<>();
-
-        for (UserRequest.SshInfoDTO sshInfoDTO : sshInfos) {
-            if (!remoteHostSet.add(sshInfoDTO.remoteHost())) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private List<SshInfo> saveSshInfos(List<UserRequest.SshInfoDTO> requestSshInfos, User user) {
@@ -513,6 +499,15 @@ public class UserService {
         }
     }
 
+    private UserResponse.SshInfoDTO createSshInfoDTO(SshInfo sshInfo) {
+        return new UserResponse.SshInfoDTO(
+                sshInfo.getId(),
+                sshInfo.getRemoteName(),
+                sshInfo.getRemoteHost(),
+                sshInfo.getRemoteKeyPath(),
+                sshInfo.isWorking());
+    }
+
     private Map<String, Object> createTemplateModel(String verificationCode) {
         Map<String, Object> templateModel = new HashMap<>();
         templateModel.put(MODEL_KEY_CODE, verificationCode);
@@ -521,5 +516,11 @@ public class UserService {
 
     private void storeVerificationCode(String email, String codeType, String verificationCode) {
         redisService.storeValue(addCodeTypePrefix(codeType), email, verificationCode, VERIFICATION_CODE_EXPIRATION_MS);
+    }
+
+    private void checkIsSshHostsEmpty(List<UserRequest.SshInfoDTO> sshInfoDTOS) {
+        if (sshInfoDTOS.isEmpty()) {
+            throw new CustomException(ExceptionCode.SSH_INFO_EMPTY);
+        }
     }
 }
