@@ -77,7 +77,7 @@ public class UserService {
                 () -> new CustomException(ExceptionCode.USER_ACCOUNT_WRONG)
         );
 
-        if (!passwordEncoder.matches(requestDTO.password(), user.getPassword())) {
+        if (isPasswordMatched(requestDTO.password(), user.getPassword())) {
             throw new CustomException(ExceptionCode.USER_ACCOUNT_WRONG);
         }
 
@@ -260,6 +260,10 @@ public class UserService {
     public UserResponse.ValidateAccessTokenDTO findNickName(Long userId) {
         String nickName = userRepository.findNickName(userId).orElse(null);
         return new UserResponse.ValidateAccessTokenDTO(nickName);
+    }
+
+    private boolean isPasswordMatched(String requestPassword, String userPassword) {
+        return !passwordEncoder.matches(requestPassword, userPassword);
     }
 
     private Map<String, String> createToken(User user) {
