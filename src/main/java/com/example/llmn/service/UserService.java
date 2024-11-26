@@ -158,8 +158,7 @@ public class UserService {
 
     @Transactional
     public void resetPassword(UserRequest.ResetPasswordDTO requestDTO) {
-        // 요청으로 들어온 코드를 가지고 레디스에서 해당 이메일을 꺼내옴
-        String email = redisService.getValueInString(CODE_TO_EMAIL_KEY_PREFIX, requestDTO.code());
+        String email = getEmailByVerificationCode(requestDTO);
         if (email == null) {
             throw new CustomException(ExceptionCode.BAD_APPROACH);
         }
@@ -477,6 +476,10 @@ public class UserService {
 
     private boolean isUpdateSuccess(UserResponse.EnvUpdateDTO responseDTO) {
         return responseDTO == null || !responseDTO.success();
+    }
+
+    private String getEmailByVerificationCode(UserRequest.ResetPasswordDTO requestDTO) {
+        return redisService.getValueInString(CODE_TO_EMAIL_KEY_PREFIX, requestDTO.code());
     }
 
     private void updatePassword(String email, String newPassword) {
