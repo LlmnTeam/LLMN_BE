@@ -422,29 +422,30 @@ public class UserService {
     }
 
     private List<SshInfo> saveNewSshInfos(List<SshInfo> existingSshInfos, List<UserRequest.SshInfoDTO> newSshInfoRequests, User user) {
-        List<SshInfo> addedSshInfos = new ArrayList<>();
+        Set<String> existingRemoteHosts = createExistingRemoteHostSet(existingSshInfos);
 
-        Set<String> existingRemoteHosts = existingSshInfos.stream()
+        return newSshInfoRequests.stream()
+                .filter(sshInfoDTO -> !existingRemoteHosts.contains(sshInfoDTO.remoteHost()))
+                .map(sshInfoDTO -> saveSshInfo(sshInfoDTO, user))
+                .toList();
+    }
+
+    private Set<String> createExistingRemoteHostSet(List<SshInfo> existingSshInfos) {
+        return existingSshInfos.stream()
                 .map(SshInfo::getRemoteHost)
                 .collect(Collectors.toSet());
+    }
 
-        for (UserRequest.SshInfoDTO sshInfoDTO : newSshInfoRequests) {
-            String remoteHost = sshInfoDTO.remoteHost();
+    private SshInfo saveSshInfo(UserRequest.SshInfoDTO sshInfoDTO, User user) {
+        SshInfo newSshInfo = SshInfo.builder()
+                .user(user)
+                .remoteHost(sshInfoDTO.remoteHost())
+                .remoteName(sshInfoDTO.remoteName())
+                .remoteKeyPath(sshInfoDTO.remoteKeyPath())
+                .build();
 
-            if (!existingRemoteHosts.contains(remoteHost)) {
-                SshInfo newSshInfo = SshInfo.builder()
-                        .user(user)
-                        .remoteHost(remoteHost)
-                        .remoteName(sshInfoDTO.remoteName())
-                        .remoteKeyPath(sshInfoDTO.remoteKeyPath())
-                        .build();
-
-                sshInfoRepository.save(newSshInfo);
-                addedSshInfos.add(newSshInfo);
-                existingRemoteHosts.add(remoteHost);
-            }
-        }
-        return addedSshInfos;
+        sshInfoRepository.save(newSshInfo);
+        return newSshInfo;
     }
 
     private SshInfo findMonitoringSshInfo(List<SshInfo> sshInfos, List<SshInfo> addedSshHosts, String monitoringSshHost) {
