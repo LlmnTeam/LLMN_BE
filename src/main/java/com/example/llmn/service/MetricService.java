@@ -52,9 +52,9 @@ public class MetricService {
     private static final String METRIC_MAP_TOTAL_MEMORY = "totalMemory";
     private static final String METRIC_MAP_USED_MEMORY = "usedMemory";
     private static final String METRIC_MAP_NETWORK_RECEIVED = "networkReceived";
-    private static final String METRIC_MAP_NETWORK_SENT ="networkSent";
+    private static final String METRIC_MAP_NETWORK_SENT = "networkSent";
     private static final String METRIC_MAP_DAILY_NET_RECEIVED = "dailyReceived";
-    private static final String METRIC_MAP_DAILY_NET_SENT ="dailySent";
+    private static final String METRIC_MAP_DAILY_NET_SENT = "dailySent";
     private static final String COMMAND_TOP = "top -b -n1 | grep \"Cpu(s)\\|Mem\"";
     private static final String COMMAND_NETWORK_USAGE = "cat /proc/net/dev";
     private static final double DEFAULT_METRIC_VALUE = 0.0;
@@ -87,7 +87,7 @@ public class MetricService {
     }
 
     @Transactional(readOnly = true)
-    public MetricResponse.FindMetricHistoryDTO findMetricHistory(int minusHour, Long sshInfoId){
+    public MetricResponse.FindMetricHistoryDTO findMetricHistory(int minusHour, Long sshInfoId) {
         List<MetricResponse.CpuMetricDTO> cpuMetricDTOS = new ArrayList<>();
         List<MetricResponse.MemoryMetricDTO> memoryMetricDTOS = new ArrayList<>();
         List<MetricResponse.NetworkInMetricDTO> networkInMetricDTOS = new ArrayList<>();
@@ -132,7 +132,6 @@ public class MetricService {
         if (isMetricEmpty(cpuAndMemoryMetrics, networkMetrics)) {
             return null;
         }
-
         cacheNetworkMetric(networkMetrics);
 
         return Metric.builder()
@@ -166,7 +165,7 @@ public class MetricService {
     private Map<String, Double> collectNetworkMetrics(Long sshInfoId) {
         Map<String, Double> currentNetworkMetric = collectCurrentNetworkMetrics(sshInfoId);
 
-        if(currentNetworkMetric.isEmpty()){
+        if (currentNetworkMetric.isEmpty()) {
             return Collections.emptyMap();
         }
 
@@ -318,7 +317,7 @@ public class MetricService {
         return bytes / BYTES_TO_MB_DIVISOR;
     }
 
-    private  MetricResponse.FindCurrentMetricDTO createFindCurrentMetricDTO(Map<String, Double> cpuAndMemoryMetrics, Map<String, Double> networkMetrics){
+    private MetricResponse.FindCurrentMetricDTO createFindCurrentMetricDTO(Map<String, Double> cpuAndMemoryMetrics, Map<String, Double> networkMetrics) {
         return new MetricResponse.FindCurrentMetricDTO(
                 cpuAndMemoryMetrics.getOrDefault(METRIC_MAP_CPU_USAGE, DEFAULT_METRIC_VALUE),
                 cpuAndMemoryMetrics.getOrDefault(METRIC_MAP_TOTAL_MEMORY, DEFAULT_METRIC_VALUE),
