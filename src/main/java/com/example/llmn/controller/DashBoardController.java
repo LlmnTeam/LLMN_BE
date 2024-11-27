@@ -3,6 +3,7 @@ package com.example.llmn.controller;
 import com.example.llmn.controller.DTO.UserResponse;
 import com.example.llmn.core.security.CustomUserDetails;
 import com.example.llmn.core.utils.ApiUtils;
+import com.example.llmn.service.DashBoardService;
 import com.example.llmn.service.MetricService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -11,24 +12,16 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Map;
-
 @Controller
 @RequiredArgsConstructor
 @RequestMapping("/api")
-public class MetricController {
+public class DashBoardController {
 
-    private final MetricService metricService;
+    private final DashBoardService dashBoardService;
 
     @GetMapping("/home")
     public ResponseEntity<?> findDashboard(@AuthenticationPrincipal CustomUserDetails userDetails) {
-        UserResponse.FindDashboardDTO responseDTO = metricService.findDashboard(userDetails.getUser().getId());
+        UserResponse.FindDashboardDTO responseDTO = dashBoardService.findDashboard(userDetails.getUser().getId());
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
-
-    /*@GetMapping("/metrics/history")
-    public ResponseEntity<?> findMetricHistory(@AuthenticationPrincipal CustomUserDetails userDetails) {
-        MetricResponse.FindMetricHistoryDTO responseDTO = metricService.findMetricHistory(METRIC_HISTORY_PREVIOUS_HOUR, userDetails.getUser().getId());
-        return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
-    }*/
 }
