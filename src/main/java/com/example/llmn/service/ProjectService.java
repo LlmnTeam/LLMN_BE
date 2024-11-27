@@ -46,12 +46,19 @@ public class ProjectService {
     private static final String LOG_FILE_SUFFIX = "-log";
 
     @Transactional
+    @Scheduled(cron = "0 0 0,12 * * *")
+    public void initEmergency() {
+        List<Project> projects = projectRepository.findAll();
+        projects.forEach(project -> project.updateIsUrgent(false));
+    }
+
+    @Transactional
     public ProjectResponse.CreateProjectDTO createProject(ProjectRequest.CreateProjectDTO requestDTO, Long userId) {
         ContainerStatus containerStatus = determineContainerStatus(requestDTO);
         boolean isUrgent = containerStatus.isProjectUrgent();
 
-        User user = getUserReference(userId);
-        SshInfo sshInfo = getSshInfoReference(requestDTO.sshInfoId());
+        User user = entityManager.getReference(User.class, userId);
+        SshInfo sshInfo = entityManager.getReference(SshInfo.class, requestDTO.sshInfoId());
         Project project = Project.builder()
                 .user(user)
                 .sshInfo(sshInfo)
@@ -65,6 +72,44 @@ public class ProjectService {
         projectRepository.save(project);
 
         return new ProjectResponse.CreateProjectDTO(project.getId());
+    }
+
+    @Transactional
+    public void updateProject(ProjectRequest.UpdateProjectDTO requestDTO, Long projectId, Long userId) {
+        Project project = projectRepository.findByIdWithUserAndSshInfo(projectId).orElseThrow(
+                () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
+        );
+
+        if (project.isNotOwnedBy(userId)) {
+            throw new CustomException(ExceptionCode.USER_FORBIDDEN);
+        }
+
+        ContainerStatus containerStatus = findContainerStatus(requestDTO, project.getSshInfo().getId());
+        project.updateProject(requestDTO.projectName(), requestDTO.containerName(), requestDTO.description(), containerStatus);
+    }
+
+    @Transactional
+    public void checkSummary(Long summaryId) {
+        Summary summary = summaryRepository.findById(summaryId).orElseThrow(
+                () -> new CustomException(ExceptionCode.SUMMARY_NOT_FOUND)
+        );
+
+        summary.check();
+    }
+
+    // 로그 파일 삭제하는 로직 추후 추가해야함
+    @Transactional
+    public void deleteProjectById(Long userId, Long projectId) {
+        Project project = projectRepository.findById(projectId).orElseThrow(
+                () -> new CustomException(ExceptionCode.PROJECT_NOT_FOUND)
+        );
+
+        if (project.isNotOwnedBy(userId)) {
+            throw new CustomException(ExceptionCode.USER_FORBIDDEN);
+        }
+
+        summaryRepository.deleteByProjectId(projectId);
+        projectRepository.delete(project);
     }
 
     @Transactional
@@ -85,27 +130,13 @@ public class ProjectService {
         );
 
         List<SshInfo> sshInfos = sshInfoRepository.findByUserId(userId);
-        List<ProjectResponse.ContainerDTO> selectableContainers = createSelectableContainerDTOs(sshInfos);
+        List<ProjectResponse.ContainerDTO> selectableContainers = findSelectableContainers(sshInfos);
 
         return new ProjectResponse.FindProjectInfoByIdDTO(
                 project.getProjectName(),
                 project.getContainerName(),
                 project.getDescription(),
                 selectableContainers);
-    }
-
-    @Transactional
-    public void updateProject(ProjectRequest.UpdateProjectDTO requestDTO, Long projectId, Long userId) {
-        Project project = projectRepository.findByIdWithUserAndSshInfo(projectId).orElseThrow(
-                () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
-        );
-
-        if (project.isNotOwnedBy(userId)) {
-            throw new CustomException(ExceptionCode.USER_FORBIDDEN);
-        }
-
-        ContainerStatus containerStatus = findContainerStatus(requestDTO, project.getSshInfo().getId());
-        project.updateProject(requestDTO.projectName(), requestDTO.containerName(), requestDTO.description(), containerStatus);
     }
 
     @Transactional
@@ -183,40 +214,69 @@ public class ProjectService {
         );
     }
 
-    // 로그 파일 삭제하는 로직 추후 추가해야함
-    @Transactional
-    public void deleteProjectById(Long userId, Long projectId) {
-        Project project = projectRepository.findById(projectId).orElseThrow(
-                () -> new CustomException(ExceptionCode.PROJECT_NOT_FOUND)
-        );
+    private ContainerStatus determineContainerStatus(ProjectRequest.CreateProjectDTO requestDTO) {
+        return requestDTO.containerName() != null ? ContainerStatus.NOT_WORKING : ContainerStatus.NOT_CONNECTED;
+    }
 
-        if (project.isNotOwnedBy(userId)) {
-            throw new CustomException(ExceptionCode.USER_FORBIDDEN);
+    private ContainerStatus findContainerStatus(ProjectRequest.UpdateProjectDTO requestDTO, Long sshInfoId) {
+        if (requestDTO.containerName() == null) {
+            return ContainerStatus.NOT_CONNECTED;
         }
 
-        summaryRepository.deleteByProjectId(projectId);
-        projectRepository.delete(project);
+        return dockerService.isContainerRunning(requestDTO.containerName(), sshInfoId) ? ContainerStatus.WORKING : ContainerStatus.NOT_WORKING;
     }
 
-    @Transactional
-    public void checkSummary(Long summaryId) {
-        Summary summary = summaryRepository.findById(summaryId).orElseThrow(
-                () -> new CustomException(ExceptionCode.SUMMARY_NOT_FOUND)
-        );
-        summary.reverseIsChecked();
-    }
+    private ProjectResponse.CloudInstanceDTO createCloudInstanceDTO(SshInfo sshInfo) {
+        String cloudName = getCloudName(sshInfo);
+        List<ProjectResponse.ContainerDTO> runningContainerDTOS = dockerService.findRunningContainerList(sshInfo.getId()).stream()
+                .map(ProjectResponse.ContainerDTO::new)
+                .toList();
 
-    @Transactional
-    @Scheduled(cron = "0 0 0,12 * * *")
-    public void initEmergency() {
-        List<Project> projects = projectRepository.findAll();
-        projects.forEach(project -> project.updateIsUrgent(false));
+        return new ProjectResponse.CloudInstanceDTO(cloudName, sshInfo.getId(), runningContainerDTOS);
     }
 
     private String getCloudName(SshInfo sshInfo) {
         String remoteName = sshInfo.getRemoteName() != null ? sshInfo.getRemoteName() : "Unknown Name";
         String remoteHost = sshInfo.getRemoteHost() != null ? sshInfo.getRemoteHost() : "Unknown Host";
         return String.format("%s (%s)", remoteName, remoteHost);
+    }
+
+    private List<ProjectResponse.ContainerDTO> findSelectableContainers(List<SshInfo> sshInfos) {
+        return sshInfos.stream()
+                .flatMap(sshInfo -> dockerService.findRunningContainerList(sshInfo.getId()).stream())
+                .map(ProjectResponse.ContainerDTO::new)
+                .toList();
+    }
+
+    private List<ProjectResponse.ProjectDTO> createProjectDTOS(List<Project> projects, Map<String, Map<String, String>> containersResourceMap, List<String> runningContainers) {
+        return projects.stream()
+                .map(project -> createProjectDTO(containersResourceMap, runningContainers, project))
+                .toList();
+    }
+
+    private ProjectResponse.ProjectDTO createProjectDTO(Map<String, Map<String, String>> containersResourceMap, List<String> runningContainers, Project project) {
+        ContainerStatus containerStatus = getContainerStatus(runningContainers, project);
+        String cpuUsage = getResourceUsageFromMap(containersResourceMap, project.getContainerName(), DOCKER_RESOURCE_KEY_CPU);
+        String memoryUsage = getResourceUsageFromMap(containersResourceMap, project.getContainerName(), DOCKER_RESOURCE_KEY_MEMORY);
+
+        return new ProjectResponse.ProjectDTO(
+                project.getId(),
+                project.isUrgent(),
+                project.getProjectName(),
+                project.getDescription(),
+                containerStatus,
+                cpuUsage,
+                memoryUsage);
+    }
+
+    private ContainerStatus getContainerStatus(List<String> runningContainerList, Project project) {
+        if (project.getContainerStatus() != ContainerStatus.NOT_CONNECTED) {
+            return runningContainerList.contains(project.getContainerName())
+                    ? ContainerStatus.WORKING
+                    : ContainerStatus.NOT_WORKING;
+        }
+
+        return ContainerStatus.NOT_CONNECTED;
     }
 
     private String findRecentLog(Project project) {
@@ -253,79 +313,6 @@ public class ProjectService {
         return secondLastLog + "\n\n" + lastLog;
     }
 
-    private ContainerStatus getContainerStatus(List<String> runningContainerList, Project project) {
-        if (project.getContainerStatus() != ContainerStatus.NOT_CONNECTED) {
-            return runningContainerList.contains(project.getContainerName())
-                    ? ContainerStatus.WORKING
-                    : ContainerStatus.NOT_WORKING;
-        }
-
-        return ContainerStatus.NOT_CONNECTED;
-    }
-
-    private String getResourceUsageFromMap(Map<String, Map<String, String>> containersResourceMap, String containerName, String resourceKey) {
-        return Optional.ofNullable(containersResourceMap.get(containerName))
-                .map(resourceMap -> resourceMap.get(resourceKey))
-                .orElse(NOT_ACCESSIBLE_VALUE);
-    }
-
-    private ContainerStatus determineContainerStatus(ProjectRequest.CreateProjectDTO requestDTO) {
-        return requestDTO.containerName() != null ? ContainerStatus.NOT_WORKING : ContainerStatus.NOT_CONNECTED;
-    }
-
-    private User getUserReference(Long userId) {
-        return entityManager.getReference(User.class, userId);
-    }
-
-    private SshInfo getSshInfoReference(Long sshInfoId) {
-        return entityManager.getReference(SshInfo.class, sshInfoId);
-    }
-
-    private ProjectResponse.CloudInstanceDTO createCloudInstanceDTO(SshInfo sshInfo) {
-        String cloudName = getCloudName(sshInfo);
-        List<ProjectResponse.ContainerDTO> runningContainerDTOS = dockerService.findRunningContainerList(sshInfo.getId()).stream()
-                .map(ProjectResponse.ContainerDTO::new)
-                .toList();
-
-        return new ProjectResponse.CloudInstanceDTO(cloudName, sshInfo.getId(), runningContainerDTOS);
-    }
-
-    private List<ProjectResponse.ProjectDTO> createProjectDTOS(List<Project> projects, Map<String, Map<String, String>> containersResourceMap, List<String> runningContainers) {
-        return projects.stream()
-                .map(project -> createProjectDTO(containersResourceMap, runningContainers, project))
-                .toList();
-    }
-
-    private List<ProjectResponse.ContainerDTO> createSelectableContainerDTOs(List<SshInfo> sshInfos) {
-        return sshInfos.stream()
-                .flatMap(sshInfo -> dockerService.findRunningContainerList(sshInfo.getId()).stream())
-                .map(ProjectResponse.ContainerDTO::new)
-                .toList();
-    }
-
-    private ContainerStatus findContainerStatus(ProjectRequest.UpdateProjectDTO requestDTO, Long sshInfoId) {
-        if (requestDTO.containerName() == null) {
-            return ContainerStatus.NOT_CONNECTED;
-        }
-
-        return dockerService.isContainerRunning(requestDTO.containerName(), sshInfoId) ? ContainerStatus.WORKING : ContainerStatus.NOT_WORKING;
-    }
-
-    private ProjectResponse.ProjectDTO createProjectDTO(Map<String, Map<String, String>> containersResourceMap, List<String> runningContainers, Project project) {
-        ContainerStatus containerStatus = getContainerStatus(runningContainers, project);
-        String cpuUsage = getResourceUsageFromMap(containersResourceMap, project.getContainerName(), DOCKER_RESOURCE_KEY_CPU);
-        String memoryUsage = getResourceUsageFromMap(containersResourceMap, project.getContainerName(), DOCKER_RESOURCE_KEY_MEMORY);
-
-        return new ProjectResponse.ProjectDTO(
-                project.getId(),
-                project.isUrgent(),
-                project.getProjectName(),
-                project.getDescription(),
-                containerStatus,
-                cpuUsage,
-                memoryUsage);
-    }
-
     private Optional<Summary> findLatestSummary(Project project) {
         Pageable pageable = PageRequest.of(0, 1, Sort.by(Sort.Direction.DESC, SORT_BY_DATE));
         return summaryRepository.findByProject(project, pageable)
@@ -334,12 +321,12 @@ public class ProjectService {
                 .findFirst();
     }
 
-    private LocalDateTime getUpdateTimeFromSummary(Optional<Summary> latestSummaryOP) {
-        return latestSummaryOP.map(Summary::getCreatedDate).orElse(null);
-    }
-
     private String getContentFromSummary(Optional<Summary> latestSummaryOP) {
         return latestSummaryOP.map(Summary::getContent).orElse(NOT_EXIST_SUMMARY);
+    }
+
+    private LocalDateTime getUpdateTimeFromSummary(Optional<Summary> latestSummaryOP) {
+        return latestSummaryOP.map(Summary::getCreatedDate).orElse(null);
     }
 
     private List<ProjectResponse.SummaryDTO> createSummaryDTOs(List<Summary> summaries) {
@@ -356,5 +343,11 @@ public class ProjectService {
         return findTextFiles(LOGS_DIRECTORY).stream()
                 .filter(logFile -> logFile.startsWith(containerName + LOG_FILE_SUFFIX))
                 .toList();
+    }
+
+    private String getResourceUsageFromMap(Map<String, Map<String, String>> containersResourceMap, String containerName, String resourceKey) {
+        return Optional.ofNullable(containersResourceMap.get(containerName))
+                .map(resourceMap -> resourceMap.get(resourceKey))
+                .orElse(NOT_ACCESSIBLE_VALUE);
     }
 }

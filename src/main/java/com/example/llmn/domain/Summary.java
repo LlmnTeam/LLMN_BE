@@ -43,7 +43,7 @@ public class Summary extends TimeStamp{
         this.isChecked = false;
     }
 
-    public void reverseIsChecked(){
+    public void check(){
         this.isChecked = !isChecked;
     }
 }
