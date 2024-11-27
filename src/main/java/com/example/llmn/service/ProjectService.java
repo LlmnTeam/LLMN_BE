@@ -85,7 +85,7 @@ public class ProjectService {
         );
 
         List<SshInfo> sshInfos = sshInfoRepository.findByUserId(userId);
-        List<ProjectResponse.ContainerDTO> selectableContainers = createSelectableContainerDTOS(sshInfos);
+        List<ProjectResponse.ContainerDTO> selectableContainers = createSelectableContainerDTOs(sshInfos);
 
         return new ProjectResponse.FindProjectInfoByIdDTO(
                 project.getProjectName(),
@@ -116,7 +116,6 @@ public class ProjectService {
         List<String> runningContainers = new ArrayList<>(containersResourceMap.keySet());
 
         List<ProjectResponse.ProjectDTO> projectDTOS = createProjectDTOS(projects, containersResourceMap, runningContainers);
-
         return new ProjectResponse.FindProjectListDTO(projectDTOS);
     }
 
@@ -147,7 +146,7 @@ public class ProjectService {
         );
         
         Page<Summary> summaryPage = summaryRepository.findByProjectId(projectId, pageable);
-        List<ProjectResponse.SummaryDTO> summaryDTOS = mapSummariesToDTOs(summaryPage.getContent());
+        List<ProjectResponse.SummaryDTO> summaryDTOS = createSummaryDTOs(summaryPage.getContent());
 
         return new ProjectResponse.FindProjectSummaryDTO(
                 project.getProjectName(),
@@ -164,10 +163,8 @@ public class ProjectService {
                 () -> new CustomException(ExceptionCode.PROJECT_NOT_FOUND)
         );
 
-        // 컨테이너 이름과 일치하는 로그 파일 가져오기
-        List<String> matchingLogFiles = findLogFilesForContainer(containerName);
-
-        return new ProjectResponse.FindProjectLogListDTO(matchingLogFiles);
+        List<String> logFileList = findLogFilesByContainerName(containerName);
+        return new ProjectResponse.FindProjectLogListDTO(logFileList);
     }
 
     @Transactional(readOnly = true)
@@ -298,7 +295,7 @@ public class ProjectService {
                 .toList();
     }
 
-    private List<ProjectResponse.ContainerDTO> createSelectableContainerDTOS(List<SshInfo> sshInfos){
+    private List<ProjectResponse.ContainerDTO> createSelectableContainerDTOs(List<SshInfo> sshInfos){
         return sshInfos.stream()
                 .flatMap(sshInfo -> dockerService.findRunningContainerList(sshInfo.getId()).stream())
                 .map(ProjectResponse.ContainerDTO::new)
@@ -344,7 +341,7 @@ public class ProjectService {
         return latestSummaryOP.map(Summary::getContent).orElse(NOT_EXIST_SUMMARY);
     }
 
-    private List<ProjectResponse.SummaryDTO> mapSummariesToDTOs(List<Summary> summaries) {
+    private List<ProjectResponse.SummaryDTO> createSummaryDTOs(List<Summary> summaries) {
         return summaries.stream()
                 .map(summary -> new ProjectResponse.SummaryDTO(
                         summary.getId(),
@@ -354,7 +351,7 @@ public class ProjectService {
                 .toList();
     }
 
-    private List<String> findLogFilesForContainer(String containerName) {
+    private List<String> findLogFilesByContainerName(String containerName) {
         return findTextFiles(LOGS_DIRECTORY).stream()
                 .filter(logFile -> logFile.startsWith(containerName + LOG_FILE_SUFFIX))
                 .toList();
