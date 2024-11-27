@@ -46,7 +46,7 @@ public class ProjectService {
     private static final String LOG_FILE_SUFFIX = "-log";
 
     @Transactional
-    public ProjectResponse.CreateProjectDTO createProject(ProjectRequest.CreateProjectDTO requestDTO, Long userId){
+    public ProjectResponse.CreateProjectDTO createProject(ProjectRequest.CreateProjectDTO requestDTO, Long userId) {
         ContainerStatus containerStatus = determineContainerStatus(requestDTO);
         boolean isUrgent = containerStatus.isProjectUrgent();
 
@@ -79,7 +79,7 @@ public class ProjectService {
 
     // 수정 시 사용할 API
     @Transactional(readOnly = true)
-    public ProjectResponse.FindProjectInfoByIdDTO findProjectInfoById(Long projectId, Long userId){
+    public ProjectResponse.FindProjectInfoByIdDTO findProjectInfoById(Long projectId, Long userId) {
         Project project = projectRepository.findById(projectId).orElseThrow(
                 () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
         );
@@ -95,12 +95,12 @@ public class ProjectService {
     }
 
     @Transactional
-    public void updateProject(ProjectRequest.UpdateProjectDTO requestDTO, Long projectId, Long userId){
+    public void updateProject(ProjectRequest.UpdateProjectDTO requestDTO, Long projectId, Long userId) {
         Project project = projectRepository.findByIdWithUserAndSshInfo(projectId).orElseThrow(
                 () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
         );
 
-        if(project.isNotOwnedBy(userId)){
+        if (project.isNotOwnedBy(userId)) {
             throw new CustomException(ExceptionCode.USER_FORBIDDEN);
         }
 
@@ -144,7 +144,7 @@ public class ProjectService {
         Project project = projectRepository.findById(projectId).orElseThrow(
                 () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
         );
-        
+
         Page<Summary> summaryPage = summaryRepository.findByProjectId(projectId, pageable);
         List<ProjectResponse.SummaryDTO> summaryDTOS = createSummaryDTOs(summaryPage.getContent());
 
@@ -158,7 +158,7 @@ public class ProjectService {
     }
 
     @Transactional(readOnly = true)
-    public ProjectResponse.FindProjectLogListDTO findProjectLogList(Long projectId){
+    public ProjectResponse.FindProjectLogListDTO findProjectLogList(Long projectId) {
         String containerName = projectRepository.findContainerNameById(projectId).orElseThrow(
                 () -> new CustomException(ExceptionCode.PROJECT_NOT_FOUND)
         );
@@ -168,7 +168,7 @@ public class ProjectService {
     }
 
     @Transactional(readOnly = true)
-    public ProjectResponse.FindProjectLogByNameDTO findProjectLogByName(Long projectId, String fileName){
+    public ProjectResponse.FindProjectLogByNameDTO findProjectLogByName(Long projectId, String fileName) {
         Project project = projectRepository.findById(projectId).orElseThrow(
                 () -> new CustomException(ExceptionCode.PROJECT_NOT_FOUND)
         );
@@ -185,21 +185,21 @@ public class ProjectService {
 
     // 로그 파일 삭제하는 로직 추후 추가해야함
     @Transactional
-    public void deleteProjectById(Long userId, Long projectId){
+    public void deleteProjectById(Long userId, Long projectId) {
         Project project = projectRepository.findById(projectId).orElseThrow(
                 () -> new CustomException(ExceptionCode.PROJECT_NOT_FOUND)
         );
 
-        if(project.isNotOwnedBy(userId)){
+        if (project.isNotOwnedBy(userId)) {
             throw new CustomException(ExceptionCode.USER_FORBIDDEN);
         }
-        
+
         summaryRepository.deleteByProjectId(projectId);
         projectRepository.delete(project);
     }
 
     @Transactional
-    public void checkSummary(Long summaryId){
+    public void checkSummary(Long summaryId) {
         Summary summary = summaryRepository.findById(summaryId).orElseThrow(
                 () -> new CustomException(ExceptionCode.SUMMARY_NOT_FOUND)
         );
@@ -219,13 +219,13 @@ public class ProjectService {
         return String.format("%s (%s)", remoteName, remoteHost);
     }
 
-    private String findRecentLog(Project project){
+    private String findRecentLog(Project project) {
         String latestLogFile = findTextFiles(LOGS_DIRECTORY).stream()
                 .filter(logFile -> logFile.startsWith(project.getContainerName() + "-log"))
                 .max(this::compareLogFileDates) // 최신 파일 찾기
                 .orElse(null);
 
-        if(latestLogFile == null){
+        if (latestLogFile == null) {
             return NOT_EXIST_LOG;
         }
 
@@ -239,21 +239,23 @@ public class ProjectService {
     }
 
     private String parseLastTwoLogs(String logContent) {
-        // 날짜 패턴으로 로그를 분리
-        String[] logs = logContent.split("(?=\\[\\d{4}-\\d{2}-\\d{2}_\\d{2}:\\d{2}\\])");
-
-        // 만약 로그가 2개 이하라면 전체 로그 반환
-        if (logs.length <= 2) {
-            return logContent.trim();
-        }
-
-        return logs[logs.length - 2].trim() + "\n\n" + logs[logs.length - 1].trim(); // 마지막 두 개의 로그를 추출하여 반환
+        String[] logs = splitLogsByDatePattern(logContent);
+        return logs.length <= 2 ? logContent.trim() : formatLastTwoLogs(logs);
     }
 
-    private ContainerStatus determineContainerStatus( List<String> runningContainerNames, Project project) {
-        // 연결된 상태라면, 실행중인 컨테이너 목록에 속해있는지 체크
+    private String[] splitLogsByDatePattern(String logContent) {
+        return logContent.split("(?=\\[\\d{4}-\\d{2}-\\d{2}_\\d{2}:\\d{2}\\])");
+    }
+
+    private String formatLastTwoLogs(String[] logs) {
+        String lastLog = logs[logs.length - 1].trim();
+        String secondLastLog = logs[logs.length - 2].trim();
+        return secondLastLog + "\n\n" + lastLog;
+    }
+
+    private ContainerStatus getContainerStatus(List<String> runningContainerList, Project project) {
         if (project.getContainerStatus() != ContainerStatus.NOT_CONNECTED) {
-            return runningContainerNames.contains(project.getContainerName())
+            return runningContainerList.contains(project.getContainerName())
                     ? ContainerStatus.WORKING
                     : ContainerStatus.NOT_WORKING;
         }
@@ -264,11 +266,10 @@ public class ProjectService {
     private String getResourceUsageFromMap(Map<String, Map<String, String>> containersResourceMap, String containerName, String resourceKey) {
         return Optional.ofNullable(containersResourceMap.get(containerName))
                 .map(resourceMap -> resourceMap.get(resourceKey))
-                .orElse(NOT_ACCESSIBLE_VALUE); // CPU 및 메모리 사용량 값이 없을 경우 "N/A"로 처리
+                .orElse(NOT_ACCESSIBLE_VALUE);
     }
 
     private ContainerStatus determineContainerStatus(ProjectRequest.CreateProjectDTO requestDTO) {
-        // 요청에 컨테이너 이름이 들어오지 않으면 NOT_CONNECTED로 처리
         return requestDTO.containerName() != null ? ContainerStatus.NOT_WORKING : ContainerStatus.NOT_CONNECTED;
     }
 
@@ -295,7 +296,7 @@ public class ProjectService {
                 .toList();
     }
 
-    private List<ProjectResponse.ContainerDTO> createSelectableContainerDTOs(List<SshInfo> sshInfos){
+    private List<ProjectResponse.ContainerDTO> createSelectableContainerDTOs(List<SshInfo> sshInfos) {
         return sshInfos.stream()
                 .flatMap(sshInfo -> dockerService.findRunningContainerList(sshInfo.getId()).stream())
                 .map(ProjectResponse.ContainerDTO::new)
@@ -303,15 +304,15 @@ public class ProjectService {
     }
 
     private ContainerStatus findContainerStatus(ProjectRequest.UpdateProjectDTO requestDTO, Long sshInfoId) {
-        if(requestDTO.containerName() == null){
+        if (requestDTO.containerName() == null) {
             return ContainerStatus.NOT_CONNECTED;
         }
 
         return dockerService.isContainerRunning(requestDTO.containerName(), sshInfoId) ? ContainerStatus.WORKING : ContainerStatus.NOT_WORKING;
     }
 
-    private ProjectResponse.ProjectDTO createProjectDTO(Map<String, Map<String, String>> containersResourceMap, List<String> runningContainers, Project project){
-        ContainerStatus containerStatus = determineContainerStatus(runningContainers, project);
+    private ProjectResponse.ProjectDTO createProjectDTO(Map<String, Map<String, String>> containersResourceMap, List<String> runningContainers, Project project) {
+        ContainerStatus containerStatus = getContainerStatus(runningContainers, project);
         String cpuUsage = getResourceUsageFromMap(containersResourceMap, project.getContainerName(), DOCKER_RESOURCE_KEY_CPU);
         String memoryUsage = getResourceUsageFromMap(containersResourceMap, project.getContainerName(), DOCKER_RESOURCE_KEY_MEMORY);
 
