@@ -4,7 +4,6 @@ import com.example.llmn.controller.DTO.ProjectRequest;
 import com.example.llmn.controller.DTO.ProjectResponse;
 import com.example.llmn.core.errors.CustomException;
 import com.example.llmn.core.errors.ExceptionCode;
-import com.example.llmn.core.utils.FileUtils;
 import com.example.llmn.domain.*;
 import com.example.llmn.repository.ProjectRepository;
 import com.example.llmn.repository.SshInfoRepository;
@@ -85,9 +84,8 @@ public class ProjectService {
                 () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
         );
 
-        // 수정 시 선택할 수 있는 컨테이너들
         List<SshInfo> sshInfos = sshInfoRepository.findByUserId(userId);
-        List<ProjectResponse.ContainerDTO> selectableContainers = createContainerDTOS(sshInfos);
+        List<ProjectResponse.ContainerDTO> selectableContainers = createSelectableContainerDTOS(sshInfos);
 
         return new ProjectResponse.FindProjectInfoByIdDTO(
                 project.getProjectName(),
@@ -102,12 +100,11 @@ public class ProjectService {
                 () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
         );
 
-        // 권한 체크
         if(project.isNotOwnedBy(userId)){
             throw new CustomException(ExceptionCode.USER_FORBIDDEN);
         }
 
-        ContainerStatus containerStatus = determineContainerStatus(requestDTO, project.getSshInfo().getId());
+        ContainerStatus containerStatus = findContainerStatus(requestDTO, project.getSshInfo().getId());
         project.updateProject(requestDTO.projectName(), requestDTO.containerName(), requestDTO.description(), containerStatus);
     }
 
@@ -117,7 +114,8 @@ public class ProjectService {
 
         Map<String, Map<String, String>> containersResourceMap = dockerService.findContainersResourceUsage(projects, userId, isUsingCache);
         List<String> runningContainers = new ArrayList<>(containersResourceMap.keySet());
-        List<ProjectResponse.ProjectDTO> projectDTOS = mapProjectsToDTOs(projects, containersResourceMap, runningContainers);
+
+        List<ProjectResponse.ProjectDTO> projectDTOS = createProjectDTOS(projects, containersResourceMap, runningContainers);
 
         return new ProjectResponse.FindProjectListDTO(projectDTOS);
     }
@@ -128,13 +126,11 @@ public class ProjectService {
                 () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
         );
 
-        // 1. 최신 로그
         String recentLog = findRecentLog(project);
 
-        // 2. 최신 요약
         Optional<Summary> latestSummaryOP = findLatestSummary(project);
-        String summaryContent = latestSummaryOP.map(Summary::getContent).orElse(NOT_EXIST_SUMMARY);
-        LocalDateTime summaryUpdateTime = latestSummaryOP.map(Summary::getCreatedDate).orElse(null);
+        String summaryContent = getContentFromSummary(latestSummaryOP);
+        LocalDateTime summaryUpdateTime = getUpdateTimeFromSummary(latestSummaryOP);
 
         return new ProjectResponse.FindProjectByIdDTO(
                 project.getProjectName(),
@@ -296,20 +292,20 @@ public class ProjectService {
         return new ProjectResponse.CloudInstanceDTO(cloudName, sshInfo.getId(), runningContainerDTOS);
     }
 
-    private List<ProjectResponse.ProjectDTO> mapProjectsToDTOs(List<Project> projects, Map<String, Map<String, String>> containersResourceMap, List<String> runningContainers) {
+    private List<ProjectResponse.ProjectDTO> createProjectDTOS(List<Project> projects, Map<String, Map<String, String>> containersResourceMap, List<String> runningContainers) {
         return projects.stream()
                 .map(project -> createProjectDTO(containersResourceMap, runningContainers, project))
                 .toList();
     }
 
-    private List<ProjectResponse.ContainerDTO> createContainerDTOS(List<SshInfo> sshInfos){
+    private List<ProjectResponse.ContainerDTO> createSelectableContainerDTOS(List<SshInfo> sshInfos){
         return sshInfos.stream()
                 .flatMap(sshInfo -> dockerService.findRunningContainerList(sshInfo.getId()).stream())
                 .map(ProjectResponse.ContainerDTO::new)
                 .toList();
     }
 
-    private ContainerStatus determineContainerStatus(ProjectRequest.UpdateProjectDTO requestDTO, Long sshInfoId) {
+    private ContainerStatus findContainerStatus(ProjectRequest.UpdateProjectDTO requestDTO, Long sshInfoId) {
         if(requestDTO.containerName() == null){
             return ContainerStatus.NOT_CONNECTED;
         }
@@ -338,6 +334,14 @@ public class ProjectService {
                 .getContent()
                 .stream()
                 .findFirst();
+    }
+
+    private LocalDateTime getUpdateTimeFromSummary(Optional<Summary> latestSummaryOP) {
+        return latestSummaryOP.map(Summary::getCreatedDate).orElse(null);
+    }
+
+    private String getContentFromSummary(Optional<Summary> latestSummaryOP) {
+        return latestSummaryOP.map(Summary::getContent).orElse(NOT_EXIST_SUMMARY);
     }
 
     private List<ProjectResponse.SummaryDTO> mapSummariesToDTOs(List<Summary> summaries) {
