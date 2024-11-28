@@ -189,9 +189,7 @@ public class UserService {
         if (redisService.isNotStoredValue(addCodeTypePrefix(codeType), requestDTO.email(), requestDTO.code()))
             return new UserResponse.VerifyEmailCodeDTO(false);
 
-        // 계정 복구를 위해 호출 했다면, 복구 로직에서 요청으로 들어온 코드를 가지고 이메일을 얻기 위해 저장해놓는다 (보안을 위해 요청으로 코드만 받기 위해)
-        if (CODE_TYPE_RECOVERY.equals(codeType))
-            redisService.storeValue(CODE_TO_EMAIL_KEY_PREFIX, requestDTO.code(), requestDTO.email(), 5 * 60 * 1000L);
+        cacheVerificationInfoIfRecovery(requestDTO, codeType);
 
         return new UserResponse.VerifyEmailCodeDTO(true);
     }
@@ -488,6 +486,12 @@ public class UserService {
         );
 
         user.updatePassword(passwordEncoder.encode(newPassword));
+    }
+
+    // 계정 복구 로직에서 요청으로 들어온 코드를 가지고 이메일을 얻기 위해 저장해놓는다 (보안 상 로직)
+    private void cacheVerificationInfoIfRecovery(UserRequest.VerifyCodeDTO requestDTO, String codeType) {
+        if (CODE_TYPE_RECOVERY.equals(codeType))
+            redisService.storeValue(CODE_TO_EMAIL_KEY_PREFIX, requestDTO.code(), requestDTO.email(), 5 * 60 * 1000L);
     }
 
     private UserResponse.CloudInfoDTO findSelectedCloud(List<SshInfo> sshInfos, Long monitoringSshId) {
