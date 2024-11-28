@@ -43,6 +43,10 @@ public class Alarm extends TimeStamp {
         this.isRead = false;
     }
 
+    public boolean isNotOwnedBy(Long userId){
+        return !receiver.getId().equals(userId);
+    }
+
     public void updateIsRead(Boolean isRead, LocalDateTime readDate){
         this.isRead = isRead;
         this.readDate = readDate;

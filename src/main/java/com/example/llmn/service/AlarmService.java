@@ -31,9 +31,7 @@ public class AlarmService {
                 () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
         );
 
-        if(receiver.doesNotReceivingAlarm()){
-            return;
-        }
+        if(receiver.doesNotReceivingAlarm()) return;
 
         Alarm alarm = Alarm.builder()
                 .receiver(receiver)
@@ -53,33 +51,25 @@ public class AlarmService {
                         alarm.getReadDate(),
                         alarm.getAlarmType(),
                         alarm.isRead() ))
-                .collect(Collectors.toList());
+                .toList();
 
         return new AlarmResponse.FindAlarmListDTO(alarmDTOS);
     }
 
     @Transactional
     public void readAlarm(AlarmRequest.ReadAlarmDTO readAlarmDTO, Long userId) {
-        LocalDateTime now = LocalDateTime.now();
-
         List<Long> alarmIds = readAlarmDTO.alarmIds();
         List<Alarm> alarms = alarmRepository.findByIdsWithUser(alarmIds);
 
         for (Alarm alarm : alarms) {
-            // 권한 없음
-            if (!alarm.getReceiver().getId().equals(userId)) {
-                continue;
-            }
-
-            // 현재 시간을 기준으로 읽었다고 업데이트
-            alarm.updateIsRead(true, now);
+            if (alarm.isNotOwnedBy(userId)) continue;
+            alarm.updateIsRead(true, LocalDateTime.now());
         }
     }
 
     @Transactional
     @Scheduled(cron = "0 5 0 * * *")
     public void deleteReadAlarm(){
-        // 일주일이 지난 이미 읽은 알람들
         LocalDateTime previousDate = LocalDateTime.now().minusDays(3);
         List<Alarm> readAlarm = alarmRepository.findReadBeforeDate(previousDate);
 
