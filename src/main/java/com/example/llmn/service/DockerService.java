@@ -123,8 +123,7 @@ public class DockerService {
     private Map.Entry<String, Map<String, String>> parseLineToContainerUsage(String line) {
         String[] parts = line.split(":");
 
-        // 유효한 라인만 처리
-        if (parts.length == 3) {
+        if (parts.length == 3) { // 유효한 라인만 처리
             String containerName = parts[0].trim();
             String cpuUsage = parts[1].trim();
             String memUsage = parts[2].trim();
@@ -142,7 +141,6 @@ public class DockerService {
 
     private void cacheResourceUsage(Long userId, Map<String, Map<String, String>> resourceUsage) {
         String value = convertMapToJson(resourceUsage);
-
         if (isNotEmpty(value)) {
             redisService.storeValue(RESOURCE_KEY, userId.toString(), value, RESOURCE_EXP);
         }

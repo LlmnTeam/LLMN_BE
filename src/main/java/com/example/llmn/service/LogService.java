@@ -64,6 +64,7 @@ public class LogService {
     public static final String NO_LOG_RECORD = "로그 기록이 존재하지 않습니다.";
 
     @Scheduled(fixedRate = 60000)
+    @SuppressWarnings("rawtypes")
     public void processAndUpdateLogs() {
         List<SshInfo> sshInfos = sshInfoRepository.findAll();
 
@@ -88,6 +89,7 @@ public class LogService {
         }
     }
 
+    @SuppressWarnings("rawtypes")
     public List<LogDataDTO> searchLog(Instant startTime, Instant endTime, String logLevel, String containerName, String elasticSearchHost) {
         try {
             ElasticsearchClient client = elasticsearchConfig.createElasticsearchClient(elasticSearchHost);
@@ -108,6 +110,7 @@ public class LogService {
                 .orElse(BLANK_STRING);
     }
 
+    @SuppressWarnings("rawtypes")
     private SearchResponse<Map> searchLogsInElasticSearch(String elasticSearchHost) {
         try {
             ElasticsearchClient client = elasticsearchConfig.createElasticsearchClient(elasticSearchHost);
@@ -153,7 +156,7 @@ public class LogService {
         }
     }
 
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({"unchecked", "rawtypes"})
     private List<Map<String, Object>> convertResponseToMap(SearchResponse<Map> searchResponse){
         return searchResponse
                 .hits().hits().stream()
@@ -288,7 +291,7 @@ public class LogService {
         );
     }
 
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({"unchecked", "rawtypes"})
     private List<LogDataDTO> convertSearchHitsToDTOs(SearchResponse<Map> response) {
         return response.hits().hits().stream()
                 .map(hit -> convertResponseMapToDTO(hit.source()))
@@ -312,7 +315,7 @@ public class LogService {
     }
 
     // 나중에 searchLog() 반환 타입을 List<LogDataDTO>이 아닌 String으로 받고 싶을 때 사용
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({"unchecked", "rawtypes"})
     private String convertSearchHitsToString(SearchResponse<Map> response) {
         List<String> logContents = response.hits().hits().stream()
                 .map(hit -> convertResponseMapToString(hit.source()))

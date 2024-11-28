@@ -73,7 +73,7 @@ public class UserService {
                 () -> new CustomException(ExceptionCode.USER_ACCOUNT_WRONG)
         );
 
-        if (isPasswordMatched(requestDTO.password(), user.getPassword())) {
+        if (isPasswordUnmatched(requestDTO.password(), user.getPassword())) {
             throw new CustomException(ExceptionCode.USER_ACCOUNT_WRONG);
         }
 
@@ -186,7 +186,7 @@ public class UserService {
     }
 
     public UserResponse.VerifyEmailCodeDTO verifyCode(UserRequest.VerifyCodeDTO requestDTO, String codeType) {
-        if (redisService.isNotStoredValue(addCodeTypePrefix(codeType), requestDTO.email(), requestDTO.code()))
+        if (redisService.isNotStoredValue(getCodeTypeKey(codeType), requestDTO.email(), requestDTO.code()))
             return new UserResponse.VerifyEmailCodeDTO(false);
 
         cacheVerificationInfoIfRecovery(requestDTO, codeType);
@@ -278,7 +278,7 @@ public class UserService {
                 user.isReceivingAlarm());
     }
 
-    private boolean isPasswordMatched(String requestPassword, String userPassword) {
+    private boolean isPasswordUnmatched(String requestPassword, String userPassword) {
         return !passwordEncoder.matches(requestPassword, userPassword);
     }
 
@@ -365,13 +365,13 @@ public class UserService {
     }
 
     private void checkAlreadySendCode(String email, String codeType) {
-        if (redisService.isValueExist(addCodeTypePrefix(codeType), email)) {
+        if (redisService.isValueExist(getCodeTypeKey(codeType), email)) {
             throw new CustomException(ExceptionCode.ALREADY_SEND_EMAIL);
         }
     }
 
     private void storeVerificationCode(String email, String codeType, String verificationCode) {
-        redisService.storeValue(addCodeTypePrefix(codeType), email, verificationCode, VERIFICATION_CODE_EXPIRATION_MS);
+        redisService.storeValue(getCodeTypeKey(codeType), email, verificationCode, VERIFICATION_CODE_EXPIRATION_MS);
     }
 
     private Map<String, Object> createTemplateModel(String verificationCode) {
@@ -511,7 +511,7 @@ public class UserService {
                 sshInfo.isWorking());
     }
 
-    private String addCodeTypePrefix(String codeType) {
+    private String getCodeTypeKey(String codeType) {
         return UserService.PREFIX_CODE + codeType;
     }
 
