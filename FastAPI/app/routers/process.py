@@ -20,7 +20,6 @@ router = APIRouter()
 async def process_log_summary(request: LogRequest):
     log_summary, is_urgent = await generate_log_summary(request.content)
     
-    # 결과를 JSON으로 반환
     return {
         "logSummary": log_summary,
         "isUrgent": is_urgent
