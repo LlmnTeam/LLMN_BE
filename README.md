@@ -184,5 +184,5 @@ https://github.com/user-attachments/assets/b23fdeee-924a-478a-9b58-0596aaa2e955
 | 이름  | 역할  | 내용  |
 |:----:|:----:|------|
 | 이한홍  | BE | <ul><li>REST API 및 DB 설계</li><li>Figma를 활용한 UI/UX 설계 및 디자인</li><li>Filebeat, Logstash, ElasticSearch을 연동한 로그 수집 파이프라인을 구축 및 Spring Boot와 통합</li><li>Apache SSHD로 클라이언트와 클라우드 서버 간 SSH 연결 기능 구현</li><li>SSE 기술로 LLM의 응답을 실시간 스트리밍 형식으로 제공하는 기능 구현</li><li>로그인, 회원관리, 프로젝트 관리, 성능 모니터링, 로그 분석 및 알림 API 개발</li><li>LangChain과 OpenAI API 연동, 프롬프트 작성 및 로그 분석 API 개발</li><li>서비스 배포</li><li>착수, 중간, 최종 보고서, 포스터 작성</li></ul> |
-| 이종일  | FE | <ul><li>React, NextJS, TS, TailWind CSS를 이용한 웹 페이지 구현</li><li>UI/UX 개선을 통한 반응형 웹 페이지 구현</li><li>SSR 도입으로 실시간 데이터 처리 구현</li></ul> |
+| 이종일  | FE | <ul><li>React, NextJS, TS, TailWind CSS를 이용한 웹 페이지 구현</li><li>UI/UX 개선을 통한 반응형 웹 페이지 구현</li><li>SSR을 활용하여 사용자 요청에 따른 효율적인 동적 데이터 처리 구현</li><li>SSR과 JWT 토큰 기반 인증으로 효율적인 로그인 상태 관리 및 접근 제어 로직 개발</li><li>입력 폼에서 실시간 피드백을 제공하는 마이크로 메시지 로직 설계 및 구현</li></ul> |
 | 박재홍  | Demo | <ul><li>시연회 준비 및 발표 자료 제작</li></ul> |
