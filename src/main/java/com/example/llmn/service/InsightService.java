@@ -10,23 +10,20 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static com.example.llmn.core.utils.DateTimeUtils.formatLocalDateTime;
 
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class InsightService {
 
     private final SummaryRepository summaryRepository;
 
-    @Transactional(readOnly = true)
     public InsightResponse.FindInsightHomeDTO findInsightList() {
         List<SummaryType> types = List.of(SummaryType.PERFORMANCE, SummaryType.DAILY, SummaryType.TEND, SummaryType.RECOMMENDATION);
         Map<SummaryType, Summary> summaryMap = getSummaryMapByTypes(types);
@@ -43,7 +40,6 @@ public class InsightService {
         );
     }
 
-    @Transactional(readOnly = true)
     public List<InsightResponse.SummaryDTO> findSummaryByType(SummaryType type, Long userId, Pageable pageable){
         List<Summary> performanceSummaries = summaryRepository.findByType(type, userId, pageable).getContent();
 

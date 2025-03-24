@@ -20,6 +20,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class AlarmService {
 
     private final AlarmRepository alarmRepository;
@@ -41,7 +42,6 @@ public class AlarmService {
         alarmRepository.save(alarm);
     }
 
-    @Transactional(readOnly = true)
     public AlarmResponse.FindAlarmListDTO findAlarmList(Long userId){
         List<Alarm> alarms = alarmRepository.findByReceiverId(userId);
         List<AlarmResponse.AlarmDTO> alarmDTOS = alarms.stream()

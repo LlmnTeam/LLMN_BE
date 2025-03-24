@@ -29,6 +29,7 @@ import static com.example.llmn.core.utils.FileUtils.*;
 @Service
 @RequiredArgsConstructor
 @Slf4j
+@Transactional(readOnly = true)
 public class ProjectService {
 
     private final DockerService dockerService;
@@ -123,7 +124,6 @@ public class ProjectService {
     }
 
     // 수정 시 사용할 API
-    @Transactional(readOnly = true)
     public ProjectResponse.FindProjectInfoByIdDTO findProjectInfoById(Long projectId, Long userId) {
         Project project = projectRepository.findById(projectId).orElseThrow(
                 () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
@@ -150,7 +150,6 @@ public class ProjectService {
         return new ProjectResponse.FindProjectListDTO(projectDTOS);
     }
 
-    @Transactional(readOnly = true)
     public ProjectResponse.FindProjectByIdDTO findProjectById(Long projectId) {
         Project project = projectRepository.findById(projectId).orElseThrow(
                 () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
@@ -170,7 +169,6 @@ public class ProjectService {
                 recentLog);
     }
 
-    @Transactional(readOnly = true)
     public ProjectResponse.FindProjectSummaryDTO findProjectSummary(Long projectId, Pageable pageable) {
         Project project = projectRepository.findById(projectId).orElseThrow(
                 () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
@@ -188,7 +186,6 @@ public class ProjectService {
         );
     }
 
-    @Transactional(readOnly = true)
     public ProjectResponse.FindProjectLogListDTO findProjectLogList(Long projectId) {
         String containerName = projectRepository.findContainerNameById(projectId).orElseThrow(
                 () -> new CustomException(ExceptionCode.PROJECT_NOT_FOUND)
@@ -198,7 +195,6 @@ public class ProjectService {
         return new ProjectResponse.FindProjectLogListDTO(logFileList);
     }
 
-    @Transactional(readOnly = true)
     public ProjectResponse.FindProjectLogByNameDTO findProjectLogByName(Long projectId, String fileName) {
         Project project = projectRepository.findById(projectId).orElseThrow(
                 () -> new CustomException(ExceptionCode.PROJECT_NOT_FOUND)

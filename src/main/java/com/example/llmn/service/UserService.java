@@ -32,6 +32,7 @@ import static com.example.llmn.core.utils.UriUtils.buildURI;
 @Service
 @RequiredArgsConstructor
 @Slf4j
+@Transactional(readOnly = true)
 public class UserService {
 
     private final PasswordEncoder passwordEncoder;
@@ -194,7 +195,6 @@ public class UserService {
         return new UserResponse.VerifyEmailCodeDTO(true);
     }
 
-    @Transactional(readOnly = true)
     public UserResponse.CheckEmailExistDTO checkEmailExist(String email) {
         boolean isValid = userRepository.doesNotExistByEmail(email);
         return new UserResponse.CheckEmailExistDTO(isValid);
@@ -206,7 +206,6 @@ public class UserService {
         return new UserResponse.CheckNickNameDTO(isDuplicate);
     }
 
-    @Transactional(readOnly = true)
     public UserResponse.CheckAccountExistDTO checkLocalAccountExist(UserRequest.EmailDTO requestDTO) {
         boolean isValid = userRepository.findByEmail(requestDTO.email()).isPresent();
         return new UserResponse.CheckAccountExistDTO(isValid);
@@ -239,13 +238,11 @@ public class UserService {
         return userId;
     }
 
-    @Transactional(readOnly = true)
     public UserResponse.ValidateAccessTokenDTO findNickName(Long userId) {
         String nickName = userRepository.findNickName(userId).orElse(null);
         return new UserResponse.ValidateAccessTokenDTO(nickName);
     }
 
-    @Transactional(readOnly = true)
     public UserResponse.FindCloudInfoDTO findCloudInfo(Long userId) {
         User user = userRepository.findById(userId).orElseThrow(
                 () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
@@ -260,7 +257,6 @@ public class UserService {
         return new UserResponse.FindCloudInfoDTO(cloudInfos, selectedCloud);
     }
 
-    @Transactional(readOnly = true)
     public UserResponse.FindConfigurationInfoDTO findConfigurationInfo(Long userId) {
         User user = userRepository.findById(userId).orElseThrow(
                 () -> new CustomException(ExceptionCode.USER_NOT_FOUND)

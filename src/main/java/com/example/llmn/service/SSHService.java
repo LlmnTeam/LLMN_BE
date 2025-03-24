@@ -103,37 +103,25 @@ public class SSHService {
         return response.contains(UPTIME_COMMAND_RESPONSE);
     }
 
-    public SSHCommandExecutor getSshExecutor(Long sshInfoId, boolean isFirstExecution) {
-        if (!isFirstExecution) {
-            return getConnectedExecutor(sshInfoId)
-                    .orElseGet(() -> initializeExecutor(sshInfoId));
-        }
-
-        return initializeExecutor(sshInfoId);
-    }
-
-    private Optional<SSHCommandExecutor> getConnectedExecutor(Long sshInfoId) {
+    public synchronized SSHCommandExecutor getSshExecutor(Long sshInfoId, boolean isFirstExecution) {
+        // 세션이 열려있으면 그대로 반환
         SSHCommandExecutor executor = executorSession.get(sshInfoId);
-        if (executor.isConnected()) {
-            return Optional.of(executor);
+        if(!isFirstExecution && executor != null && executor.isConnected()){
+            return executor;
         }
 
-        return Optional.empty();
-    }
+        // SSH 정보 가져오기
+        SshInfoDTO sshInfoDTO = getSshInfo(sshInfoId);
+        if (sshInfoDTO == null) return null;
 
-    private SSHCommandExecutor initializeExecutor(Long sshInfoId) {
-        return executorSession.computeIfAbsent(sshInfoId, id -> {
-            SshInfoDTO sshInfoDTO = getSshInfo(id);
-            return createExecutor(sshInfoDTO);
-        });
-    }
-
-    private SSHCommandExecutor createExecutor(SshInfoDTO sshInfoDTO) {
-        return new SSHCommandExecutor(
-                sshInfoDTO.remoteHost(),
-                sshInfoDTO.remoteName(),
-                sshInfoDTO.remoteKeyPath()
-        );
+        // 새로운 세션 생성 후 저장
+        try {
+            SSHCommandExecutor newExecutor = new SSHCommandExecutor(sshInfoDTO.remoteHost(), sshInfoDTO.remoteName(), sshInfoDTO.remoteKeyPath());
+            executorSession.put(sshInfoId, newExecutor);
+            return newExecutor;
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private SshInfoDTO getSshInfo(Long sshInfoId) {

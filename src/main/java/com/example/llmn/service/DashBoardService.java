@@ -33,7 +33,6 @@ public class DashBoardService {
     private static final String SORT_BY_DATE = "createdDate";
     private static final String NO_SUMMARY_DATA = "요약된 내용이 존재하지 않습니다.";
 
-
     @Transactional
     public UserResponse.FindDashboardDTO findDashboard(Long userId) {
         Long sshInfoId = findMonitoringSshId(userId);

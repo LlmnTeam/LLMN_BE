@@ -36,6 +36,7 @@ import static com.example.llmn.core.utils.JsonUtils.*;
 @Service
 @RequiredArgsConstructor
 @Slf4j
+@Transactional(readOnly = true)
 public class MetricService {
 
     private final MetricRepository metricRepository;
@@ -86,7 +87,6 @@ public class MetricService {
                 });
     }
 
-    @Transactional(readOnly = true)
     public MetricResponse.FindMetricHistoryDTO findMetricHistory(int minusHour, Long sshInfoId) {
         List<MetricResponse.CpuMetricDTO> cpuMetricDTOS = new ArrayList<>();
         List<MetricResponse.MemoryMetricDTO> memoryMetricDTOS = new ArrayList<>();
