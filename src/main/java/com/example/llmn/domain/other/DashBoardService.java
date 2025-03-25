@@ -2,6 +2,8 @@ package com.example.llmn.domain.other;
 
 import com.example.llmn.domain.metric.MetricResponse;
 import com.example.llmn.domain.metric.MetricService;
+import com.example.llmn.domain.metric.model.response.FindCurrentMetricRes;
+import com.example.llmn.domain.metric.model.response.FindMetricHistoryRes;
 import com.example.llmn.domain.user.model.UserResponse;
 import com.example.llmn.common.exceptions.CustomException;
 import com.example.llmn.common.exceptions.ExceptionCode;
@@ -40,8 +42,10 @@ public class DashBoardService {
         Long sshInfoId = findMonitoringSshId(userId);
         String remoteHost = findRemoteHost(sshInfoId);
 
-        MetricResponse.FindCurrentMetricDTO currentMetric = metricService.findCurrentMetric(sshInfoId);
-        MetricResponse.FindMetricHistoryDTO metricHistory = metricService.findMetricHistory(24, sshInfoId);
+
+        FindCurrentMetricRes currentMetric = metricService.findCurrentMetric(sshInfoId);
+        FindMetricHistoryRes metricHistory = metricService.findMetricHistory(24, sshInfoId);
+
         String hourlySummary = findLatestHourlySummary();
 
         return new UserResponse.FindDashboardDTO(
@@ -57,26 +61,26 @@ public class DashBoardService {
                 metricHistory.networkOutMetrics());
     }
 
-    private String formatCpuUsage(MetricResponse.FindCurrentMetricDTO currentMetric) {
+    private String formatCpuUsage(FindCurrentMetricRes currentMetric) {
         return Optional.ofNullable(currentMetric)
                 .map(metric -> String.format("%.2f%%", metric.cpuUsage()))
                 .orElse(NOT_AVAILABLE);
     }
 
-    private String formatMemoryUsage(MetricResponse.FindCurrentMetricDTO currentMetric) {
+    private String formatMemoryUsage(FindCurrentMetricRes currentMetric) {
         return Optional.ofNullable(currentMetric)
                 .filter(metric -> metric.totalMemory() > 0)
                 .map(metric -> String.format("%.2f%%", (metric.usedMemory() / metric.totalMemory()) * 100))
                 .orElse(NOT_AVAILABLE);
     }
 
-    private String formatNetworkReceived(MetricResponse.FindCurrentMetricDTO currentMetric) {
+    private String formatNetworkReceived(FindCurrentMetricRes currentMetric) {
         return Optional.ofNullable(currentMetric)
                 .map(metric -> String.format("%.2f MB", metric.networkReceived()))
                 .orElse(NOT_AVAILABLE);
     }
 
-    private String formatNetworkSent(MetricResponse.FindCurrentMetricDTO currentMetric) {
+    private String formatNetworkSent(FindCurrentMetricRes currentMetric) {
         return Optional.ofNullable(currentMetric)
                 .map(metric -> String.format("%.2f MB", metric.networkSent()))
                 .orElse(NOT_AVAILABLE);

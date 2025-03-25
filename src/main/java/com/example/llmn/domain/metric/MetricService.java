@@ -1,7 +1,7 @@
 package com.example.llmn.domain.metric;
 
-import com.example.llmn.common.utils.DateTimeUtils;
-
+import com.example.llmn.domain.metric.model.response.FindCurrentMetricRes;
+import com.example.llmn.domain.metric.model.response.FindMetricHistoryRes;
 import com.example.llmn.domain.ssh.SshInfo;
 import com.example.llmn.domain.user.User;
 import com.example.llmn.domain.ssh.SSHService;
@@ -17,10 +17,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import static com.example.llmn.common.utils.ConverterUtils.convertStringToLong;
-import static com.example.llmn.common.utils.DateTimeUtils.HOUR_MINUTE_FORMATTER;
 import static com.example.llmn.common.utils.DateTimeUtils.getCurrentHourStartMinusHours;
 import static com.example.llmn.common.utils.JsonUtils.*;
 import static com.example.llmn.domain.metric.MetricConstants.*;
@@ -55,36 +53,23 @@ public class MetricService {
         metricRepository.saveAll(allMetrics);
     }
 
-    public MetricResponse.FindCurrentMetricDTO findCurrentMetric(Long sshInfoId) {
+    public FindCurrentMetricRes findCurrentMetric(Long sshInfoId) {
         return retrieveCachedMetric(sshInfoId)
                 .orElseGet(() -> {
                     Map<String, Double> cpuAndMemoryMetrics = collectCpuAndMemoryMetrics(sshInfoId);
                     Map<String, Double> networkMetrics = collectNetworkMetrics(sshInfoId);
-                    MetricResponse.FindCurrentMetricDTO metricDTO = createFindCurrentMetricDTO(cpuAndMemoryMetrics, networkMetrics);
+                    FindCurrentMetricRes metricRes = FindCurrentMetricRes.from(cpuAndMemoryMetrics, networkMetrics);
 
-                    cacheMetric(sshInfoId, metricDTO);
-                    return metricDTO;
+                    cacheMetric(sshInfoId, metricRes);
+                    return metricRes;
                 });
     }
 
-    public MetricResponse.FindMetricHistoryDTO findMetricHistory(int minusHour, Long sshInfoId) {
-        List<MetricResponse.CpuMetricDTO> cpuMetricDTOS = new ArrayList<>();
-        List<MetricResponse.MemoryMetricDTO> memoryMetricDTOS = new ArrayList<>();
-        List<MetricResponse.NetworkInMetricDTO> networkInMetricDTOS = new ArrayList<>();
-        List<MetricResponse.NetworkOutMetricDTO> networkOutMetricDTOS = new ArrayList<>();
-
+    public FindMetricHistoryRes findMetricHistory(int minusHour, Long sshInfoId) {
         LocalDateTime startTime = getCurrentHourStartMinusHours(minusHour);
         List<Metric> metrics = metricRepository.findMetricsAfter(startTime, sshInfoId);
 
-        metrics.forEach(metric -> {
-            String time = DateTimeUtils.formatLocalDateTime(metric.getCreatedDate(), HOUR_MINUTE_FORMATTER);
-            cpuMetricDTOS.add(createCpuMetricDTO(metric, time));
-            memoryMetricDTOS.add(createMemoryMetricDTO(metric, time));
-            networkInMetricDTOS.add(createNetworkInMetricDTO(metric, time));
-            networkOutMetricDTOS.add(createNetworkOutMetricDTO(metric, time));
-        });
-
-        return new MetricResponse.FindMetricHistoryDTO(cpuMetricDTOS, memoryMetricDTOS, networkInMetricDTOS, networkOutMetricDTOS);
+        return FindMetricHistoryRes.from(metrics);
     }
 
     private List<Metric> collectAllMetrics(List<User> users) {
@@ -204,7 +189,7 @@ public class MetricService {
         );
     }
 
-    private Optional<MetricResponse.FindCurrentMetricDTO> retrieveCachedMetric(Long sshInfoId) {
+    private Optional<FindCurrentMetricRes> retrieveCachedMetric(Long sshInfoId) {
         String cachedValue = redisService.getValueInString(METRIC_KEY, sshInfoId.toString());
         if (cachedValue == null) {
             return Optional.empty();
@@ -213,8 +198,8 @@ public class MetricService {
         return Optional.ofNullable(convertJsonToMetricDTO(cachedValue));
     }
 
-    private void cacheMetric(Long sshInfoId, MetricResponse.FindCurrentMetricDTO metricDTO) {
-        String value = convertMetricDtoToJson(metricDTO);
+    private void cacheMetric(Long sshInfoId, FindCurrentMetricRes metricRes) {
+        String value = convertMetricDtoToJson(metricRes);
 
         if (isNotEmpty(value)) {
             redisService.storeValue(METRIC_KEY, sshInfoId.toString(), value, METRIC_EXP);
@@ -272,38 +257,7 @@ public class MetricService {
         return networkUsageMap;
     }
 
-    private MetricResponse.CpuMetricDTO createCpuMetricDTO(Metric metric, String time) {
-        double cpuUsage = Math.round(metric.getCpuUsage() * 1000.0) / 1000.0;
-        return new MetricResponse.CpuMetricDTO(time, cpuUsage);
-    }
-
-    private MetricResponse.MemoryMetricDTO createMemoryMetricDTO(Metric metric, String time) {
-        double memoryUsage = metric.getTotalMemory() > 0 ?
-                Math.round((metric.getUsedMemory() / metric.getTotalMemory() * 100) * 1000.0) / 1000.0 : 0.0;
-        return new MetricResponse.MemoryMetricDTO(time, memoryUsage);
-    }
-
-    private MetricResponse.NetworkInMetricDTO createNetworkInMetricDTO(Metric metric, String time) {
-        double networkReceived = Math.round(metric.getTotalBytesReceived() * 1000.0) / 1000.0;
-        return new MetricResponse.NetworkInMetricDTO(time, networkReceived);
-    }
-
-    private MetricResponse.NetworkOutMetricDTO createNetworkOutMetricDTO(Metric metric, String time) {
-        double networkSent = Math.round(metric.getTotalBytesSent() * 1000.0) / 1000.0;
-        return new MetricResponse.NetworkOutMetricDTO(time, networkSent);
-    }
-
     private double convertBytesToMB(long bytes) {
         return bytes / BYTES_TO_MB_DIVISOR;
-    }
-
-    private MetricResponse.FindCurrentMetricDTO createFindCurrentMetricDTO(Map<String, Double> cpuAndMemoryMetrics, Map<String, Double> networkMetrics) {
-        return new MetricResponse.FindCurrentMetricDTO(
-                cpuAndMemoryMetrics.getOrDefault(METRIC_MAP_CPU_USAGE, DEFAULT_METRIC_VALUE),
-                cpuAndMemoryMetrics.getOrDefault(METRIC_MAP_TOTAL_MEMORY, DEFAULT_METRIC_VALUE),
-                cpuAndMemoryMetrics.getOrDefault(METRIC_MAP_USED_MEMORY, DEFAULT_METRIC_VALUE),
-                networkMetrics.getOrDefault(METRIC_MAP_NETWORK_RECEIVED, DEFAULT_METRIC_VALUE),
-                networkMetrics.getOrDefault(METRIC_MAP_NETWORK_SENT, DEFAULT_METRIC_VALUE)
-        );
     }
 }

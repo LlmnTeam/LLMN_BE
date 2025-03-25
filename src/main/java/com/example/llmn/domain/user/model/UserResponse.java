@@ -1,6 +1,10 @@
 package com.example.llmn.domain.user.model;
 
 import com.example.llmn.domain.metric.MetricResponse;
+import com.example.llmn.domain.metric.model.response.CpuMetricRes;
+import com.example.llmn.domain.metric.model.response.MemoryMetricRes;
+import com.example.llmn.domain.metric.model.response.NetworkInMetricRes;
+import com.example.llmn.domain.metric.model.response.NetworkOutMetricRes;
 
 import java.util.List;
 
@@ -19,10 +23,10 @@ public class UserResponse {
             String networkReceived,
             String networkSent,
             String summary,
-            List<MetricResponse.CpuMetricDTO> cpuHistory,
-            List<MetricResponse.MemoryMetricDTO> memoryHistory,
-            List<MetricResponse.NetworkInMetricDTO> networkInHistory,
-            List<MetricResponse.NetworkOutMetricDTO> networkOutHistory){}
+            List<CpuMetricRes> cpuHistory,
+            List<MemoryMetricRes> memoryHistory,
+            List<NetworkInMetricRes> networkInHistory,
+            List<NetworkOutMetricRes> networkOutHistory){}
 
     public record FindConfigurationInfoDTO(
             String nickName,

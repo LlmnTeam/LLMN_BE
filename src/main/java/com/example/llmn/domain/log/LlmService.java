@@ -4,6 +4,7 @@ import com.example.llmn.domain.metric.MetricResponse;
 import com.example.llmn.domain.alarm.AlarmService;
 import com.example.llmn.domain.alarm.AlarmType;
 import com.example.llmn.domain.metric.MetricService;
+import com.example.llmn.domain.metric.model.response.*;
 import com.example.llmn.domain.project.Project;
 import com.example.llmn.domain.summary.Summary;
 import com.example.llmn.domain.summary.SummaryType;
@@ -183,7 +184,7 @@ public class LlmService {
     }
 
     private Optional<LogDTO.PerformanceSummaryResponseDTO> fetchMetricSummary(Long sshInfoId){
-        MetricResponse.FindMetricHistoryDTO metricHistory = metricService.findMetricHistory(METRIC_HISTORY_PREVIOUS_HOUR, sshInfoId);
+        FindMetricHistoryRes metricHistory = metricService.findMetricHistory(METRIC_HISTORY_PREVIOUS_HOUR, sshInfoId);
 
         String summaryRequestBody = buildSummaryRequestBody(metricHistory);
         LogDTO.PerformanceSummaryResponseDTO responseDTO = sendSummaryRequest(performanceSummeryUri, summaryRequestBody, LogDTO.PerformanceSummaryResponseDTO.class);
@@ -191,7 +192,7 @@ public class LlmService {
         return Optional.ofNullable(responseDTO);
     }
 
-    private String buildSummaryRequestBody(MetricResponse.FindMetricHistoryDTO metricHistory) {
+    private String buildSummaryRequestBody(FindMetricHistoryRes metricHistory) {
         StringBuilder summaryRequestBody = new StringBuilder();
         summaryRequestBody.append(PERFORMANCE_SUMMARY_HEADER);
         appendCpuMetrics(summaryRequestBody, metricHistory);
@@ -202,33 +203,33 @@ public class LlmService {
         return summaryRequestBody.toString();
     }
 
-    private void appendCpuMetrics(StringBuilder builder, MetricResponse.FindMetricHistoryDTO metricHistory) {
+    private void appendCpuMetrics(StringBuilder builder, FindMetricHistoryRes metricHistory) {
         builder.append("1. CPU Metrics:\n");
-        for (MetricResponse.CpuMetricDTO cpuMetric : metricHistory.cpuMetrics()) {
+        for (CpuMetricRes cpuMetric : metricHistory.cpuMetrics()) {
             builder.append(String.format("- Time: %s, CPU Usage: %.2f%%", cpuMetric.time(), cpuMetric.cpuUsage()))
                     .append("\n");
         }
     }
 
-    private void appendMemoryMetrics(StringBuilder builder, MetricResponse.FindMetricHistoryDTO metricHistory) {
+    private void appendMemoryMetrics(StringBuilder builder, FindMetricHistoryRes metricHistory) {
         builder.append("\n2. Memory Metrics:\n");
-        for (MetricResponse.MemoryMetricDTO memoryMetric : metricHistory.memoryMetrics()) {
+        for (MemoryMetricRes memoryMetric : metricHistory.memoryMetrics()) {
             builder.append(String.format("- Time: %s, Memory Usage: %.2f MB", memoryMetric.time(), memoryMetric.memoryUsage()))
                     .append("\n");
         }
     }
 
-    private void appendNetworkInMetrics(StringBuilder builder, MetricResponse.FindMetricHistoryDTO metricHistory) {
+    private void appendNetworkInMetrics(StringBuilder builder, FindMetricHistoryRes metricHistory) {
         builder.append("\n3. Network In Metrics:\n");
-        for (MetricResponse.NetworkInMetricDTO networkInMetric : metricHistory.networkInMetrics()) {
+        for (NetworkInMetricRes networkInMetric : metricHistory.networkInMetrics()) {
             builder.append(String.format("- Time: %s, Network Received: %.2f MB", networkInMetric.time(), networkInMetric.networkReceived()))
                     .append("\n");
         }
     }
 
-    private void appendNetworkOutMetrics(StringBuilder builder, MetricResponse.FindMetricHistoryDTO metricHistory) {
+    private void appendNetworkOutMetrics(StringBuilder builder, FindMetricHistoryRes metricHistory) {
         builder.append("\n4. Network Out Metrics:\n");
-        for (MetricResponse.NetworkOutMetricDTO networkOutMetric : metricHistory.networkOutMetrics()) {
+        for (NetworkOutMetricRes networkOutMetric : metricHistory.networkOutMetrics()) {
             builder.append(String.format("- Time: %s, Network Sent: %.2f MB", networkOutMetric.time(), networkOutMetric.networkSent()))
                     .append("\n");
         }

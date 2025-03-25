@@ -1,6 +1,7 @@
 package com.example.llmn.common.utils;
 
 import com.example.llmn.domain.metric.MetricResponse;
+import com.example.llmn.domain.metric.model.response.FindCurrentMetricRes;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -47,20 +48,20 @@ public class JsonUtils {
         }
     }
 
-    public static MetricResponse.FindCurrentMetricDTO convertJsonToMetricDTO(String json) {
+    public static FindCurrentMetricRes convertJsonToMetricDTO(String json) {
         try {
-            return objectMapper.readValue(json, MetricResponse.FindCurrentMetricDTO.class);
+            return objectMapper.readValue(json, FindCurrentMetricRes.class);
         } catch (JsonProcessingException e) {
             log.error("JSON을 MetricDTO로 변환하는 중 오류 발생: {}", json, e);
             return null;
         }
     }
 
-    public static String convertMetricDtoToJson(MetricResponse.FindCurrentMetricDTO metricDTO){
+    public static String convertMetricDtoToJson(FindCurrentMetricRes metricRes){
         try {
-            return objectMapper.writeValueAsString(metricDTO);
+            return objectMapper.writeValueAsString(metricRes);
         } catch (JsonProcessingException e) {
-            log.error("MetricDTO를 JSON 문자열로 변환하는 중 오류 발생: {}", metricDTO, e);
+            log.error("MetricDTO를 JSON 문자열로 변환하는 중 오류 발생: {}", metricRes, e);
             return EMPTY_JSON;
         }
     }
