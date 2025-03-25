@@ -23,6 +23,9 @@ import static com.example.llmn.common.utils.ConverterUtils.convertStringToLong;
 import static com.example.llmn.common.utils.DateTimeUtils.HOUR_MINUTE_FORMATTER;
 import static com.example.llmn.common.utils.DateTimeUtils.getCurrentHourStartMinusHours;
 import static com.example.llmn.common.utils.JsonUtils.*;
+import static com.example.llmn.domain.metric.MetricConstants.*;
+import static com.example.llmn.integration.redis.RedisConstants.REDIS_KEY_NETWORK_REC;
+import static com.example.llmn.integration.redis.RedisConstants.REDIS_KEY_NETWORK_TRANS;
 
 @Service
 @RequiredArgsConstructor
@@ -36,26 +39,12 @@ public class MetricService {
     private final RedisService redisService;
     private final SSHService sshService;
 
-    private static final String REDIS_KEY_NETWORK_REC = "network:received";
-    private static final String REDIS_KEY_NETWORK_TRANS = "network:transmitted";
     private static final String METRIC_KEY = "metric";
     private static final Long METRIC_EXP = 10 * 60 * 1000L; // 10분
-    private static final String METRIC_MAP_CPU_USAGE = "cpuUsage";
-    private static final String METRIC_MAP_TOTAL_MEMORY = "totalMemory";
-    private static final String METRIC_MAP_USED_MEMORY = "usedMemory";
-    private static final String METRIC_MAP_NETWORK_RECEIVED = "networkReceived";
-    private static final String METRIC_MAP_NETWORK_SENT = "networkSent";
-    private static final String METRIC_MAP_DAILY_NET_RECEIVED = "dailyReceived";
-    private static final String METRIC_MAP_DAILY_NET_SENT = "dailySent";
-    private static final String COMMAND_TOP = "top -b -n1 | grep \"Cpu(s)\\|Mem\"";
-    private static final String COMMAND_NETWORK_USAGE = "cat /proc/net/dev";
     private static final double DEFAULT_METRIC_VALUE = 0.0;
     private static final double BYTES_TO_MB_DIVISOR = 1024.0 * 1024.0;
     private static final int RECEIVED_BYTES_INDEX = 1;
     private static final int TRANSMITTED_BYTES_INDEX = 9;
-    private static final Pattern CPU_PATTERN = Pattern.compile("%Cpu\\(s\\):\\s+([\\d.]+)\\s+us,\\s+([\\d.]+)\\s+sy,.*");
-    private static final Pattern MEM_PATTERN = Pattern.compile("MiB Mem :\\s+([\\d.]+)\\s+total,\\s+([\\d.]+)\\s+free,\\s+([\\d.]+)\\s+used,.*");
-    private static final Pattern NETWORK_PATTERN = Pattern.compile("^(eth|ens|enp|wlan)\\S*:"); // 주요 네트워크 인터페이스 패턴
 
     @Scheduled(cron = "0 0/10 * * * *")
     @Transactional

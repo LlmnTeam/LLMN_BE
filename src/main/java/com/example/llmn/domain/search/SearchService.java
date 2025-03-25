@@ -21,13 +21,14 @@ import static com.example.llmn.common.utils.FileUtils.findTextFiles;
 @Service
 @RequiredArgsConstructor
 @Slf4j
+@Transactional(readOnly = true)
 public class SearchService {
 
     private final ProjectRepository projectRepository;
     private final SummaryRepository summaryRepository;
+
     private static final String LOG_FILE_URI_TEMPLATE = "/project/%d/%s";
 
-    @Transactional(readOnly = true)
     public SearchResponse.SearchDTO search(String keyword, LocalDateTime startDate, LocalDateTime endDate, Long userId) {
         List<Project> projects = projectRepository.findByUserId(userId);
         Map<String, Long> containerNameToProjectIdMap = createContainerNameToProjectIdMap(projects);

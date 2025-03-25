@@ -25,11 +25,14 @@ import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static com.example.llmn.common.constants.GlobalConstants.BLANK_STRING;
+import static com.example.llmn.common.constants.GlobalConstants.NO_MESSAGE;
 import static com.example.llmn.common.utils.DateTimeUtils.*;
 import static com.example.llmn.common.utils.FileUtils.createDirectoryIfNotExist;
 import static com.example.llmn.common.utils.FileUtils.findTextFiles;
 import static com.example.llmn.common.utils.MapUtils.extractBooleanFromMap;
 import static com.example.llmn.common.utils.MapUtils.extractStringFromMap;
+import static com.example.llmn.domain.log.LogConstants.*;
 
 @Service
 @RequiredArgsConstructor
@@ -39,29 +42,9 @@ public class LogService {
     private final ElasticsearchConfig elasticsearchConfig;
     private final SshInfoRepository sshInfoRepository;
 
-    private static final String LOGS_DIRECTORY = "logs";
-    private static final String LOG_LEVEL_INFO = "INFO";
-    private static final String LOG_LEVEL_WARN = "WARN";
-    private static final String LOG_LEVEL_ERROR = "ERROR";
-    private static final String LOG_LEVEL_UNKNOWN = "UNKNOWN";
-    private static final String LOG_KEY_TIMESTAMP = "@timestamp";
-    private static final String LOG_KEY_LEVEL = "log_level";
-    private static final String LOG_KEY_CONTAINER_NAME = "container_name";
-    private static final String LOG_KEY_CONTAINER = "container";
-    private static final String LOG_KEY_MESSAGE = "message";
-    private static final String LOG_KEY_PROCESSED = "is_processed";
-    private static final String LOG_KEY_ID = "_id";
     private static final String CONTAINER_KEY_NAME = "name";
     private static final String UNKNOWN_CONTAINER = "unknown_container";
-    private static final String NO_MESSAGE = "No message";
-    private static final String BLANK_STRING = "";
     private static final String LOG_FORMAT = "[%s]\n%s";
-    private static final int MAX_LOG_SIZE = 1000;
-    public static final String LOG_INDEX = "docker-logs-*";
-    public static final String LOG_INDEX_PREFIX = "docker-logs-";
-    public static final String LOG_FILE_CONTENT_REGEX = "(?=\\[\\d{4}-\\d{2}-\\d{2}_\\d{2}:\\d{2}\\])";
-    public static final String BLANKE_STRING = "";
-    public static final String NO_LOG_RECORD = "로그 기록이 존재하지 않습니다.";
 
     @Scheduled(fixedRate = 60000)
     @SuppressWarnings("rawtypes")
@@ -327,7 +310,7 @@ public class LogService {
     private String convertResponseMapToString(Map<String, Object> responseMap) {
         return responseMap == null
                 ? NO_LOG_RECORD
-                : (String) Optional.ofNullable(responseMap.get(LOG_KEY_MESSAGE)).orElse(BLANKE_STRING);
+                : (String) Optional.ofNullable(responseMap.get(LOG_KEY_MESSAGE)).orElse(BLANK_STRING);
     }
 
     private Optional<String> findLatestLogFile(String containerName) {

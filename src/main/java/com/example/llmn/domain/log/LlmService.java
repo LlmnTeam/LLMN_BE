@@ -26,6 +26,7 @@ import java.util.Optional;
 
 import static com.example.llmn.common.utils.DateTimeUtils.formatLocalDateTime;
 import static com.example.llmn.common.utils.UriUtils.buildURI;
+import static com.example.llmn.domain.log.LogConstants.*;
 
 @Service
 @RequiredArgsConstructor
@@ -58,19 +59,7 @@ public class LlmService {
     @Value("${recommend.uri}")
     private String recommendUri;
 
-    private static final String LOG_DATA_HEADER = "<Log Data>\n";
-    private static final String PERFORMANCE_SUMMARY_HEADER = "<Performance Summary>\n";
-    private static final String APPLICATION_LOG_SUMMARY_HEADER = "<Application Log Summary>\n";
-    private static final String WEEKLY_TREND_HEADER = "-<Weekly Trend Summaries>\n";
-    private static final String LOG_EMERGENCY_ALARM_SUFFIX = "의 로그를 점검 해보세요. 문제점이 발견되었습니다.";
-    private static final String LOG_UPDATE_ALARM_SUFFIX = "의 요약이 업데이트 되었습니다.";
     private static final int METRIC_HISTORY_PREVIOUS_HOUR = 1;
-    private static final String PERFORMANCE_SUMMARY_ALARM = "새로운 성능 요약이 생성 되었습니다.";
-    private static final String HOURLY_SUMMARY_ALARM = "새로운 시간별 요약이 생성 되었습니다.";
-    private static final String DAILY_SUMMARY_ALARM = "새로운 일일 요약이 생성 되었습니다.";
-    private static final String TREND_SUMMARY_ALARM = "장기 트렌드 분석 요약이 생성 되었습니다.";
-    private static final String RECOMMENDATION_ALARM = "새로운 추천 사항이 업데이트 되었습니다";
-    private static final String NO_SUMMARY_DATA = "- 요약 데이터가 존재하지 않습니다.\n";
 
     @Transactional
     @Scheduled(cron = "0 0 * * * *")

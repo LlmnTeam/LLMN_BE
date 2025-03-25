@@ -15,6 +15,9 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import static com.example.llmn.common.utils.JsonUtils.*;
+import static com.example.llmn.domain.docker.DockerConstants.*;
+import static com.example.llmn.integration.redis.RedisConstants.REDIS_KEY_RESOURCE;
+import static com.example.llmn.integration.redis.RedisConstants.REDIS_EXP_RESOURCE;
 
 @Service
 @RequiredArgsConstructor
@@ -24,15 +27,6 @@ public class DockerService {
     private final SSHService sshService;
     private final RedisService redisService;
     private final ProjectRepository projectRepository;
-
-    private static final String RESOURCE_KEY = "resource";
-    public static final String DOCKER_RESOURCE_KEY_CPU = "CPU";
-    public static final String DOCKER_RESOURCE_KEY_MEMORY = "Memory";
-    public static final String COMMAND_CONTAINER_STOP = "docker stop ";
-    public static final String COMMAND_CONTAINER_RESTART = "docker restart ";
-    public static final String COMMAND_CONTAINER_PS = "docker ps --format \"{{.Names}}\"";
-    public static final String COMMAND_CONTAINER_STATS = "docker stats --no-stream --format \"{{.Name}}:{{.CPUPerc}}:{{.MemUsage}}\"";
-    private static final Long RESOURCE_EXP = 10 * 60 * 1000L; // 10분
 
     public boolean stopContainer(String containerName, Long projectId) {
         Long sshInfoId = projectRepository.findSshInfoId(projectId).orElseThrow(
@@ -85,7 +79,7 @@ public class DockerService {
             return Collections.emptyMap();
         }
 
-        String cachedValue = redisService.getValueInString(RESOURCE_KEY, userId.toString());
+        String cachedValue = redisService.getValueInString(REDIS_KEY_RESOURCE, userId.toString());
 
         if (cachedValue == null) {
             return Collections.emptyMap();
@@ -144,7 +138,7 @@ public class DockerService {
     private void cacheResourceUsage(Long userId, Map<String, Map<String, String>> resourceUsage) {
         String value = convertMapToJson(resourceUsage);
         if (isNotEmpty(value)) {
-            redisService.storeValue(RESOURCE_KEY, userId.toString(), value, RESOURCE_EXP);
+            redisService.storeValue(REDIS_KEY_RESOURCE, userId.toString(), value, REDIS_EXP_RESOURCE);
         }
     }
 

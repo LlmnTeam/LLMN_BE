@@ -23,6 +23,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.*;
 
+import static com.example.llmn.common.constants.GlobalConstants.NOT_AVAILABLE;
+import static com.example.llmn.common.constants.GlobalConstants.SORT_BY_DATE;
 import static com.example.llmn.common.utils.DateTimeUtils.formatLocalDateTime;
 import static com.example.llmn.common.utils.DateTimeUtils.parseDateTimeFromLogFile;
 import static com.example.llmn.common.utils.FileUtils.*;
@@ -41,10 +43,8 @@ public class ProjectService {
 
     private static final String DOCKER_RESOURCE_KEY_CPU = "CPU";
     private static final String DOCKER_RESOURCE_KEY_MEMORY = "Memory";
-    private static final String NOT_ACCESSIBLE_VALUE = "N/A";
     private static final String NOT_EXIST_SUMMARY = "";
     private static final String NOT_EXIST_LOG = "";
-    private static final String SORT_BY_DATE = "createdDate";
     private static final String LOG_FILE_SUFFIX = "-log";
 
     @Transactional
@@ -345,6 +345,6 @@ public class ProjectService {
     private String getResourceUsageFromMap(Map<String, Map<String, String>> containersResourceMap, String containerName, String resourceKey) {
         return Optional.ofNullable(containersResourceMap.get(containerName))
                 .map(resourceMap -> resourceMap.get(resourceKey))
-                .orElse(NOT_ACCESSIBLE_VALUE);
+                .orElse(NOT_AVAILABLE);
     }
 }

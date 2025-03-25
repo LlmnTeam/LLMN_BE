@@ -29,10 +29,13 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import static com.example.llmn.common.constants.GlobalConstants.DELIMITER;
+import static com.example.llmn.common.constants.GlobalConstants.PREFIX_CODE;
 import static com.example.llmn.common.utils.EmailUtils.generateVerificationCode;
 import static com.example.llmn.common.utils.FileUtils.*;
 import static com.example.llmn.common.utils.MailTemplate.VERIFICATION_CODE;
 import static com.example.llmn.common.utils.UriUtils.buildURI;
+import static com.example.llmn.integration.redis.RedisConstants.*;
 
 @Service
 @RequiredArgsConstructor
@@ -58,19 +61,13 @@ public class UserService {
     @Value("${update_env.uri}")
     private String updateEnvUri;
 
-    private static final String PREFIX_CODE = "code:";
     private static final String MAIL_TEMPLATE_FOR_CODE = "verification_code_email.html";
     private static final String SSH_DIRECTORY = "ssh";
-    private static final String REDIS_SSH_KEY = "SSH";
     private static final String MODEL_KEY_CODE = "code";
-    private static final String DELIMITER = "-";
-    private static final Long REDIS_SSH_KEY_EXP = 60L * 60 * 24 * 180; // 180일
     private static final String OPEN_API_KEY = "OPENAI_API_KEY";
     private static final String CODE_TO_EMAIL_KEY_PREFIX = "codeToEmail";
     private static final String CODE_TYPE_RECOVERY = "recovery";
     private static final long VERIFICATION_CODE_EXPIRATION_MS = 175 * 1000L;
-    private static final String REDIS_KEY_REFRESH_TOKEN = "refreshToken";
-    private static final String REDIS_KEY_ACCESS_TOKEN = "accessToken";
 
     @Transactional
     public void join(UserRequest.JoinDTO requestDTO) {
@@ -430,7 +427,7 @@ public class UserService {
 
     private void cacheUserSshInfo(Long userId, SshInfo monitoringSshInfo) {
         String combinedInfo = String.join(DELIMITER, monitoringSshInfo.getRemoteHost(), monitoringSshInfo.getRemoteName(), monitoringSshInfo.getRemoteKeyPath());
-        redisService.storeValue(REDIS_SSH_KEY, userId.toString(), combinedInfo, REDIS_SSH_KEY_EXP);
+        redisService.storeValue(REDIS_KEY_SSH, userId.toString(), combinedInfo, REDIS_EXP_SSH);
     }
 
     private SshInfo findMonitoringSshInfo(Long userId, String monitoringSshHost) {
@@ -480,7 +477,7 @@ public class UserService {
     }
 
     private String getCodeTypeKey(String codeType) {
-        return UserService.PREFIX_CODE + codeType;
+        return PREFIX_CODE + codeType;
     }
 
     private UserResponse.CloudInfoDTO convertToCloudInfoDTO(SshInfo sshInfo) {

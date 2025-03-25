@@ -20,6 +20,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
 
+import static com.example.llmn.common.constants.GlobalConstants.NOT_AVAILABLE;
+import static com.example.llmn.common.constants.GlobalConstants.SORT_BY_DATE;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -30,8 +33,6 @@ public class DashBoardService {
     private final SshInfoRepository sshInfoRepository;
     private final MetricService metricService;
 
-    private static final String NOT_AVAILABLE = "N/A";
-    private static final String SORT_BY_DATE = "createdDate";
     private static final String NO_SUMMARY_DATA = "요약된 내용이 존재하지 않습니다.";
 
     @Transactional

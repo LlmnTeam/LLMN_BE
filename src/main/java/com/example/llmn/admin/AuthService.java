@@ -16,6 +16,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.HashMap;
 import java.util.Map;
 
+import static com.example.llmn.integration.redis.RedisConstants.*;
+
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -25,10 +27,6 @@ public class AuthService {
     private final UserRepository userRepository;
     private final RedisService redisService;
     private final PasswordEncoder passwordEncoder;
-
-    private static final String REDIS_KEY_REFRESH_TOKEN = "refreshToken";
-    private static final String REDIS_KEY_ACCESS_TOKEN = "accessToken";
-    private static final String REDIS_KEY_SESSION_ID = "sessionId";
 
     @Transactional
     public Map<String, String> login(UserRequest.LoginDTO requestDTO) {
