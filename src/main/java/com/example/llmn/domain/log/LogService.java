@@ -6,6 +6,7 @@ import co.elastic.clients.elasticsearch._types.query_dsl.BoolQuery;
 import co.elastic.clients.elasticsearch.core.*;
 import co.elastic.clients.elasticsearch.indices.CreateIndexRequest;
 import co.elastic.clients.json.JsonData;
+import com.example.llmn.domain.log.model.LogDataDTO;
 import com.example.llmn.integration.elasticsearch.ElasticsearchConfig;
 import com.example.llmn.common.utils.FileUtils;
 import com.example.llmn.common.utils.JsonUtils;

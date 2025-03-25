@@ -1,5 +1,7 @@
 package com.example.llmn.domain.log;
 
+import com.example.llmn.domain.log.model.request.SummaryReq;
+import com.example.llmn.domain.log.model.response.*;
 import com.example.llmn.domain.metric.MetricResponse;
 import com.example.llmn.domain.alarm.AlarmService;
 import com.example.llmn.domain.alarm.AlarmType;
@@ -80,8 +82,8 @@ public class LlmService {
         for(User user : users) {
             Long monitoringSshInfoId = user.getMonitoringSshId();
 
-            fetchMetricSummary(monitoringSshInfoId).ifPresent(performanceSummaryDTO -> {
-                saveSummary(user, performanceSummaryDTO.performanceSummary(), SummaryType.PERFORMANCE);
+            fetchMetricSummary(monitoringSshInfoId).ifPresent(performanceSummaryRes -> {
+                saveSummary(user, performanceSummaryRes.performanceSummary(), SummaryType.PERFORMANCE);
                 alarmService.generateAlarm(user.getId(), PERFORMANCE_SUMMARY_ALARM, AlarmType.UPDATE);
             });
         }
@@ -93,9 +95,9 @@ public class LlmService {
         List<Long> userIds = userRepository.findIds();
 
         for(Long userId: userIds) {
-            fetchHourlySummary(userId).ifPresent(hourlySummaryDTO -> {
+            fetchHourlySummary(userId).ifPresent(hourlySummaryRes -> {
                 User userRef = userRepository.getReferenceById(userId);
-                saveSummary(userRef, hourlySummaryDTO.hourlySummary(), SummaryType.HOURLY);
+                saveSummary(userRef, hourlySummaryRes.hourlySummary(), SummaryType.HOURLY);
                 alarmService.generateAlarm(userId, HOURLY_SUMMARY_ALARM, AlarmType.UPDATE);
             });
         }
@@ -107,9 +109,9 @@ public class LlmService {
         List<Long> userIds = userRepository.findIds();
 
         for(Long userId: userIds) {
-            fetchDailySummary(userId).ifPresent(dailySummaryDTO -> {
+            fetchDailySummary(userId).ifPresent(dailySummaryRes -> {
                 User userRef = userRepository.getReferenceById(userId);
-                saveSummary(userRef, dailySummaryDTO.dailySummary(), SummaryType.DAILY);
+                saveSummary(userRef, dailySummaryRes.dailySummary(), SummaryType.DAILY);
                 alarmService.generateAlarm(userId, DAILY_SUMMARY_ALARM, AlarmType.UPDATE);
             });
         }
@@ -121,9 +123,9 @@ public class LlmService {
         List<Long> userIds = userRepository.findIds();
 
         for(Long userId: userIds) {
-            fetchTrendSummary(userId).ifPresent(trendSummaryDTO -> {
+            fetchTrendSummary(userId).ifPresent(trendSummaryRes -> {
                 User userRef = userRepository.getReferenceById(userId);
-                saveSummary(userRef, trendSummaryDTO.trendSummary(), SummaryType.TEND);
+                saveSummary(userRef, trendSummaryRes.trendSummary(), SummaryType.TEND);
 
                 alarmService.generateAlarm(userId, TREND_SUMMARY_ALARM, AlarmType.UPDATE);
             });
@@ -148,19 +150,19 @@ public class LlmService {
     private void processProjectLogSummary(Project project) {
         String containerName = project.getContainerName();
 
-        fetchLogSummary(containerName).ifPresent(logSummaryDTO -> {
-            saveSummary(project.getUser(), project, logSummaryDTO.logSummary(), SummaryType.LOG);
+        fetchLogSummary(containerName).ifPresent(summaryRes -> {
+            saveSummary(project.getUser(), project, summaryRes.logSummary(), SummaryType.LOG);
 
-            checkUrgency(project, logSummaryDTO);
+            checkUrgency(project, summaryRes);
             alarmService.generateAlarm(project.getUser().getId(), createAlarmContent(project), AlarmType.UPDATE);
         });
     }
 
-    private Optional<LogDTO.SummaryResponseDTO> fetchLogSummary(String containerName) {
+    private Optional<SummaryRes> fetchLogSummary(String containerName) {
         String logContent = logService.findRecentLogs(containerName);
 
         String summaryRequestBody = buildSummaryRequestBody(containerName, logContent);
-        LogDTO.SummaryResponseDTO responseDTO = sendSummaryRequest(logSummeryUri, summaryRequestBody, LogDTO.SummaryResponseDTO.class);
+        SummaryRes responseDTO = sendSummaryRequest(logSummeryUri, summaryRequestBody, SummaryRes.class);
 
         return Optional.ofNullable(responseDTO);
     }
@@ -171,8 +173,8 @@ public class LlmService {
                 "Log Content: " + logMessage + "\n";
     }
 
-    private void checkUrgency(Project project, LogDTO.SummaryResponseDTO summaryDTO) {
-        if(summaryDTO.isUrgent()) {
+    private void checkUrgency(Project project, SummaryRes summaryRes) {
+        if(summaryRes.isUrgent()) {
             project.updateIsUrgent(true);
             String emergencyAlarmContent = project.getProjectName() + LOG_EMERGENCY_ALARM_SUFFIX;
             alarmService.generateAlarm(project.getUser().getId(), emergencyAlarmContent, AlarmType.EMERGENCY);
@@ -183,11 +185,11 @@ public class LlmService {
         return project.getProjectName() + LOG_UPDATE_ALARM_SUFFIX;
     }
 
-    private Optional<LogDTO.PerformanceSummaryResponseDTO> fetchMetricSummary(Long sshInfoId){
+    private Optional<PerformanceSummaryRes> fetchMetricSummary(Long sshInfoId){
         FindMetricHistoryRes metricHistory = metricService.findMetricHistory(METRIC_HISTORY_PREVIOUS_HOUR, sshInfoId);
 
         String summaryRequestBody = buildSummaryRequestBody(metricHistory);
-        LogDTO.PerformanceSummaryResponseDTO responseDTO = sendSummaryRequest(performanceSummeryUri, summaryRequestBody, LogDTO.PerformanceSummaryResponseDTO.class);
+        PerformanceSummaryRes responseDTO = sendSummaryRequest(performanceSummeryUri, summaryRequestBody, PerformanceSummaryRes.class);
 
         return Optional.ofNullable(responseDTO);
     }
@@ -235,13 +237,13 @@ public class LlmService {
         }
     }
 
-    private Optional<LogDTO.HourlySummaryResponseDTO> fetchHourlySummary(Long userId) {
+    private Optional<HourlySummaryRes> fetchHourlySummary(Long userId) {
         LocalDateTime startOfHour = LocalDateTime.now().withMinute(0).minusSeconds(0);
         List<Summary> performanceSummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.PERFORMANCE), userId, startOfHour);
         List<Summary> logSummaries = summaryRepository.findByTypeWithinDateWithProject(List.of(SummaryType.LOG), userId, startOfHour);
 
         String summaryRequestBody = buildHourlySummaryRequestBody(performanceSummaries, logSummaries);
-        LogDTO.HourlySummaryResponseDTO responseDTO = sendSummaryRequest(hourlySummaryUri, summaryRequestBody, LogDTO.HourlySummaryResponseDTO.class);
+        HourlySummaryRes responseDTO = sendSummaryRequest(hourlySummaryUri, summaryRequestBody, HourlySummaryRes.class);
 
         return Optional.ofNullable(responseDTO);
     }
@@ -254,13 +256,13 @@ public class LlmService {
         return summaryRequestBody.toString();
     }
 
-    private Optional<LogDTO.DailySummaryResponseDTO> fetchDailySummary(Long userId) {
+    private Optional<DailySummaryRes> fetchDailySummary(Long userId) {
         LocalDateTime startOfDay = LocalDateTime.now().with(LocalTime.MIN);
         List<Summary> performanceSummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.PERFORMANCE), userId, startOfDay);
         List<Summary> logSummaries = summaryRepository.findByTypeWithinDateWithProject(List.of(SummaryType.LOG), userId, startOfDay);
 
         String summaryRequestBody = buildDailySummaryRequestBody(performanceSummaries, logSummaries);
-        LogDTO.DailySummaryResponseDTO responseDTO = sendSummaryRequest(dailySummeryUri, summaryRequestBody, LogDTO.DailySummaryResponseDTO.class);
+        DailySummaryRes responseDTO = sendSummaryRequest(dailySummeryUri, summaryRequestBody, DailySummaryRes.class);
 
         return Optional.ofNullable(responseDTO);
     }
@@ -273,12 +275,12 @@ public class LlmService {
         return summaryRequestBody.toString();
     }
 
-    private Optional<LogDTO.TrendSummaryResponseDTO> fetchTrendSummary(Long userId){
+    private Optional<TrendSummaryRes> fetchTrendSummary(Long userId){
         LocalDateTime startOfDay = LocalDateTime.now().minusWeeks(1).with(LocalTime.MIN);
         List<Summary> dailySummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.DAILY), userId, startOfDay);
 
         String summaryRequestBody = buildTendSummaryRequestBody(dailySummaries);
-        LogDTO.TrendSummaryResponseDTO responseDTO = sendSummaryRequest(trendSummeryUri, summaryRequestBody, LogDTO.TrendSummaryResponseDTO.class);
+        TrendSummaryRes responseDTO = sendSummaryRequest(trendSummeryUri, summaryRequestBody, TrendSummaryRes.class);
 
         return Optional.ofNullable(responseDTO);
     }
@@ -290,13 +292,13 @@ public class LlmService {
         return summaryRequestBody.toString();
     }
 
-    private Optional<LogDTO.RecommendationDTO> fetchRecommendation(Long userId) {
+    private Optional<RecommendationRes> fetchRecommendation(Long userId) {
         LocalDateTime startOfTime = LocalDateTime.now().minusHours(6);
         List<Summary> performanceSummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.PERFORMANCE), userId, startOfTime);
         List<Summary> logSummaries = summaryRepository.findByTypeWithinDateWithProject(List.of(SummaryType.LOG), userId, startOfTime);
 
         String summaryRequestBody = buildRecommendRequestBody(performanceSummaries, logSummaries);
-        LogDTO.RecommendationDTO responseDTO = sendSummaryRequest(recommendUri, summaryRequestBody, LogDTO.RecommendationDTO.class);
+        RecommendationRes responseDTO = sendSummaryRequest(recommendUri, summaryRequestBody, RecommendationRes.class);
 
         return Optional.ofNullable(responseDTO);
     }
@@ -350,7 +352,7 @@ public class LlmService {
         try {
             return webClient.post()
                     .uri(buildURI(uri))
-                    .bodyValue(new LogDTO.SummaryRequestDTO(requestContent))
+                    .bodyValue(new SummaryReq(requestContent))
                     .retrieve()
                     .bodyToMono(responseType)
                     .block();

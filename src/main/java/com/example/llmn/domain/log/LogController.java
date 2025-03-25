@@ -1,6 +1,7 @@
 package com.example.llmn.domain.log;
 
 import com.example.llmn.common.utils.ApiUtils;
+import com.example.llmn.domain.log.model.LogDataDTO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;

@@ -1,4 +1,4 @@
-package com.example.llmn.domain.log;
+package com.example.llmn.domain.log.model;
 
 import java.time.Instant;
 
