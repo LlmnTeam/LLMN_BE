@@ -1,6 +1,6 @@
 package com.example.llmn.domain.remote;
 
-import com.example.llmn.domain.project.ProjectRequest;
+import com.example.llmn.domain.project.model.request.ExecuteCommandReq;
 import com.example.llmn.security.userdetails.CustomUserDetails;
 import com.example.llmn.common.utils.ApiUtils;
 import lombok.RequiredArgsConstructor;
@@ -26,7 +26,7 @@ public class SshController {
     }
 
     @PostMapping("/command/home")
-    public ResponseEntity<?> executeCommandInShell(@RequestBody ProjectRequest.ExecuteCommandDTO requestDTO, @AuthenticationPrincipal CustomUserDetails userDetails) {
+    public ResponseEntity<?> executeCommandInShell(@RequestBody ExecuteCommandReq requestDTO, @AuthenticationPrincipal CustomUserDetails userDetails) {
         String response = sshService.executeCommandInShell(requestDTO.command(), requestDTO.isFirstExecution(), userDetails.getUser().getId());
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, response));
     }

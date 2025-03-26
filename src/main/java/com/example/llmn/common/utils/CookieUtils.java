@@ -74,7 +74,7 @@ public class CookieUtils {
                 .secure(cookie.getSecure())
                 .maxAge(cookie.getMaxAge())
                 .path("/")
-                .sameSite("None")
+                .sameSite("Lax")
                 .build();
     }
 

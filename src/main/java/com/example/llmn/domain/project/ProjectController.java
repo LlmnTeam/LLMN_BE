@@ -1,5 +1,9 @@
 package com.example.llmn.domain.project;
 
+import com.example.llmn.domain.project.model.request.ContainerReq;
+import com.example.llmn.domain.project.model.request.CreateProjectReq;
+import com.example.llmn.domain.project.model.request.UpdateProjectReq;
+import com.example.llmn.domain.project.model.response.*;
 import com.example.llmn.security.userdetails.CustomUserDetails;
 import com.example.llmn.common.utils.ApiUtils;
 import com.example.llmn.domain.docker.DockerService;
@@ -27,26 +31,26 @@ public class ProjectController {
     private static final boolean NOT_USING_CACHE = false;
 
     @PostMapping("/project")
-    public ResponseEntity<?> createProject(@RequestBody ProjectRequest.CreateProjectDTO requestDTO, @AuthenticationPrincipal CustomUserDetails userDetails) {
-        ProjectResponse.CreateProjectDTO responseDTO = projectService.createProject(requestDTO, userDetails.getUser().getId());
+    public ResponseEntity<?> createProject(@RequestBody CreateProjectReq requestDTO, @AuthenticationPrincipal CustomUserDetails userDetails) {
+        CreateProjectRes responseDTO = projectService.createProject(requestDTO, userDetails.getUser().getId());
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 
     @GetMapping("/project/cloud")
     public ResponseEntity<?> findCloudAndContainerInfo(@AuthenticationPrincipal CustomUserDetails userDetails) {
-        ProjectResponse.FindCloudAndContainerInfoDTO responseDTO = projectService.findCloudAndContainerInfo(userDetails.getUser().getId());
+        FindCloudAndContainerInfoRes responseDTO = projectService.findCloudAndContainerInfo(userDetails.getUser().getId());
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 
     // 수정 시 사용할 API
     @GetMapping("/project/{projectId}/info")
     public ResponseEntity<?> findProjectInfoById(@PathVariable Long projectId, @AuthenticationPrincipal CustomUserDetails userDetails) {
-        ProjectResponse.FindProjectInfoByIdDTO responseDTO = projectService.findProjectInfoById(projectId, userDetails.getUser().getId());
+        FindProjectInfoByIdRes responseDTO = projectService.findProjectInfoById(projectId, userDetails.getUser().getId());
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 
     @PatchMapping("/project/{projectId}")
-    public ResponseEntity<?> updateProject(@RequestBody ProjectRequest.UpdateProjectDTO requestDTO,
+    public ResponseEntity<?> updateProject(@RequestBody UpdateProjectReq requestDTO,
                                            @PathVariable Long projectId, @AuthenticationPrincipal CustomUserDetails userDetails) {
         projectService.updateProject(requestDTO, projectId, userDetails.getUser().getId());
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, null));
@@ -54,56 +58,56 @@ public class ProjectController {
 
     @GetMapping("/project")
     public ResponseEntity<?> findProjectList(@AuthenticationPrincipal CustomUserDetails userDetails) {
-        ProjectResponse.FindProjectListDTO responseDTO = projectService.findProjectList(userDetails.getUser().getId(), USING_CACHE);
+        FindProjectListRes responseDTO = projectService.findProjectList(userDetails.getUser().getId(), USING_CACHE);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 
     @GetMapping("/project/refresh")
     public ResponseEntity<?> findRefreshedProjectList(@AuthenticationPrincipal CustomUserDetails userDetails) {
-        ProjectResponse.FindProjectListDTO responseDTO = projectService.findProjectList(userDetails.getUser().getId(), NOT_USING_CACHE);
+        FindProjectListRes responseDTO = projectService.findProjectList(userDetails.getUser().getId(), NOT_USING_CACHE);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 
     @GetMapping("/project/{projectId}")
     public ResponseEntity<?> findProjectById(@PathVariable Long projectId) {
-        ProjectResponse.FindProjectByIdDTO responseDTO = projectService.findProjectById(projectId);
+        FindProjectByIdRes responseDTO = projectService.findProjectById(projectId);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 
     @GetMapping("/project/{projectId}/summaries")
     public ResponseEntity<?> findProjectSummary(@PathVariable Long projectId,
-                                                @PageableDefault(size = 5, sort = SORT_BY_DATE, direction = Sort.Direction.DESC) Pageable pageable){
-        ProjectResponse.FindProjectSummaryDTO responseDTO = projectService.findProjectSummary(projectId, pageable);
+                                                @PageableDefault(size = 5, sort = SORT_BY_DATE, direction = Sort.Direction.DESC) Pageable pageable) {
+        FindProjectSummaryRes responseDTO = projectService.findProjectSummary(projectId, pageable);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 
     @GetMapping("/project/{projectId}/logs")
     public ResponseEntity<?> findProjectLogList(@PathVariable Long projectId) {
-        ProjectResponse.FindProjectLogListDTO responseDTO = projectService.findProjectLogList(projectId);
+        FindProjectLogListRes responseDTO = projectService.findProjectLogList(projectId);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 
     @GetMapping("/project/{projectId}/logs/{fileName}")
-    public ResponseEntity<?> findProjectLogByName(@PathVariable Long projectId, @PathVariable String fileName){
-        ProjectResponse.FindProjectLogByNameDTO responseDTO = projectService.findProjectLogByName(projectId, fileName);
+    public ResponseEntity<?> findProjectLogByName(@PathVariable Long projectId, @PathVariable String fileName) {
+        FindProjectLogByNameRes responseDTO = projectService.findProjectLogByName(projectId, fileName);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 
     @GetMapping("/containers")
     public ResponseEntity<?> findContainerList(@RequestParam Long sshId) {
         List<String> runningContainerNameList = dockerService.findRunningContainerList(sshId);
-        ProjectResponse.FindContainerListDTO responseDTO = new ProjectResponse.FindContainerListDTO(runningContainerNameList);
+        FindContainerListRes responseDTO = new FindContainerListRes(runningContainerNameList);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 
     @PostMapping("/project/{projectId}/container/stop")
-    public ResponseEntity<?> stopContainer(@RequestBody ProjectRequest.ContainerDTO requestDTO, @PathVariable Long projectId) {
+    public ResponseEntity<?> stopContainer(@RequestBody ContainerReq requestDTO, @PathVariable Long projectId) {
         boolean response = dockerService.stopContainer(requestDTO.name(), projectId);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, response));
     }
 
     @PostMapping("/project/{projectId}/container/restart")
-    public ResponseEntity<?> restartContainer(@RequestBody ProjectRequest.ContainerDTO requestDTO, @PathVariable Long projectId) {
+    public ResponseEntity<?> restartContainer(@RequestBody ContainerReq requestDTO, @PathVariable Long projectId) {
         boolean response = dockerService.restartContainer(requestDTO.name(), projectId);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, response));
     }
@@ -115,7 +119,7 @@ public class ProjectController {
     }
 
     @PostMapping("/summaries/{summaryId}/check")
-    public ResponseEntity<?> checkSummary(@PathVariable Long summaryId){
+    public ResponseEntity<?> checkSummary(@PathVariable Long summaryId) {
         projectService.checkSummary(summaryId);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, null));
     }
