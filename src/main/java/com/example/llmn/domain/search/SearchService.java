@@ -1,6 +1,9 @@
 package com.example.llmn.domain.search;
 
 import com.example.llmn.domain.project.Project;
+import com.example.llmn.domain.search.model.InsightDTO;
+import com.example.llmn.domain.search.model.LogFileDTO;
+import com.example.llmn.domain.search.model.SearchRes;
 import com.example.llmn.domain.summary.Summary;
 import com.example.llmn.domain.project.ProjectRepository;
 import com.example.llmn.domain.summary.SummaryRepository;
@@ -14,9 +17,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import static com.example.llmn.common.constants.GlobalConstants.BLANK_STRING;
 import static com.example.llmn.common.utils.DateTimeUtils.*;
 import static com.example.llmn.common.utils.FileUtils.LOGS_DIRECTORY;
 import static com.example.llmn.common.utils.FileUtils.findTextFiles;
+import static com.example.llmn.domain.log.LogConstants.LOG_FILE_URI_TEMPLATE;
 
 @Service
 @RequiredArgsConstructor
@@ -27,20 +32,18 @@ public class SearchService {
     private final ProjectRepository projectRepository;
     private final SummaryRepository summaryRepository;
 
-    private static final String LOG_FILE_URI_TEMPLATE = "/project/%d/%s";
-
-    public SearchResponse.SearchDTO search(String keyword, LocalDateTime startDate, LocalDateTime endDate, Long userId) {
+    public SearchRes search(String keyword, LocalDateTime startDate, LocalDateTime endDate, Long userId) {
         List<Project> projects = projectRepository.findByUserId(userId);
         Map<String, Long> containerNameToProjectIdMap = createContainerNameToProjectIdMap(projects);
 
         List<String> logFiles = findTextFiles(LOGS_DIRECTORY);
-        List<SearchResponse.LogFileDTO> searchedLogDTOS = searchLogFiles(logFiles, keyword.toLowerCase(), startDate, endDate, containerNameToProjectIdMap);
-        List<SearchResponse.InsightDTO> searchedInsightDTOS = searchInsights(projects, keyword.toLowerCase(), startDate, endDate);
+        List<LogFileDTO> searchedLogFileDTOS = searchLogFiles(logFiles, keyword.toLowerCase(), startDate, endDate, containerNameToProjectIdMap);
+        List<InsightDTO> searchedInsightDTOS = searchInsights(projects, keyword.toLowerCase(), startDate, endDate);
 
-        return new SearchResponse.SearchDTO(searchedLogDTOS, searchedInsightDTOS);
+        return new SearchRes(searchedLogFileDTOS, searchedInsightDTOS);
     }
 
-    private List<SearchResponse.LogFileDTO> searchLogFiles(List<String> logFiles, String keyword, LocalDateTime startDate, LocalDateTime endDate, Map<String, Long> containerNameMap) {
+    private List<LogFileDTO> searchLogFiles(List<String> logFiles, String keyword, LocalDateTime startDate, LocalDateTime endDate, Map<String, Long> containerNameMap) {
         return logFiles.stream()
                 .filter(fileName -> isKeywordContain(fileName, keyword))
                 .filter(fileName -> isWithinDateRange(parseDateTimeFromLogFile(fileName), startDate, endDate))
@@ -57,19 +60,33 @@ public class SearchService {
         return value.toLowerCase().contains(keyword);
     }
 
-    private SearchResponse.LogFileDTO createLogFileDTO(String fileName, Map<String, Long> containerNameToProjectIdMap) {
+    private LogFileDTO createLogFileDTO(String fileName, Map<String, Long> containerNameToProjectIdMap) {
         String containerName = extractContainerName(fileName);
         Long projectId = containerNameToProjectIdMap.get(containerName);
         String redirectURI = buildLogViewRedirectURI(projectId, fileName);
 
-        return new SearchResponse.LogFileDTO(fileName, redirectURI);
+        return new LogFileDTO(fileName, redirectURI);
     }
 
-    private List<SearchResponse.InsightDTO> searchInsights(List<Project> projects, String keyword, LocalDateTime startDate, LocalDateTime endDate) {
+    // 로그 파일명 형식인 '컨테이너명-log-날짜.txt'에서 컨테이너명 추출하기
+    private String extractContainerName(String fileName) {
+        if (fileName == null || fileName.isEmpty()) {
+            return BLANK_STRING;
+        }
+
+        String[] fileNameParts = fileName.split("-");
+        return fileNameParts.length > 0 ? fileNameParts[0] : BLANK_STRING;
+    }
+
+    private String buildLogViewRedirectURI(Long projectId, String fileName) {
+        return String.format(LOG_FILE_URI_TEMPLATE, projectId, fileName);
+    }
+
+    private List<InsightDTO> searchInsights(List<Project> projects, String keyword, LocalDateTime startDate, LocalDateTime endDate) {
         List<Project> relatedProjects = findRelatedProjects(projects, keyword);
         List<Summary> summaries = summaryRepository.findByProjectsAndDateRange(relatedProjects, startDate, endDate);
 
-        return createInsightDTOs(summaries);
+        return createInsightDTOS(summaries);
     }
 
     private List<Project> findRelatedProjects(List<Project> projects, String keyword) {
@@ -79,27 +96,13 @@ public class SearchService {
                 .toList();
     }
 
-    private List<SearchResponse.InsightDTO> createInsightDTOs(List<Summary> summaries) {
+    private List<InsightDTO> createInsightDTOS(List<Summary> summaries) {
         return summaries.stream()
-                .map(summary -> new SearchResponse.InsightDTO(
+                .map(summary -> new InsightDTO(
                         summary.getProject().getProjectName(),
                         formatLocalDateTime(summary.getCreatedDate()),
                         summary.getSummaryType(),
                         summary.getContent()))
                 .toList();
-    }
-
-    // 로그 파일명 형식인 '컨테이너명-log-날짜.txt'에서 컨테이너명 추출하기
-    private String extractContainerName(String fileName) {
-        if (fileName == null || fileName.isEmpty()) {
-            return "";
-        }
-
-        String[] fileNameParts = fileName.split("-");
-        return fileNameParts.length > 0 ? fileNameParts[0] : "";
-    }
-
-    private String buildLogViewRedirectURI(Long projectId, String fileName) {
-        return String.format(LOG_FILE_URI_TEMPLATE, projectId, fileName);
     }
 }

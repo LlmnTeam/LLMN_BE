@@ -5,6 +5,8 @@ public class LogConstants {
     private LogConstants() {}
 
     public static final String LOGS_DIRECTORY = "logs";
+    public static final String LOG_FILE_SUFFIX = "-log";
+    public static final String LOG_FILE_URI_TEMPLATE = "/project/%d/%s";
 
     public static final String LOG_LEVEL_INFO = "INFO";
     public static final String LOG_LEVEL_WARN = "WARN";

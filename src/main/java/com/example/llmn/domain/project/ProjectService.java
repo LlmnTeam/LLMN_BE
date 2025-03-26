@@ -26,11 +26,13 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.*;
 
-import static com.example.llmn.common.constants.GlobalConstants.NOT_AVAILABLE;
-import static com.example.llmn.common.constants.GlobalConstants.SORT_BY_DATE;
+import static com.example.llmn.common.constants.GlobalConstants.*;
 import static com.example.llmn.common.utils.DateTimeUtils.formatLocalDateTime;
 import static com.example.llmn.common.utils.DateTimeUtils.parseDateTimeFromLogFile;
 import static com.example.llmn.common.utils.FileUtils.*;
+import static com.example.llmn.domain.docker.DockerConstants.DOCKER_RESOURCE_KEY_CPU;
+import static com.example.llmn.domain.docker.DockerConstants.DOCKER_RESOURCE_KEY_MEMORY;
+import static com.example.llmn.domain.log.LogConstants.LOG_FILE_SUFFIX;
 
 @Service
 @RequiredArgsConstructor
@@ -43,12 +45,6 @@ public class ProjectService {
     private final SummaryRepository summaryRepository;
     private final SshInfoRepository sshInfoRepository;
     private final UserRepository userRepository;
-
-    private static final String DOCKER_RESOURCE_KEY_CPU = "CPU";
-    private static final String DOCKER_RESOURCE_KEY_MEMORY = "Memory";
-    private static final String NOT_EXIST_SUMMARY = "";
-    private static final String NOT_EXIST_LOG = "";
-    private static final String LOG_FILE_SUFFIX = "-log";
 
     @Transactional
     @Scheduled(cron = "0 0 0,12 * * *")
@@ -255,7 +251,7 @@ public class ProjectService {
                 .orElse(null);
 
         if (latestLogFile == null) {
-            return NOT_EXIST_LOG;
+            return BLANK_STRING;
         }
 
         return parseLastTwoLogs(readFileAsString(latestLogFile));
@@ -291,7 +287,7 @@ public class ProjectService {
     }
 
     private String getContentFromSummary(Optional<Summary> latestSummaryOP) {
-        return latestSummaryOP.map(Summary::getContent).orElse(NOT_EXIST_SUMMARY);
+        return latestSummaryOP.map(Summary::getContent).orElse(BLANK_STRING);
     }
 
     private LocalDateTime getUpdateTimeFromSummary(Optional<Summary> latestSummaryOP) {

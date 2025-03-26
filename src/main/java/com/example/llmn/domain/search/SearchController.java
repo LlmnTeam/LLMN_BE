@@ -1,5 +1,6 @@
 package com.example.llmn.domain.search;
 
+import com.example.llmn.domain.search.model.SearchRes;
 import com.example.llmn.security.userdetails.CustomUserDetails;
 import com.example.llmn.common.utils.ApiUtils;
 import lombok.RequiredArgsConstructor;
@@ -29,7 +30,7 @@ public class SearchController {
                                     @AuthenticationPrincipal CustomUserDetails userDetails) {
         startDate = Optional.ofNullable(startDate).orElse(DEFAULT_START_DATE);
         endDate = Optional.ofNullable(endDate).orElse(LocalDateTime.now());
-        SearchResponse.SearchDTO responseDTO = searchService.search(keyword, startDate, endDate, userDetails.getUser().getId());
+        SearchRes responseDTO = searchService.search(keyword, startDate, endDate, userDetails.getUser().getId());
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 }
