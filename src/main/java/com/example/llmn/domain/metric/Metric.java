@@ -1,7 +1,7 @@
 package com.example.llmn.domain.metric;
 
 import com.example.llmn.common.entity.BaseEntity;
-import com.example.llmn.domain.ssh.SshInfo;
+import com.example.llmn.domain.remote.SshInfo;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;

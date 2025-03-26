@@ -11,14 +11,6 @@ public class LogConstants {
     public static final String LOG_LEVEL_ERROR = "ERROR";
     public static final String LOG_LEVEL_UNKNOWN = "UNKNOWN";
 
-    public static final String LOG_KEY_TIMESTAMP = "@timestamp";
-    public static final String LOG_KEY_LEVEL = "log_level";
-    public static final String LOG_KEY_CONTAINER_NAME = "container_name";
-    public static final String LOG_KEY_CONTAINER = "container";
-    public static final String LOG_KEY_MESSAGE = "message";
-    public static final String LOG_KEY_PROCESSED = "is_processed";
-    public static final String LOG_KEY_ID = "_id";
-
     public static final int MAX_LOG_SIZE = 1000;
 
     public static final String PERFORMANCE_SUMMARY_ALARM = "새로운 성능 요약이 생성 되었습니다.";

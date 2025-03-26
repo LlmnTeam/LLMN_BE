@@ -1,17 +1,12 @@
 package com.example.llmn.domain.log;
 
-import co.elastic.clients.elasticsearch.ElasticsearchClient;
-import co.elastic.clients.elasticsearch._types.ElasticsearchException;
-import co.elastic.clients.elasticsearch._types.query_dsl.BoolQuery;
 import co.elastic.clients.elasticsearch.core.*;
-import co.elastic.clients.elasticsearch.indices.CreateIndexRequest;
-import co.elastic.clients.json.JsonData;
 import com.example.llmn.domain.log.model.LogDataDTO;
-import com.example.llmn.integration.elasticsearch.ElasticsearchConfig;
+import com.example.llmn.integration.elasticsearch.ElasticSearchService;
 import com.example.llmn.common.utils.FileUtils;
 import com.example.llmn.common.utils.JsonUtils;
-import com.example.llmn.domain.ssh.SshInfo;
-import com.example.llmn.domain.ssh.SshInfoRepository;
+import com.example.llmn.domain.remote.SshInfo;
+import com.example.llmn.domain.remote.SshInfoRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -34,13 +29,14 @@ import static com.example.llmn.common.utils.FileUtils.findTextFiles;
 import static com.example.llmn.common.utils.MapUtils.extractBooleanFromMap;
 import static com.example.llmn.common.utils.MapUtils.extractStringFromMap;
 import static com.example.llmn.domain.log.LogConstants.*;
+import static com.example.llmn.integration.elasticsearch.ElasticSearchConstants.*;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class LogService {
 
-    private final ElasticsearchConfig elasticsearchConfig;
+    private final ElasticSearchService elasticSearchService;
     private final SshInfoRepository sshInfoRepository;
 
     private static final String CONTAINER_KEY_NAME = "name";
@@ -53,38 +49,38 @@ public class LogService {
         List<SshInfo> sshInfos = sshInfoRepository.findAll();
 
         for(SshInfo sshInfo : sshInfos) {
-            SearchResponse<Map> searchResponse = searchLogsInElasticSearch(sshInfo.getRemoteHost());
+            SearchResponse<Map> searchResponse = elasticSearchService.searchUnprocessedDocuments(
+                    getLogIndex(),
+                    sshInfo.getRemoteHost(),
+                    Map.class,
+                    MAX_LOG_SIZE
+            );
 
             List<Map<String, Object>> logMaps = convertResponseToMap(searchResponse);
             List<Map<String, Object>> refinedLogMaps = refineLogFields(logMaps);
 
-            updateLogToElasticSearch(refinedLogMaps, sshInfo.getRemoteHost());
+            elasticSearchService.updateDocuments(getLogIndex(), refinedLogMaps, sshInfo.getRemoteHost());
             saveLogMapsToFile(refinedLogMaps, sshInfo.getId());
         }
     }
 
     public void deleteLogsBefore(Instant cutoffTime, String elasticSearchHost) {
-        try {
-            ElasticsearchClient client = elasticsearchConfig.createElasticsearchClient(elasticSearchHost);
-            DeleteByQueryRequest deleteRequest = buildDeleteRequest(cutoffTime);
-            client.deleteByQuery(deleteRequest);
-        } catch (IOException e){
-            log.info("<ElasticSearch> 데이터 삭제 실패");
-        }
+        elasticSearchService.deleteDocumentsBefore(LOG_INDEX, cutoffTime, elasticSearchHost);
     }
 
     @SuppressWarnings("rawtypes")
     public List<LogDataDTO> searchLog(Instant startTime, Instant endTime, String logLevel, String containerName, String elasticSearchHost) {
-        try {
-            ElasticsearchClient client = elasticsearchConfig.createElasticsearchClient(elasticSearchHost);
-            SearchRequest searchRequest = buildSearchRequest(startTime, endTime, logLevel, containerName);
-            SearchResponse<Map> response = client.search(searchRequest, Map.class);
+        SearchResponse<Map> response = elasticSearchService.searchWithFilters(
+                LOG_INDEX,
+                startTime,
+                endTime,
+                logLevel,
+                containerName,
+                elasticSearchHost,
+                Map.class
+        );
 
-            return convertSearchHitsToDTOs(response);
-        } catch (IOException e) {
-            log.error("<ElasticSearch> {} 어플리케이션에 대해 검색 실패", containerName);
-            return new ArrayList<>();
-        }
+        return convertSearchHitsToDTOs(response);
     }
 
     public String findRecentLogs(String containerName) {
@@ -94,61 +90,22 @@ public class LogService {
                 .orElse(BLANK_STRING);
     }
 
-    @SuppressWarnings("rawtypes")
-    private SearchResponse<Map> searchLogsInElasticSearch(String elasticSearchHost) {
-        try {
-            ElasticsearchClient client = elasticsearchConfig.createElasticsearchClient(elasticSearchHost);
-            SearchRequest searchRequest = buildSearchRequest(getLogIndex());
-            return client.search(searchRequest, Map.class);
-        } catch (ElasticsearchException e) {
-            createElasticSearchIndex(getLogIndex(), elasticSearchHost);
-            return new SearchResponse.Builder<Map>().build();
-        } catch (IOException e){
-            log.error("<ElasticSearch> {}에 대한 검색 실패", getLogIndex());
-            return new SearchResponse.Builder<Map>().build();
-        }
-    }
-
-    private SearchRequest buildSearchRequest(String index) {
-        return new SearchRequest.Builder()
-                .index(index)
-                .query(q -> q.bool(b -> b
-                        .should(s -> s.term(t -> t.field(LOG_KEY_PROCESSED).value(false)))  // is_processed가 false인 로그
-                        .should(s -> s.bool(bs -> bs.mustNot(mn -> mn.exists(e -> e.field(LOG_KEY_PROCESSED)))))  // is_processed 필드가 없는 로그
-                ))
-                .size(MAX_LOG_SIZE)
-                .build();
-    }
-
-    private void createElasticSearchIndex(String indexName, String elasticSearchHost)  {
-        try {
-            CreateIndexRequest createIndexRequest = new CreateIndexRequest.Builder()
-                    .index(indexName)
-                    .mappings(m -> m
-                            .properties(LOG_KEY_PROCESSED, p -> p.boolean_(b -> b))
-                            .properties(LOG_KEY_TIMESTAMP, p -> p.date(d -> d))
-                            .properties(LOG_KEY_LEVEL, p -> p.keyword(k -> k))
-                            .properties(LOG_KEY_CONTAINER_NAME, p -> p.keyword(k -> k))
-                            .properties(LOG_KEY_MESSAGE, p -> p.text(t -> t))
-                    )
-                    .build();
-
-            ElasticsearchClient client = elasticsearchConfig.createElasticsearchClient(elasticSearchHost);
-            client.indices().create(createIndexRequest);
-        } catch (IOException e) {
-            log.info("ElasticSearch 인덱스 생성 실패!");
-        }
-    }
-
     @SuppressWarnings({"unchecked", "rawtypes"})
     private List<Map<String, Object>> convertResponseToMap(SearchResponse<Map> searchResponse){
+        if (searchResponse.hits() == null || searchResponse.hits().hits() == null) {
+            return Collections.emptyList();
+        }
+
         return searchResponse
                 .hits().hits().stream()
                 .map(hit -> {
                     Map<String, Object> logMap = hit.source();
-                    logMap.put(LOG_KEY_ID, hit.id());
+                    if (logMap != null) {
+                        logMap.put(ES_FIELD_ID, hit.id());
+                    }
                     return logMap;
                 })
+                .filter(Objects::nonNull)
                 .toList();
     }
 
@@ -166,14 +123,14 @@ public class LogService {
 
     @SuppressWarnings("unchecked")
     private String extractContainerNameFromLogMap(Map<String, Object> logMap) {
-        Map<String, Object> container = (Map<String, Object>) logMap.get(LOG_KEY_CONTAINER);
+        Map<String, Object> container = (Map<String, Object>) logMap.get(ES_FIELD_CONTAINER_OBJECT);
         return Optional.ofNullable(container)
                 .map(map -> (String) map.get(CONTAINER_KEY_NAME))
                 .orElse(UNKNOWN_CONTAINER);
     }
 
     private String extractMessageFromLogMap(Map<String, Object> logMap) {
-        return Optional.ofNullable((String) logMap.get(LOG_KEY_MESSAGE))
+        return Optional.ofNullable((String) logMap.get(ES_FIELD_MESSAGE))
                 .orElse(NO_MESSAGE);
     }
 
@@ -186,40 +143,11 @@ public class LogService {
     }
 
     private void updateLogFields(Map<String, Object> logMap, String logLevel, String containerName, String message) {
-        logMap.put(LOG_KEY_LEVEL, logLevel);
-        logMap.put(LOG_KEY_CONTAINER_NAME, containerName);
-        logMap.put(LOG_KEY_PROCESSED, true);
-        logMap.put(LOG_KEY_MESSAGE, message);
-        logMap.remove(LOG_KEY_CONTAINER);
-    }
-
-    private void updateLogToElasticSearch(List<Map<String, Object>> logMaps, String elasticSearchHost) {
-        try {
-            ElasticsearchClient client = elasticsearchConfig.createElasticsearchClient(elasticSearchHost);
-            for (Map<String, Object> logMap : logMaps) {
-                String documentId = extractDocumentId(logMap);
-                if (documentId == null) {
-                    return;
-                }
-
-                UpdateRequest<Map<String, Object>, Map<String, Object>> updateRequest = buildUpdateRequest(getLogIndex(), logMap, documentId);
-                client.update(updateRequest, Map.class);
-            }
-        } catch (IOException e){
-            log.error("<ElasticSearch> {}에 대한 업데이트 실패", getLogIndex());
-        }
-    }
-
-    private String extractDocumentId(Map<String, Object> logMap) {
-        return (String) logMap.remove(LOG_KEY_ID);
-    }
-
-    private UpdateRequest<Map<String, Object>, Map<String, Object>> buildUpdateRequest(String index, Map<String, Object> logMap, String id) {
-        return new UpdateRequest.Builder<Map<String, Object>, Map<String, Object>>()
-                .index(index)
-                .id(id)
-                .doc(logMap)
-                .build();
+        logMap.put(ES_FIELD_LEVEL, logLevel);
+        logMap.put(ES_FIELD_CONTAINER_NAME, containerName);
+        logMap.put(ES_FIELD_PROCESSED, true);
+        logMap.put(ES_FIELD_MESSAGE, message);
+        logMap.remove(ES_FIELD_CONTAINER_OBJECT);
     }
 
     private void saveLogMapsToFile(List<Map<String, Object>> logMaps, Long sshId) {
@@ -238,7 +166,7 @@ public class LogService {
 
     private Map<String, List<Map<String, Object>>> groupByContainerName(List<Map<String, Object>> logMaps) {
         return logMaps.stream()
-                .collect(Collectors.groupingBy(log -> (String) log.getOrDefault(LOG_KEY_CONTAINER_NAME, UNKNOWN_CONTAINER)));
+                .collect(Collectors.groupingBy(log -> (String) log.getOrDefault(ES_FIELD_CONTAINER_NAME, UNKNOWN_CONTAINER)));
     }
 
     private String buildLogFileName(String containerName, String timestampForTitle, Long sshId) {
@@ -259,59 +187,41 @@ public class LogService {
     }
 
     private String extractLogContentInMap(Map<String, Object> logMap, String timestamp) {
-        return Optional.ofNullable(logMap.get(LOG_KEY_MESSAGE))
+        return Optional.ofNullable(logMap.get(ES_FIELD_MESSAGE))
                 .map(Object::toString)
                 .map(logMessage -> String.format(LOG_FORMAT, timestamp, logMessage))
                 .orElse(NO_LOG_RECORD);
     }
 
-    private DeleteByQueryRequest buildDeleteRequest(Instant cutoffTime) {
-        return DeleteByQueryRequest.of(d -> d
-                .index(LOG_INDEX)
-                .query(q -> q.range(r -> r
-                        .field(LOG_KEY_TIMESTAMP)
-                        .lte(JsonData.of(cutoffTime.toString()))
-                ))
-        );
-    }
-
     @SuppressWarnings({"unchecked", "rawtypes"})
     private List<LogDataDTO> convertSearchHitsToDTOs(SearchResponse<Map> response) {
+        if (response.hits() == null || response.hits().hits() == null) {
+            return Collections.emptyList();
+        }
+
         return response.hits().hits().stream()
                 .map(hit -> convertResponseMapToDTO(hit.source()))
                 .toList();
     }
 
     private LogDataDTO convertResponseMapToDTO(Map<String, Object> responseMap) {
-        String containerName = extractStringFromMap(responseMap, LOG_KEY_CONTAINER_NAME, UNKNOWN_CONTAINER);
-        Instant timestamp = parseInstant((String) responseMap.get(LOG_KEY_TIMESTAMP));
+        if (responseMap == null) {
+            return new LogDataDTO(UNKNOWN_CONTAINER, Instant.now(), NO_MESSAGE, false, LOG_LEVEL_UNKNOWN);
+        }
+
+        String containerName = extractStringFromMap(responseMap, ES_FIELD_CONTAINER_NAME, UNKNOWN_CONTAINER);
+        Instant timestamp = parseInstant((String) responseMap.get(ES_FIELD_TIMESTAMP));
         String formattedMessage = formatLogMessage(responseMap);
-        boolean isProcessed = extractBooleanFromMap(responseMap, LOG_KEY_PROCESSED, false);
-        String logLevel = extractStringFromMap(responseMap, LOG_KEY_LEVEL, LOG_LEVEL_UNKNOWN);
+        boolean isProcessed = extractBooleanFromMap(responseMap, ES_FIELD_PROCESSED, false);
+        String logLevel = extractStringFromMap(responseMap, ES_FIELD_LEVEL, LOG_LEVEL_UNKNOWN);
 
         return new LogDataDTO(containerName, timestamp, formattedMessage, isProcessed, logLevel);
     }
 
     private String formatLogMessage(Map<String, Object> responseMap) {
-        return Optional.ofNullable((String) responseMap.get(LOG_KEY_MESSAGE))
+        return Optional.ofNullable((String) responseMap.get(ES_FIELD_MESSAGE))
                 .map(JsonUtils::normalizeJson)
                 .orElse(NO_MESSAGE);
-    }
-
-    // 나중에 searchLog() 반환 타입을 List<LogDataDTO>이 아닌 String으로 받고 싶을 때 사용
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    private String convertSearchHitsToString(SearchResponse<Map> response) {
-        List<String> logContents = response.hits().hits().stream()
-                .map(hit -> convertResponseMapToString(hit.source()))
-                .toList();
-
-        return String.join("\n", logContents);
-    }
-
-    private String convertResponseMapToString(Map<String, Object> responseMap) {
-        return responseMap == null
-                ? NO_LOG_RECORD
-                : (String) Optional.ofNullable(responseMap.get(LOG_KEY_MESSAGE)).orElse(BLANK_STRING);
     }
 
     private Optional<String> findLatestLogFile(String containerName) {
@@ -354,34 +264,6 @@ public class LogService {
 
     private String extractHeaderFromLog(String log) {
         return log.substring(1, 17);
-    }
-
-    private SearchRequest buildSearchRequest(Instant startTime, Instant endTime, String logLevel, String containerName) {
-        BoolQuery.Builder boolQuery = new BoolQuery.Builder();
-
-        addTimeRangeFilter(boolQuery, startTime, endTime);
-        if (logLevel != null) addTermFilter(boolQuery, LOG_KEY_LEVEL, logLevel);
-        if (containerName != null) addTermFilter(boolQuery, LOG_KEY_CONTAINER_NAME, containerName);
-
-        return new SearchRequest.Builder()
-                .index(LOG_INDEX)
-                .query(q -> q.bool(boolQuery.build()))
-                .build();
-    }
-
-    private void addTimeRangeFilter(BoolQuery.Builder boolQuery, Instant startTime, Instant endTime) {
-        boolQuery.must(m -> m.range(r -> r
-                .field(LOG_KEY_TIMESTAMP)
-                .gte(JsonData.of(startTime.toString()))
-                .lte(JsonData.of(endTime.toString()))
-        ));
-    }
-
-    private void addTermFilter(BoolQuery.Builder boolQuery, String field, String value) {
-        boolQuery.filter(f -> f.term(t -> t
-                .field(field)
-                .value(value)
-        ));
     }
 
     private String getLogIndex() {

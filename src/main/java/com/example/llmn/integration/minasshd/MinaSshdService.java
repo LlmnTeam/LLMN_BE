@@ -21,6 +21,10 @@ import java.security.KeyPair;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
+import static com.example.llmn.common.constants.GlobalConstants.BLANK_STRING;
+import static com.example.llmn.integration.minasshd.MinaSshdConstants.*;
+import static com.example.llmn.integration.redis.RedisConstants.*;
+
 @Slf4j
 public class MinaSshdService {
     private final SshClient client;
@@ -30,26 +34,7 @@ public class MinaSshdService {
     private final InputStream pipedOut;
     private final Jedis jedis;
 
-    private static final int AUTH_TIMEOUT = 10;
-    private static final int CONNECTION_TIMEOUT = 5;
-    private static final int SHELL_CHANNEL_TIMEOUT = 10;
-    private static final int REDIS_PORT = 6379;
-    private static final String REDIS_HOST = "redis";
-    private static final int REDIS_TIMEOUT = 60000; // 1분
-    private static final String REDIS_CHANNEL = "ssh-command-output"; // 고정된 Redis 채널 이름
-    private static final String PROMPT_UBUNTU = "ubuntu@";
-    private static final String PROMPT_DOLLAR = "$ ";
-    private static final int SSH_PORT = 22;
     private static final String FAIL_COMMAND = "명령어 실행에 실패하였습니다.";
-    private static final String PTY_TYPE = "xterm";
-    private static final int PTY_COLUMNS = 160;
-    private static final int PTY_LINES = 24;
-    private static final int PTY_WIDTH = 640;
-    private static final int PTY_HEIGHT = 480;
-    private static final int BUFFER_SIZE = 4096;
-    private static final int SLEEP_DURATION_MS = 100;
-    private static final String BLANK_STRING = "";
-    private static final int ASCII_SIGINT_SIGNAL = 3; // ASCII 0x03은 SIGINT 신호
 
     public MinaSshdService(String host, String username, String privateKeyPath) {
         this.client = initializeSSHClient();
@@ -188,7 +173,7 @@ public class MinaSshdService {
     }
 
     private Jedis initializeJedis() {
-        return new Jedis(REDIS_HOST, REDIS_PORT, REDIS_TIMEOUT);
+        return new Jedis(REDIS_HOST, REDIS_PORT, REDIS_TIMEOUT_SSH);
     }
 
     private void clearOutputStream() throws IOException {
@@ -232,7 +217,7 @@ public class MinaSshdService {
 
             String output = decodeToUtf8(buffer, bytesRead);
             resultBuilder.append(output);
-            jedis.publish(REDIS_CHANNEL, output);
+            jedis.publish(REDIS_CHANNEL_SSH, output);
         }
     }
 

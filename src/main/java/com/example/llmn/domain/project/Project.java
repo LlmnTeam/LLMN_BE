@@ -1,7 +1,7 @@
 package com.example.llmn.domain.project;
 
 import com.example.llmn.domain.docker.ContainerStatus;
-import com.example.llmn.domain.ssh.SshInfo;
+import com.example.llmn.domain.remote.SshInfo;
 import com.example.llmn.common.entity.BaseEntity;
 import com.example.llmn.domain.user.User;
 import jakarta.persistence.*;

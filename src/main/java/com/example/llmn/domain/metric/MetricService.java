@@ -2,10 +2,10 @@ package com.example.llmn.domain.metric;
 
 import com.example.llmn.domain.metric.model.response.FindCurrentMetricRes;
 import com.example.llmn.domain.metric.model.response.FindMetricHistoryRes;
-import com.example.llmn.domain.ssh.SshInfo;
+import com.example.llmn.domain.remote.SshInfo;
 import com.example.llmn.domain.user.User;
-import com.example.llmn.domain.ssh.SSHService;
-import com.example.llmn.domain.ssh.SshInfoRepository;
+import com.example.llmn.domain.remote.SSHService;
+import com.example.llmn.domain.remote.SshInfoRepository;
 import com.example.llmn.domain.user.UserRepository;
 import com.example.llmn.integration.redis.RedisService;
 import lombok.RequiredArgsConstructor;

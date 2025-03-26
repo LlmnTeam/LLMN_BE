@@ -1,6 +1,5 @@
 package com.example.llmn.domain.other;
 
-import com.example.llmn.domain.metric.MetricResponse;
 import com.example.llmn.domain.metric.MetricService;
 import com.example.llmn.domain.metric.model.response.FindCurrentMetricRes;
 import com.example.llmn.domain.metric.model.response.FindMetricHistoryRes;
@@ -8,7 +7,7 @@ import com.example.llmn.domain.user.model.UserResponse;
 import com.example.llmn.common.exceptions.CustomException;
 import com.example.llmn.common.exceptions.ExceptionCode;
 import com.example.llmn.domain.summary.SummaryType;
-import com.example.llmn.domain.ssh.SshInfoRepository;
+import com.example.llmn.domain.remote.SshInfoRepository;
 import com.example.llmn.domain.summary.SummaryRepository;
 import com.example.llmn.domain.user.UserRepository;
 import lombok.RequiredArgsConstructor;
