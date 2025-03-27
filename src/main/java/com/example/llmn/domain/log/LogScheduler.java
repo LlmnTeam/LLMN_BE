@@ -1,12 +1,15 @@
 package com.example.llmn.domain.log;
 
+import com.example.llmn.common.exceptions.CustomException;
+import com.example.llmn.common.exceptions.ExceptionCode;
 import com.example.llmn.domain.log.model.request.SummaryReq;
 import com.example.llmn.domain.log.model.response.*;
-import com.example.llmn.domain.metric.MetricResponse;
 import com.example.llmn.domain.alarm.AlarmService;
 import com.example.llmn.domain.alarm.AlarmType;
 import com.example.llmn.domain.metric.MetricService;
 import com.example.llmn.domain.metric.model.response.*;
+import com.example.llmn.domain.other.OpenAiKey;
+import com.example.llmn.domain.other.OpenAiKeyRepository;
 import com.example.llmn.domain.project.Project;
 import com.example.llmn.domain.summary.Summary;
 import com.example.llmn.domain.summary.SummaryType;
@@ -34,13 +37,14 @@ import static com.example.llmn.domain.log.LogConstants.*;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class LlmService {
+public class LogScheduler {
 
     private final LogService logService;
     private final MetricService metricService;
     private final AlarmService alarmService;
     private final UserRepository userRepository;
     private final SummaryRepository summaryRepository;
+    private final OpenAiKeyRepository openAiKeyRepository;
     private final ProjectRepository projectRepository;
     private final WebClient webClient;
 
@@ -66,103 +70,103 @@ public class LlmService {
 
     @Transactional
     @Scheduled(cron = "0 0 * * * *")
-    public void summaryProjectLog(){
-        List<Project> projects = projectRepository.findAllWithUser().stream()
-                .filter(Project::isConnected)
-                .toList();
+    public void summaryProjectLog() {
+        List<User> users = userRepository.findAll();
+        for(User user : users){
+            List<Project> projects = projectRepository.findByUserId(user.getId()).stream()
+                    .filter(Project::isConnected)
+                    .toList();
 
-        projects.forEach(this::processProjectLogSummary);
+            projects.forEach(project -> processProjectLogSummary(project, user.getId()));
+        }
     }
 
     @Transactional
     @Scheduled(cron = "0 5 * * * *")
-    public void summaryPerformance(){
+    public void summaryPerformance() {
         List<User> users = userRepository.findAll();
-
-        for(User user : users) {
+        for (User user : users) {
             Long monitoringSshInfoId = user.getMonitoringSshId();
 
-            fetchMetricSummary(monitoringSshInfoId).ifPresent(performanceSummaryRes -> {
-                saveSummary(user, performanceSummaryRes.performanceSummary(), SummaryType.PERFORMANCE);
-                alarmService.generateAlarm(user.getId(), PERFORMANCE_SUMMARY_ALARM, AlarmType.UPDATE);
-            });
+            fetchMetricSummary(monitoringSshInfoId, user.getId())
+                    .ifPresent(performanceSummaryRes -> {
+                        saveSummary(user, performanceSummaryRes.performanceSummary(), SummaryType.PERFORMANCE);
+                        alarmService.generateAlarm(user.getId(), PERFORMANCE_SUMMARY_ALARM, AlarmType.UPDATE);
+                    });
         }
     }
 
     @Transactional
     @Scheduled(cron = "0 10 * * * *")
-    public void summaryHourly(){
+    public void summaryHourly() {
         List<Long> userIds = userRepository.findIds();
-
-        for(Long userId: userIds) {
-            fetchHourlySummary(userId).ifPresent(hourlySummaryRes -> {
-                User userRef = userRepository.getReferenceById(userId);
-                saveSummary(userRef, hourlySummaryRes.hourlySummary(), SummaryType.HOURLY);
-                alarmService.generateAlarm(userId, HOURLY_SUMMARY_ALARM, AlarmType.UPDATE);
-            });
+        for (Long userId : userIds) {
+            fetchHourlySummary(userId)
+                    .ifPresent(hourlySummaryRes -> {
+                        User user = userRepository.getReferenceById(userId);
+                        saveSummary(user, hourlySummaryRes.hourlySummary(), SummaryType.HOURLY);
+                        alarmService.generateAlarm(userId, HOURLY_SUMMARY_ALARM, AlarmType.UPDATE);
+                    });
         }
     }
 
     @Transactional
     @Scheduled(cron = "0 55 23 * * *")
-    public void summaryDaily(){
+    public void summaryDaily() {
         List<Long> userIds = userRepository.findIds();
-
-        for(Long userId: userIds) {
-            fetchDailySummary(userId).ifPresent(dailySummaryRes -> {
-                User userRef = userRepository.getReferenceById(userId);
-                saveSummary(userRef, dailySummaryRes.dailySummary(), SummaryType.DAILY);
-                alarmService.generateAlarm(userId, DAILY_SUMMARY_ALARM, AlarmType.UPDATE);
-            });
+        for (Long userId : userIds) {
+            fetchDailySummary(userId)
+                    .ifPresent(dailySummaryRes -> {
+                        User user = userRepository.getReferenceById(userId);
+                        saveSummary(user, dailySummaryRes.dailySummary(), SummaryType.DAILY);
+                        alarmService.generateAlarm(userId, DAILY_SUMMARY_ALARM, AlarmType.UPDATE);
+                    });
         }
     }
 
     @Transactional
     @Scheduled(cron = "0 45 23 * * 0")
-    public void summaryTrend(){
+    public void summaryTrend() {
         List<Long> userIds = userRepository.findIds();
-
-        for(Long userId: userIds) {
-            fetchTrendSummary(userId).ifPresent(trendSummaryRes -> {
-                User userRef = userRepository.getReferenceById(userId);
-                saveSummary(userRef, trendSummaryRes.trendSummary(), SummaryType.TEND);
-
-                alarmService.generateAlarm(userId, TREND_SUMMARY_ALARM, AlarmType.UPDATE);
-            });
+        for (Long userId : userIds) {
+            fetchTrendSummary(userId)
+                    .ifPresent(trendSummaryRes -> {
+                        User user = userRepository.getReferenceById(userId);
+                        saveSummary(user, trendSummaryRes.trendSummary(), SummaryType.TEND);
+                        alarmService.generateAlarm(userId, TREND_SUMMARY_ALARM, AlarmType.UPDATE);
+                    });
         }
     }
 
     @Transactional
     @Scheduled(cron = "0 20 0,6,12,18 * * *")
-    public void recommend(){
+    public void recommend() {
         List<Long> userIds = userRepository.findIds();
-
-        for(Long userId: userIds) {
-            fetchRecommendation(userId).ifPresent(recommendationDTO -> {
-                User userRef = userRepository.getReferenceById(userId);
-                saveSummary(userRef, recommendationDTO.recommend(), SummaryType.RECOMMENDATION);
-
-                alarmService.generateAlarm(userId, RECOMMENDATION_ALARM, AlarmType.UPDATE);
-            });
+        for (Long userId : userIds) {
+            fetchRecommendation(userId)
+                    .ifPresent(recommendationDTO -> {
+                        User user = userRepository.getReferenceById(userId);
+                        saveSummary(user, recommendationDTO.recommend(), SummaryType.RECOMMENDATION);
+                        alarmService.generateAlarm(userId, RECOMMENDATION_ALARM, AlarmType.UPDATE);
+                    });
         }
     }
 
-    private void processProjectLogSummary(Project project) {
+    private void processProjectLogSummary(Project project, Long userId) {
         String containerName = project.getContainerName();
-
-        fetchLogSummary(containerName).ifPresent(summaryRes -> {
-            saveSummary(project.getUser(), project, summaryRes.logSummary(), SummaryType.LOG);
-
-            checkUrgency(project, summaryRes);
-            alarmService.generateAlarm(project.getUser().getId(), createAlarmContent(project), AlarmType.UPDATE);
-        });
+        fetchLogSummary(containerName, userId)
+                .ifPresent(summaryRes -> {
+                    saveSummary(project.getUser(), project, summaryRes.logSummary(), SummaryType.LOG);
+                    checkUrgency(project, summaryRes);
+                    alarmService.generateAlarm(project.getUser().getId(), createAlarmContent(project), AlarmType.UPDATE);
+                });
     }
 
-    private Optional<SummaryRes> fetchLogSummary(String containerName) {
+    private Optional<SummaryRes> fetchLogSummary(String containerName, Long userId) {
         String logContent = logService.findRecentLogs(containerName);
 
         String summaryRequestBody = buildSummaryRequestBody(containerName, logContent);
-        SummaryRes responseDTO = sendSummaryRequest(logSummeryUri, summaryRequestBody, SummaryRes.class);
+        SummaryRes responseDTO = sendSummaryRequest(logSummeryUri, summaryRequestBody, SummaryRes.class, userId);
 
         return Optional.ofNullable(responseDTO);
     }
@@ -174,7 +178,7 @@ public class LlmService {
     }
 
     private void checkUrgency(Project project, SummaryRes summaryRes) {
-        if(summaryRes.isUrgent()) {
+        if (summaryRes.isUrgent()) {
             project.updateIsUrgent(true);
             String emergencyAlarmContent = project.getProjectName() + LOG_EMERGENCY_ALARM_SUFFIX;
             alarmService.generateAlarm(project.getUser().getId(), emergencyAlarmContent, AlarmType.EMERGENCY);
@@ -185,11 +189,11 @@ public class LlmService {
         return project.getProjectName() + LOG_UPDATE_ALARM_SUFFIX;
     }
 
-    private Optional<PerformanceSummaryRes> fetchMetricSummary(Long sshInfoId){
+    private Optional<PerformanceSummaryRes> fetchMetricSummary(Long sshInfoId, Long userId) {
         FindMetricHistoryRes metricHistory = metricService.findMetricHistory(METRIC_HISTORY_PREVIOUS_HOUR, sshInfoId);
 
         String summaryRequestBody = buildSummaryRequestBody(metricHistory);
-        PerformanceSummaryRes responseDTO = sendSummaryRequest(performanceSummeryUri, summaryRequestBody, PerformanceSummaryRes.class);
+        PerformanceSummaryRes responseDTO = sendSummaryRequest(performanceSummeryUri, summaryRequestBody, PerformanceSummaryRes.class, userId);
 
         return Optional.ofNullable(responseDTO);
     }
@@ -243,7 +247,7 @@ public class LlmService {
         List<Summary> logSummaries = summaryRepository.findByTypeWithinDateWithProject(List.of(SummaryType.LOG), userId, startOfHour);
 
         String summaryRequestBody = buildHourlySummaryRequestBody(performanceSummaries, logSummaries);
-        HourlySummaryRes responseDTO = sendSummaryRequest(hourlySummaryUri, summaryRequestBody, HourlySummaryRes.class);
+        HourlySummaryRes responseDTO = sendSummaryRequest(hourlySummaryUri, summaryRequestBody, HourlySummaryRes.class, userId);
 
         return Optional.ofNullable(responseDTO);
     }
@@ -262,7 +266,7 @@ public class LlmService {
         List<Summary> logSummaries = summaryRepository.findByTypeWithinDateWithProject(List.of(SummaryType.LOG), userId, startOfDay);
 
         String summaryRequestBody = buildDailySummaryRequestBody(performanceSummaries, logSummaries);
-        DailySummaryRes responseDTO = sendSummaryRequest(dailySummeryUri, summaryRequestBody, DailySummaryRes.class);
+        DailySummaryRes responseDTO = sendSummaryRequest(dailySummeryUri, summaryRequestBody, DailySummaryRes.class, userId);
 
         return Optional.ofNullable(responseDTO);
     }
@@ -275,12 +279,12 @@ public class LlmService {
         return summaryRequestBody.toString();
     }
 
-    private Optional<TrendSummaryRes> fetchTrendSummary(Long userId){
+    private Optional<TrendSummaryRes> fetchTrendSummary(Long userId) {
         LocalDateTime startOfDay = LocalDateTime.now().minusWeeks(1).with(LocalTime.MIN);
         List<Summary> dailySummaries = summaryRepository.findByTypeWithinDate(List.of(SummaryType.DAILY), userId, startOfDay);
 
         String summaryRequestBody = buildTendSummaryRequestBody(dailySummaries);
-        TrendSummaryRes responseDTO = sendSummaryRequest(trendSummeryUri, summaryRequestBody, TrendSummaryRes.class);
+        TrendSummaryRes responseDTO = sendSummaryRequest(trendSummeryUri, summaryRequestBody, TrendSummaryRes.class, userId);
 
         return Optional.ofNullable(responseDTO);
     }
@@ -298,7 +302,7 @@ public class LlmService {
         List<Summary> logSummaries = summaryRepository.findByTypeWithinDateWithProject(List.of(SummaryType.LOG), userId, startOfTime);
 
         String summaryRequestBody = buildRecommendRequestBody(performanceSummaries, logSummaries);
-        RecommendationRes responseDTO = sendSummaryRequest(recommendUri, summaryRequestBody, RecommendationRes.class);
+        RecommendationRes responseDTO = sendSummaryRequest(recommendUri, summaryRequestBody, RecommendationRes.class, userId);
 
         return Optional.ofNullable(responseDTO);
     }
@@ -348,17 +352,24 @@ public class LlmService {
         }
     }
 
-    private <T> T sendSummaryRequest(String uri, String requestContent, Class<T> responseType) {
+    private <T> T sendSummaryRequest(String uri, String requestContent, Class<T> responseType, Long userId) {
         try {
+            String apiKey = getOpenAiKey(userId);
             return webClient.post()
                     .uri(buildURI(uri))
-                    .bodyValue(new SummaryReq(requestContent))
+                    .bodyValue(new SummaryReq(requestContent, apiKey))
                     .retrieve()
                     .bodyToMono(responseType)
                     .block();
         } catch (Exception e) {
             return null;
         }
+    }
+
+    private String getOpenAiKey(Long userId) {
+        return openAiKeyRepository.findByUser_Id(userId)
+                .map(OpenAiKey::getKeyValue)
+                .orElseThrow(() -> new CustomException(ExceptionCode.API_KEY_NOT_FOUND));
     }
 
     private void saveSummary(User user, String content, SummaryType summaryType) {

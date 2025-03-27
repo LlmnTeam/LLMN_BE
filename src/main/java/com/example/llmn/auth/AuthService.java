@@ -1,4 +1,4 @@
-package com.example.llmn.admin;
+package com.example.llmn.auth;
 
 import com.example.llmn.common.exceptions.CustomException;
 import com.example.llmn.common.exceptions.ExceptionCode;
@@ -16,6 +16,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.HashMap;
 import java.util.Map;
 
+import static com.example.llmn.common.constants.GlobalConstants.ACCESS_TOKEN;
+import static com.example.llmn.common.constants.GlobalConstants.REFRESH_TOKEN;
 import static com.example.llmn.integration.redis.RedisConstants.*;
 
 @Service
@@ -44,13 +46,15 @@ public class AuthService {
     }
 
     private Map<String, String> createToken(User user) {
+        String accessToken = JWTProvider.createAccessToken(user);
         String refreshToken = JWTProvider.createRefreshToken(user);
 
         redisService.storeValue(REDIS_KEY_REFRESH_TOKEN, String.valueOf(user.getId()), refreshToken, JWTProvider.REFRESH_EXP_MILLI);
         redisService.storeValue(REDIS_KEY_SESSION_ID, user.getId().toString());
 
         Map<String, String> tokens = new HashMap<>();
-        tokens.put(REDIS_KEY_REFRESH_TOKEN, refreshToken);
+        tokens.put(ACCESS_TOKEN, accessToken);
+        tokens.put(REFRESH_TOKEN, refreshToken);
 
         return tokens;
     }

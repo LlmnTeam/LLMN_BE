@@ -1,7 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException
+import logging
+
+from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
-from app.models.dto import (
-    LogRequest, LogFilesRequest, ValidateAPIRequest, EnvUpdateRequest
+from app.schemas.dto import (
+    LogRequest, LogFilesRequest, ValidateAPIRequest
 )
 from app.services.generate_summaries import (
     generate_log_summary, generate_performance_summary, generate_daily_summary,
@@ -11,14 +13,13 @@ from app.services.generate_summaries import (
 from app.services.conversation_manager import ConversationManager
 from app.services.rag_service import Rag_Service
 from app.utils.utils import combine_logs_and_question, get_user_id_from_token
-from app.settings import env_file_path, reload_settings
-from dotenv import set_key, load_dotenv
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 @router.post("/process/logSummary")
 async def process_log_summary(request: LogRequest):
-    log_summary, is_urgent = await generate_log_summary(request.content)
+    log_summary, is_urgent = await generate_log_summary(request.content, request.apiKey)
     
     return {
         "logSummary": log_summary,
@@ -27,7 +28,7 @@ async def process_log_summary(request: LogRequest):
 
 @router.post("/process/performanceSummary")
 async def process_performance_summary(request: LogRequest):
-    performance_summary = await generate_performance_summary(request.content)
+    performance_summary = await generate_performance_summary(request.content, request.apiKey)
     
     return {
         "performanceSummary": performance_summary
@@ -35,15 +36,15 @@ async def process_performance_summary(request: LogRequest):
 
 @router.post("/process/dailySummary")
 async def process_daily_summary(request: LogRequest):
-    daily_summary = await generate_daily_summary(request.content)
+    daily_summary = await generate_daily_summary(request.content, request.apiKey)
     
     return {
         "dailySummary": daily_summary
     }
 
 @router.post("/process/trendSummary")
-async def process_daily_summary(request: LogRequest):
-    trend_summary = await generate_trend_summary(request.content)
+async def process_trend_summary(request: LogRequest):
+    trend_summary = await generate_trend_summary(request.content, request.apiKey)
     
     return {
         "trendSummary": trend_summary
@@ -51,7 +52,7 @@ async def process_daily_summary(request: LogRequest):
 
 @router.post("/process/recommend")
 async def process_recommend(request: LogRequest):
-    recommend = await generate_recommend(request.content)
+    recommend = await generate_recommend(request.content, request.apiKey)
     
     return {
         "recommend": recommend
@@ -59,7 +60,7 @@ async def process_recommend(request: LogRequest):
 
 @router.post("/process/hourlySummary")
 async def process_hourly_summary(request: LogRequest):
-    hourly_summary = await generate_hourly_summary(request.content)
+    hourly_summary = await generate_hourly_summary(request.content, request.apiKey)
     
     return {
         "hourlySummary": hourly_summary
@@ -75,8 +76,8 @@ async def process_logs_and_question(
     # 로그와 질문을 포함한 최종 질문 생성
     final_question = combine_logs_and_question(request, conversation_manager)
 
-    # OpnAI API 호출
-    rag_service = Rag_Service()
+    # RAG 서비스 초기화 (API 키 전달)
+    rag_service = Rag_Service(request.api_key)
 
     # 스트리밍된 응답을 수집하기 위한 리스트
     response_collector = []
@@ -101,25 +102,3 @@ async def validate_api_key(request: ValidateAPIRequest):
         return {"isValid": True}
     else:
         return {"isValid": False}
-        
-@router.post("/update-env")
-async def update_env(request: EnvUpdateRequest):
-    key, value = request.key, request.value
-
-    try:
-        # .env 파일 로드
-        load_dotenv(env_file_path)
-        
-        # .env 파일에 key-value 쌍 저장
-        set_key(env_file_path, key, f'"{value}"')
-
-        # .env 파일 다시 로드
-        load_dotenv(env_file_path, override=True)
-
-        # 환경 설정을 다시 로드하여 업데이트 적용
-        reload_settings()
-
-        return {"success": True}
-    
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f".env 파일 업데이트 실패: {str(e)}")

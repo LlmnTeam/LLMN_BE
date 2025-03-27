@@ -8,7 +8,6 @@ public class RedisConstants {
     public static final String REDIS_HOST = "redis";
 
     public static final String REDIS_KEY_REFRESH_TOKEN = "refreshToken";
-    public static final String REDIS_KEY_ACCESS_TOKEN = "accessToken";
     public static final String REDIS_KEY_SESSION_ID = "sessionId";
     public static final String REDIS_KEY_SSH = "SSH";
 

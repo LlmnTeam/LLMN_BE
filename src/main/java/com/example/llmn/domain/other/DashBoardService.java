@@ -41,7 +41,6 @@ public class DashBoardService {
         Long sshInfoId = findMonitoringSshId(userId);
         String remoteHost = findRemoteHost(sshInfoId);
 
-
         FindCurrentMetricRes currentMetric = metricService.findCurrentMetric(sshInfoId);
         FindMetricHistoryRes metricHistory = metricService.findMetricHistory(24, sshInfoId);
 

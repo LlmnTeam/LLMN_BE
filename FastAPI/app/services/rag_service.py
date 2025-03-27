@@ -5,7 +5,6 @@ from typing import Any, Dict, List
 from langchain.callbacks.base import BaseCallbackHandler
 from langchain.schema import LLMResult
 from langchain_openai import ChatOpenAI
-from app.settings import app_settings
 
 # OpenAI API 스트리밍
 class StreamingHandler(BaseCallbackHandler):
@@ -32,14 +31,14 @@ class StreamingHandler(BaseCallbackHandler):
 
 class Rag_Service:
     # 스트리밍 핸들러와 LLM을 초기화
-    def __init__(self):
+    def __init__(self, api_key: str):
         self.streamer_queue = Queue() # 토큰을 비동기적으로 전달하기 위한 저장소로 사용
         self.streaming_handler = StreamingHandler(queue=self.streamer_queue)
         self.LLM = ChatOpenAI(
             model="gpt-4o-mini",
             streaming=True,
             callbacks=[self.streaming_handler],
-            openai_api_key=app_settings.OPENAI_API_KEY
+            openai_api_key=api_key
         )
 
     # LLM 호출

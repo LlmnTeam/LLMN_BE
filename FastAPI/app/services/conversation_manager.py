@@ -10,13 +10,13 @@ class ConversationManager:
         self.keep_recent_messages = 15  # 요약 후 유지할 최근 대화 수
 
     # 대화 히스토리에 사용자 입력과 시스템 응답을 추가
-    def add_to_history(self, user_input: str, system_response: str):
+    def add_to_history(self, user_input: str, system_response: str, api_key: str):
         r.rpush(self.key, f"User: {user_input}", f"System: {system_response}")
         r.expire(self.key, 1800)  
 
         # 대화 토큰 수 체크
         if self.calculate_total_tokens() > self.max_token_length:
-            self.summarize_conversation()
+            self.summarize_conversation(api_key)
 
     # 최근 n개의 대화 히스토리(질문/응답) 가져오기
     def get_recent_conversation(self):
@@ -49,7 +49,7 @@ class ConversationManager:
         return total_tokens
     
     # 대화 요약 생성
-    def summarize_conversation(self):
+    def summarize_conversation(self, api_key: str):
         total_length = r.llen(self.key)
         num_messages_to_summarize = total_length - self.keep_recent_messages * 2  # 사용자와 시스템 메시지 각각 포함
 
@@ -73,7 +73,7 @@ class ConversationManager:
             model="gpt-4o-mini",
             temperature=0.3,
             max_tokens=750,
-            openai_api_key=app_settings.OPENAI_API_KEY
+            openai_api_key=api_key
         )
 
         try:

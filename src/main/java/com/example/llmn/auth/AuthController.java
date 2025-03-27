@@ -1,4 +1,4 @@
-package com.example.llmn.admin;
+package com.example.llmn.auth;
 
 import com.example.llmn.common.utils.ApiUtils;
 import com.example.llmn.domain.user.model.request.LoginReq;

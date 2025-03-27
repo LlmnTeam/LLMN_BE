@@ -2,6 +2,8 @@ package com.example.llmn.domain.user;
 
 import com.example.llmn.common.exceptions.CustomException;
 import com.example.llmn.common.exceptions.ExceptionCode;
+import com.example.llmn.domain.other.OpenAiKey;
+import com.example.llmn.domain.other.OpenAiKeyRepository;
 import com.example.llmn.domain.user.model.request.*;
 import com.example.llmn.domain.user.model.response.*;
 import com.example.llmn.integration.email.model.EmailVerificationTemplate;
@@ -46,6 +48,7 @@ public class UserService {
     private final SshInfoRepository sshInfoRepository;
     private final MetricRepository metricRepository;
     private final AlarmRepository alarmRepository;
+    private final OpenAiKeyRepository openAiKeyRepository;
     private final SSHService sshService;
     private final RedisService redisService;
     private final SummaryRepository summaryRepository;
@@ -56,11 +59,6 @@ public class UserService {
     @Value("${validate_key.uri}")
     private String requestValidateKeyUri;
 
-    @Value("${update_env.uri}")
-    private String updateEnvUri;
-
-    private static final String OPEN_API_KEY = "OPENAI_API_KEY";
-
     @Transactional
     public void join(JoinReq requestDTO) {
         userValidator.validateJoinRequest(requestDTO);
@@ -70,7 +68,7 @@ public class UserService {
         List<SshInfo> sshInfos = sshService.saveSshInfos(requestDTO.sshInfos(), user);
         sshService.setMonitoringSshInfo(requestDTO.monitoringSshHost(), sshInfos, user);
 
-        updateOpenAIKey(requestDTO.openAiKey());
+        updateOpenAIKey(requestDTO.openAiKey(), requestDTO.email());
     }
 
     @Async
@@ -167,16 +165,22 @@ public class UserService {
         return new VerifySshConnectRes(isValid);
     }
 
-    public void updateOpenAIKey(String value) {
-        EnvUpdateDTO responseDTO = webClient.post()
-                .uri(buildURI(updateEnvUri))
-                .bodyValue(new EnvUpdateReq(OPEN_API_KEY, value))
-                .retrieve()
-                .bodyToMono(EnvUpdateDTO.class)
-                .block();
+    @Transactional
+    public void updateOpenAIKey(String apiKey, String email) {
+        // 이메일을 임시 식별자로 사용
+        Optional<OpenAiKey> existingKey = openAiKeyRepository.findByTempIdentifier(email);
 
-        if (isUpdateSuccess(responseDTO))
-            throw new CustomException(ExceptionCode.UPDATE_KEY_FAIL);
+        if (existingKey.isPresent()) {
+            existingKey.get().updateKeyValue(apiKey);
+        } else {
+            OpenAiKey openAiKey = OpenAiKey.builder()
+                    .keyValue(apiKey)
+                    .tempIdentifier(email)
+                    .build();
+            openAiKeyRepository.save(openAiKey);
+        }
+
+        validateOpenAIKey(apiKey);
     }
 
     public ValidateOpenAIKeyRes validateOpenAIKey(String apiKey) {

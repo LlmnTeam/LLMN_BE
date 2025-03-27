@@ -1,3 +1,3 @@
 package com.example.llmn.domain.log.model.request;
 
-public record SummaryReq(String content) {}
+public record SummaryReq(String content, String apiKey) {}

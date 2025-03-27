@@ -1,6 +1,5 @@
 from langchain_openai import ChatOpenAI
 from langchain.prompts import PromptTemplate
-from app.settings import app_settings
 import logging
 
 logger = logging.getLogger(__name__)
@@ -31,7 +30,7 @@ async def validate_openai_api_key(api_key: str) -> bool:
         # 오류 발생 시 유효하지 않음
         return False
 
-async def generate_log_summary(content: str):    
+async def generate_log_summary(content: str, api_key: str):     
     prompt = (
         "### Persona ###\n"
         "You are an expert system log analyst. Summarize and detect anomalies in the following system logs.\n"
@@ -83,7 +82,7 @@ async def generate_log_summary(content: str):
         model="gpt-4o-mini",
         temperature=0.3,
         max_tokens=1200,
-        openai_api_key=app_settings.OPENAI_API_KEY
+        openai_api_key=api_key
     )
     
     prompt_template = PromptTemplate(input_variables=["prompt"], template="{prompt}")
@@ -107,7 +106,7 @@ async def generate_log_summary(content: str):
 
     return log_summary, is_urgent
 
-async def generate_performance_summary(content: str):    
+async def generate_performance_summary(content: str, api_key: str):  
     prompt = (
         "### Persona ###\n"
         "You are an expert system performance analyst. Summarize and identify abnormal patterns in the following performance metrics.\n"
@@ -159,7 +158,7 @@ async def generate_performance_summary(content: str):
         model="gpt-4o-mini",
         temperature=0.3,
         max_tokens=500,
-        openai_api_key=app_settings.OPENAI_API_KEY
+        openai_api_key=api_key
     )
     
     prompt_template = PromptTemplate(input_variables=["prompt"], template="{prompt}")
@@ -170,7 +169,7 @@ async def generate_performance_summary(content: str):
 
     return performance_summary
 
-async def generate_daily_summary(content: str):    
+async def generate_daily_summary(content: str, api_key: str): 
     prompt = (
         "### Persona ###\n"
         "You are an expert system performance and application log analyst. Generate a daily key summary report based on application and performance logs.\n"
@@ -229,7 +228,7 @@ async def generate_daily_summary(content: str):
         model="gpt-4o-mini",
         temperature=0.3,
         max_tokens=1200,
-        openai_api_key=app_settings.OPENAI_API_KEY
+        openai_api_key=api_key
     )
     
     prompt_template = PromptTemplate(input_variables=["prompt"], template="{prompt}")
@@ -240,7 +239,7 @@ async def generate_daily_summary(content: str):
 
     return daily_summary
 
-async def generate_trend_summary(content: str):    
+async def generate_trend_summary(content: str, api_key: str):  
     prompt = (
         "### Persona ###\n"
         "You are an expert system performance and application log analyst. Generate a weekly long-term trend analysis report based on daily key summaries.\n"
@@ -338,7 +337,7 @@ async def generate_trend_summary(content: str):
         model="gpt-4o-mini",
         temperature=0.3,
         max_tokens=2000,
-        openai_api_key=app_settings.OPENAI_API_KEY
+        openai_api_key=api_key
     )
     
     prompt_template = PromptTemplate(input_variables=["prompt"], template="{prompt}")
@@ -349,7 +348,7 @@ async def generate_trend_summary(content: str):
 
     return trend_summary
 
-async def generate_recommend(content: str):    
+async def generate_recommend(content: str, api_key: str):   
     prompt = (
         "### Persona ###\n"
         "You are an expert system performance analyst. Your task is to provide concise, actionable recommendations based on application logs and performance data from the past 6 hours.\n"
@@ -381,7 +380,7 @@ async def generate_recommend(content: str):
         model="gpt-4o-mini",
         temperature=0.3,
         max_tokens=750,
-        openai_api_key=app_settings.OPENAI_API_KEY
+        openai_api_key=api_key
     )
     
     prompt_template = PromptTemplate(input_variables=["prompt"], template="{prompt}")
@@ -392,7 +391,7 @@ async def generate_recommend(content: str):
 
     return recommend
 
-async def generate_hourly_summary(content: str):    
+async def generate_hourly_summary(content: str, api_key: str): 
     prompt = (
         "### Persona ###\n"
         "You are an expert system log and performance analyst. Analyze the logs and provide concise, one-line summaries focusing on critical issues or performance problems from the past hour.\n"
@@ -421,10 +420,9 @@ async def generate_hourly_summary(content: str):
         model="gpt-4o-mini",
         temperature=0.3,
         max_tokens=750,
-        openai_api_key=app_settings.OPENAI_API_KEY
+        openai_api_key=api_key
     )
     
-
     prompt_template = PromptTemplate(input_variables=["prompt"], template="{prompt}")
     formatted_prompt = prompt_template.format(prompt=prompt)
 

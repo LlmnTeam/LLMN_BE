@@ -12,8 +12,6 @@ env_file_path = os.path.join(os.path.dirname(__file__), ".env")
 
 # 환경 설정
 class Settings(BaseSettings):
-    OPENAI_API_KEY: str
-    DATABASE_URL: str
     REDIS_HOST: str
     REDIS_PORT: int
     REDIS_DB: int
@@ -22,10 +20,6 @@ class Settings(BaseSettings):
         env_file = env_file_path
 
 app_settings = Settings()
-
-def reload_settings():
-    global app_settings
-    app_settings = Settings()
 
 # Redis 설정
 r = redis.Redis(

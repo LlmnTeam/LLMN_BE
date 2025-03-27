@@ -90,7 +90,7 @@ public class UserController {
 
     @PatchMapping("/accounts/apiKey")
     public ResponseEntity<?> updateApiKey(@RequestBody @Valid UpdateApiKeyReq requestDTO){
-        userService.updateOpenAIKey(requestDTO.apiKey());
+        userService.updateOpenAIKey(requestDTO.apiKey(), requestDTO.email());
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, null));
     }
 

@@ -23,6 +23,7 @@ import static com.example.llmn.common.utils.FileUtils.getFileAsResource;
 public class LogController {
 
     private final LogService logService;
+    private final LogScheduler logScheduler;
 
     @GetMapping("/logs")
     public ResponseEntity<?> searchLogs(@RequestParam Instant startTime,
@@ -41,5 +42,17 @@ public class LogController {
                 .contentType(MediaType.parseMediaType(MediaType.TEXT_PLAIN_VALUE))
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + logFileName + "\"")
                 .body(resource);
+    }
+
+    @GetMapping("/summaryProjectLog")
+    public ResponseEntity<?> summaryProjectLog(){
+        logScheduler.summaryProjectLog();
+        return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, null));
+    }
+
+    @GetMapping("/summaryPerformance")
+    public ResponseEntity<?> summaryPerformance(){
+        logScheduler.summaryPerformance();
+        return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, null));
     }
 }
