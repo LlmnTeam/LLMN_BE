@@ -112,32 +112,50 @@ public class SSHService {
     }
 
     @Transactional
-    public List<SshInfo> saveNewSshInfos(List<SshInfo> existingSshInfos, List<SshInfoReq> newSshInfoRequests, User user) {
-        Set<String> existingRemoteHosts = createExistingRemoteHostSet(existingSshInfos);
+    public List<SshInfo> addNewSshConfigurations(List<SshInfo> existingSshInfos, List<SshInfoReq> requestedSshConfigs, User user) {
+        Set<String> existingHostAddresses = extractExistingHostAddresses(existingSshInfos);
 
-        return newSshInfoRequests.stream()
-                .filter(sshInfoReq -> !existingRemoteHosts.contains(sshInfoReq.remoteHost()))
-                .map(sshInfoReq -> saveSshInfo(sshInfoReq, user))
+        // 기존에 없는 새 호스트 주소만 필터링 후 저장
+        return requestedSshConfigs.stream()
+                .filter(sshInfoReq -> !existingHostAddresses.contains(sshInfoReq.remoteHost()))
+                .map(sshInfoReq -> createAndSaveSshConfig(sshInfoReq, user))
                 .toList();
     }
 
     @Transactional
-    public void updateStoredSshInfo(List<SshInfo> storedSshInfos, List<SshInfoReq> newSshInfoRequests) {
-        Map<String, SshInfoReq> newSshInfoMap = createNewSshInfoMap(newSshInfoRequests);
+    public void updateExistingSshConfigurations(List<SshInfo> existingSshConfigs, List<SshInfoReq> requestedSshConfigs) {
+        // Map<String(호스트 주소), SshInfoReq(SSH 구성)> 형태로 변환
+        Map<String, SshInfoReq> requestedConfigsMap = mapHostToSshConfigRequest(requestedSshConfigs);
 
-        storedSshInfos.forEach(sshInfo -> {
-            if (isIncludedInRequest(sshInfo, newSshInfoMap)) {
-                SshInfoReq matchingSshInfoReq = newSshInfoMap.get(sshInfo.getRemoteHost());
-                sshInfo.updateSshInfo(
-                        matchingSshInfoReq.remoteHost(),
-                        matchingSshInfoReq.remoteName(),
-                        matchingSshInfoReq.remoteKeyPath(),
-                        true);
+        // 각 기존 SSH 구성을 순회하면서 업데이트 또는 삭제
+        existingSshConfigs.forEach(sshInfo -> {
+            if (isHostInRequestedConfigs(sshInfo, requestedConfigsMap)) {
+                SshInfoReq updatedConfig = requestedConfigsMap.get(sshInfo.getRemoteHost());
+                sshInfo.updateSshInfo(updatedConfig.remoteHost(), updatedConfig.remoteName(), updatedConfig.remoteKeyPath(), true);
             } else {
                 metricRepository.deleteBySShInfoId(sshInfo.getId());
                 sshInfoRepository.delete(sshInfo);
             }
         });
+    }
+
+    public SshInfo findMonitoringSshInfo(Long userId, String monitoringSshHost) {
+        return sshInfoRepository.findByUserId(userId).stream()
+                .filter(sshInfo -> sshInfo.getRemoteHost().equals(monitoringSshHost))
+                .findFirst()
+                .orElseThrow(() -> new CustomException(ExceptionCode.MONITORING_SSH_NOT_SELECT));
+    }
+
+    @Transactional
+    public void setMonitoringSshInfo(String monitoringSshHost, List<SshInfo> sshInfos, User user) {
+        Optional<SshInfo> monitoringSshInfo = sshInfos.stream()
+                .filter(sshInfo -> sshInfo.getRemoteHost().equals(monitoringSshHost))
+                .findFirst();
+
+        if (monitoringSshInfo.isEmpty())
+            throw new CustomException(ExceptionCode.MONITORING_SSH_NOT_SELECT);
+
+        user.updateMonitoringSshInfo(monitoringSshInfo.get().getId());
     }
 
     public Path uploadSSHKey(MultipartFile file) {
@@ -208,8 +226,8 @@ public class SSHService {
         redisService.storeValue(REDIS_KEY_SSH, sshInfoId.toString(), combinedInfo, REDIS_EXP_SSH);
     }
 
-    private Map<String, SshInfoReq> createNewSshInfoMap(List<SshInfoReq> newSshInfoRequests) {
-        return newSshInfoRequests.stream()
+    private Map<String, SshInfoReq> mapHostToSshConfigRequest(List<SshInfoReq> requestedSshConfigs) {
+        return requestedSshConfigs.stream()
                 .collect(Collectors.toMap(
                         SshInfoReq::remoteHost,
                         Function.identity(),
@@ -217,26 +235,26 @@ public class SSHService {
                 ));
     }
 
-    private boolean isIncludedInRequest(SshInfo sshInfo, Map<String, SshInfoReq> newSshInfoMap) {
+    private boolean isHostInRequestedConfigs(SshInfo sshInfo, Map<String, SshInfoReq> newSshInfoMap) {
         return newSshInfoMap.containsKey(sshInfo.getRemoteHost());
     }
 
-    private Set<String> createExistingRemoteHostSet(List<SshInfo> existingSshInfos) {
+    private Set<String> extractExistingHostAddresses(List<SshInfo> existingSshInfos) {
         return existingSshInfos.stream()
                 .map(SshInfo::getRemoteHost)
                 .collect(Collectors.toSet());
     }
 
-    private SshInfo saveSshInfo(SshInfoReq sshInfoReq, User user) {
-        SshInfo newSshInfo = SshInfo.builder()
+    private SshInfo createAndSaveSshConfig(SshInfoReq sshInfoReq, User user) {
+        SshInfo newSshConfig = SshInfo.builder()
                 .user(user)
                 .remoteHost(sshInfoReq.remoteHost())
                 .remoteName(sshInfoReq.remoteName())
                 .remoteKeyPath(sshInfoReq.remoteKeyPath())
                 .build();
 
-        sshInfoRepository.save(newSshInfo);
+        sshInfoRepository.save(newSshConfig);
 
-        return newSshInfo;
+        return newSshConfig;
     }
 }

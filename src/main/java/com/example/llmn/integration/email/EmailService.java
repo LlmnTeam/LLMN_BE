@@ -1,5 +1,8 @@
 package com.example.llmn.integration.email;
 
+import com.example.llmn.integration.email.model.TemplateModel;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
@@ -13,12 +16,14 @@ import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
 
 import java.security.SecureRandom;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import static com.example.llmn.common.constants.GlobalConstants.CHAR_SET;
 import static com.example.llmn.common.constants.GlobalConstants.UTF_EIGHT_ENCODING;
+import static com.example.llmn.integration.email.EmailConstants.MODEL_KEY_CODE;
 
 @Component
 @RequiredArgsConstructor
@@ -32,11 +37,11 @@ public class EmailService {
     private String serviceMailAccount;
 
     @Async
-    public void sendMail(String toEmail, String subject, String templateName, Map<String, Object> templateModel) {
+    public void sendMail(String toEmail, String subject, String templateName, TemplateModel templateModel) {
         try {
             MimeMessage message = createMimeMessage(toEmail, subject, templateName, templateModel);
             mailSender.send(message);
-        } catch (MessagingException e){
+        } catch (MessagingException e) {
             log.error("{}로의 메일 전송에 실패했습니다", toEmail);
         }
     }
@@ -50,7 +55,7 @@ public class EmailService {
                 .collect(Collectors.joining());
     }
 
-    private MimeMessage createMimeMessage(String toEmail, String subject, String templateName, Map<String, Object> templateModel) throws MessagingException {
+    private MimeMessage createMimeMessage(String toEmail, String subject, String templateName, TemplateModel templateModel) throws MessagingException {
         MimeMessage message = mailSender.createMimeMessage();
 
         MimeMessageHelper helper = new MimeMessageHelper(message, true, UTF_EIGHT_ENCODING);
@@ -62,9 +67,16 @@ public class EmailService {
         return message;
     }
 
-    private String createHtmlText(String templateName, Map<String, Object> templateModel) {
+    private String createHtmlText(String templateName, TemplateModel templateModel) {
+        Map<String, Object> modelMap = convertTemplateModelToMap(templateModel);
+
         Context context = new Context();
-        templateModel.forEach(context::setVariable);
+        modelMap.forEach(context::setVariable);
         return templateEngine.process(templateName, context);
+    }
+
+    private Map<String, Object> convertTemplateModelToMap(TemplateModel templateModel) {
+        ObjectMapper objectMapper = new ObjectMapper();
+        return objectMapper.convertValue(templateModel, new TypeReference<>() {});
     }
 }

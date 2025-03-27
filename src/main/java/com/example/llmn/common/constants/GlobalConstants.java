@@ -5,6 +5,9 @@ public class GlobalConstants {
     private GlobalConstants() {
     }
 
+    public static final String REFRESH_TOKEN = "refreshToken";
+    public static final String ACCESS_TOKEN = "accessToken";
+
     public static final String PREFIX_CODE = "code:";
     public static final String DELIMITER = "-";
     public static final String BLANK_STRING = "";

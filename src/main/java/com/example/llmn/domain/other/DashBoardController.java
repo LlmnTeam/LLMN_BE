@@ -1,6 +1,6 @@
 package com.example.llmn.domain.other;
 
-import com.example.llmn.domain.user.model.UserResponse;
+import com.example.llmn.domain.user.model.response.FindDashboardRes;
 import com.example.llmn.security.userdetails.CustomUserDetails;
 import com.example.llmn.common.utils.ApiUtils;
 import lombok.RequiredArgsConstructor;
@@ -19,7 +19,7 @@ public class DashBoardController {
 
     @GetMapping("/home")
     public ResponseEntity<?> findDashboard(@AuthenticationPrincipal CustomUserDetails userDetails) {
-        UserResponse.FindDashboardDTO responseDTO = dashBoardService.findDashboard(userDetails.getUser().getId());
+        FindDashboardRes responseDTO = dashBoardService.findDashboard(userDetails.getUser().getId());
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 }

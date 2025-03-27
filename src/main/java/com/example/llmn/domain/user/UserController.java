@@ -4,21 +4,15 @@ import com.example.llmn.domain.user.model.request.*;
 import com.example.llmn.domain.user.model.response.*;
 import com.example.llmn.security.userdetails.CustomUserDetails;
 import com.example.llmn.common.utils.ApiUtils;
-import com.example.llmn.domain.user.model.UserRequest;
-import com.example.llmn.domain.user.model.UserResponse;
+
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 
-import java.nio.file.Path;
-import java.util.Map;
-
-import static com.example.llmn.common.utils.CookieUtils.createRefreshTokenCookie;
+import static com.example.llmn.integration.email.EmailConstants.CODE_TYPE_JOIN;
 
 @RestController
 @RequiredArgsConstructor
@@ -26,7 +20,6 @@ import static com.example.llmn.common.utils.CookieUtils.createRefreshTokenCookie
 public class UserController {
 
     private final UserService userService;
-    private static final String CODE_TYPE_JOIN = "join";
 
     @PostMapping("/accounts")
     public ResponseEntity<?> join(@RequestBody @Valid JoinReq requestDTO){
@@ -54,14 +47,14 @@ public class UserController {
     }
 
     @PostMapping("/accounts/resend/code")
-    public ResponseEntity<?> resendCode(@RequestBody @Valid UserRequest.EmailDTO requestDTO, @RequestParam String codeType) {
+    public ResponseEntity<?> resendCode(@RequestBody @Valid EmailReq requestDTO, @RequestParam String codeType) {
         userService.sendCodeByEmail(requestDTO.email(), codeType);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, null));
     }
 
     @PostMapping("/accounts/validate/ssh")
-    public ResponseEntity<?> verifySshConnect(@RequestBody @Valid VerifySshConnectReq requestDTO){
-        VerifySshConnectRes responseDTO = userService.verifySshConnect(requestDTO);
+    public ResponseEntity<?> checkSshConnect(@RequestBody @Valid VerifySshConnectReq requestDTO){
+        VerifySshConnectRes responseDTO = userService.checkSshConnect(requestDTO);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 
@@ -78,7 +71,7 @@ public class UserController {
     }
 
     @PatchMapping("/cloud")
-    public ResponseEntity<?> updateMonitoringSsh(@RequestBody @Valid UserRequest.UpdateMonitoringSshDTO requestDTO, @AuthenticationPrincipal CustomUserDetails userDetails) {
+    public ResponseEntity<?> updateMonitoringSsh(@RequestBody @Valid UpdateMonitoringSshReq requestDTO, @AuthenticationPrincipal CustomUserDetails userDetails) {
         userService.updateMonitoringSsh(userDetails.getUser().getId(), requestDTO.remoteHost());
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, null));
     }
@@ -96,14 +89,14 @@ public class UserController {
     }
 
     @PatchMapping("/accounts/apiKey")
-    public ResponseEntity<?> updateApiKey(@RequestBody @Valid UserRequest.UpdateAPiKeyDTO requestDTO){
-        userService.updateApiKey(requestDTO.apiKey());
+    public ResponseEntity<?> updateApiKey(@RequestBody @Valid UpdateApiKeyReq requestDTO){
+        userService.updateOpenAIKey(requestDTO.apiKey());
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, null));
     }
 
     @PostMapping("/accounts/recovery/code")
     public ResponseEntity<?> sendCodeForRecovery(@RequestBody @Valid EmailReq requestDTO) {
-        CheckAccountExistRes responseDTO = userService.checkLocalAccountExist(requestDTO);
+        CheckAccountExistRes responseDTO = userService.checkAccountExist(requestDTO);
         if (responseDTO.isValid()) userService.sendCodeByEmail(requestDTO.email(), CODE_TYPE_JOIN);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
@@ -123,7 +116,7 @@ public class UserController {
     // nickName을 응답으로 주는 이유는, 토큰 검증 시 닉네임도 함께 받고 싶다는 프론트의 요구사항 (SSR을 사용할 때 필요하고 함)
     @PostMapping("/validate/accessToken")
     public ResponseEntity<?> validateAccessToken(@CookieValue String accessToken){
-        Long userId = userService.validateAccessTokenInRedis(accessToken);
+        Long userId = userService.validateAccessToken(accessToken);
         ValidateAccessTokenRes responseDTO = userService.findNickName(userId);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }

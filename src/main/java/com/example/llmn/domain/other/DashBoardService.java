@@ -3,13 +3,13 @@ package com.example.llmn.domain.other;
 import com.example.llmn.domain.metric.MetricService;
 import com.example.llmn.domain.metric.model.response.FindCurrentMetricRes;
 import com.example.llmn.domain.metric.model.response.FindMetricHistoryRes;
-import com.example.llmn.domain.user.model.UserResponse;
 import com.example.llmn.common.exceptions.CustomException;
 import com.example.llmn.common.exceptions.ExceptionCode;
 import com.example.llmn.domain.summary.SummaryType;
 import com.example.llmn.domain.remote.SshInfoRepository;
 import com.example.llmn.domain.summary.SummaryRepository;
 import com.example.llmn.domain.user.UserRepository;
+import com.example.llmn.domain.user.model.response.FindDashboardRes;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -37,7 +37,7 @@ public class DashBoardService {
     private static final String NO_SUMMARY_DATA = "요약된 내용이 존재하지 않습니다.";
 
     @Transactional
-    public UserResponse.FindDashboardDTO findDashboard(Long userId) {
+    public FindDashboardRes findDashboard(Long userId) {
         Long sshInfoId = findMonitoringSshId(userId);
         String remoteHost = findRemoteHost(sshInfoId);
 
@@ -47,7 +47,7 @@ public class DashBoardService {
 
         String hourlySummary = findLatestHourlySummary();
 
-        return new UserResponse.FindDashboardDTO(
+        return new FindDashboardRes(
                 remoteHost,
                 formatCpuUsage(currentMetric),
                 formatMemoryUsage(currentMetric),

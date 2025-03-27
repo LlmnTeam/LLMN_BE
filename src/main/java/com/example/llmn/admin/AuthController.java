@@ -1,8 +1,8 @@
 package com.example.llmn.admin;
 
 import com.example.llmn.common.utils.ApiUtils;
-import com.example.llmn.domain.user.model.UserRequest;
-import com.example.llmn.domain.user.model.UserResponse;
+import com.example.llmn.domain.user.model.request.LoginReq;
+import com.example.llmn.domain.user.model.response.LoginRes;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
@@ -15,6 +15,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
 
+import static com.example.llmn.common.constants.GlobalConstants.ACCESS_TOKEN;
+import static com.example.llmn.common.constants.GlobalConstants.REFRESH_TOKEN;
 import static com.example.llmn.common.utils.CookieUtils.createRefreshTokenCookie;
 
 @RestController
@@ -24,14 +26,11 @@ public class AuthController {
 
     private final AuthService authService;
 
-    private static final String REFRESH_TOKEN = "refreshToken";
-    private static final String ACCESS_TOKEN = "accessToken";
-
     @PostMapping("/auth/login")
-    public ResponseEntity<?> login(@RequestBody @Valid UserRequest.LoginDTO requestDTO) {
+    public ResponseEntity<?> login(@RequestBody @Valid LoginReq requestDTO) {
         Map<String, String> tokens = authService.login(requestDTO);
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, createRefreshTokenCookie(tokens.get(REFRESH_TOKEN), true, false))
-                .body(ApiUtils.success(HttpStatus.OK, new UserResponse.LoginDTO(tokens.get(ACCESS_TOKEN))));
+                .body(ApiUtils.success(HttpStatus.OK, new LoginRes(tokens.get(ACCESS_TOKEN))));
     }
 }

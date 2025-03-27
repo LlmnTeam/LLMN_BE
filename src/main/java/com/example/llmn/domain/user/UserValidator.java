@@ -7,6 +7,7 @@ import com.example.llmn.domain.user.model.request.SshInfoReq;
 import com.example.llmn.domain.user.model.request.UpdateConfigurationReq;
 import com.example.llmn.integration.redis.RedisService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -23,13 +24,14 @@ public class UserValidator {
     private final RedisService redisService;
 
     public void validateJoinRequest(JoinReq requestDTO) {
-        validatePassword(requestDTO);
-        validateIsSshHostsEmpty(requestDTO.sshInfos());
-        validateNoDuplicateSshHosts(requestDTO.sshInfos());
-        validateAlreadyJoin(requestDTO.email());
-        validateDuplicateNickname(requestDTO.nickName());
+        validatePasswordsMatch(requestDTO);
+        validateSshInfosNotEmpty(requestDTO.sshInfos());
+        validateSshHostsUnique(requestDTO.sshInfos());
+        validateEmailNotExists(requestDTO.email());
+        validateNicknameNotExists(requestDTO.nickName());
     }
 
+    @Async
     public void validateAlreadySendCode(String email, String codeType) {
         if (redisService.isValueExist(getCodeTypeKey(codeType), email)) {
             throw new CustomException(ExceptionCode.ALREADY_SEND_EMAIL);
@@ -43,19 +45,19 @@ public class UserValidator {
         }
     }
 
-    private void validatePassword(JoinReq requestDTO) {
+    private void validatePasswordsMatch(JoinReq requestDTO) {
         if (!requestDTO.password().equals(requestDTO.passwordConfirm())) {
             throw new CustomException(ExceptionCode.USER_PASSWORD_WRONG);
         }
     }
 
-    public void validateIsSshHostsEmpty(List<SshInfoReq> sshInfoReqs) {
+    public void validateSshInfosNotEmpty(List<SshInfoReq> sshInfoReqs) {
         if (sshInfoReqs.isEmpty()) {
             throw new CustomException(ExceptionCode.SSH_INFO_EMPTY);
         }
     }
 
-    public void validateNoDuplicateSshHosts(List<SshInfoReq> sshInfos) {
+    public void validateSshHostsUnique(List<SshInfoReq> sshInfos) {
         Set<String> remoteHostSet = sshInfos.stream()
                 .map(SshInfoReq::remoteHost)
                 .collect(Collectors.toSet());
@@ -65,12 +67,12 @@ public class UserValidator {
         }
     }
 
-    private void validateAlreadyJoin(String email) {
+    private void validateEmailNotExists(String email) {
         if (userRepository.existsByEmail(email))
             throw new CustomException(ExceptionCode.USER_EMAIL_EXIST);
     }
 
-    private void validateDuplicateNickname(String nickName) {
+    private void validateNicknameNotExists(String nickName) {
         if (userRepository.existsByNickname(nickName))
             throw new CustomException(ExceptionCode.USER_NICKNAME_EXIST);
     }

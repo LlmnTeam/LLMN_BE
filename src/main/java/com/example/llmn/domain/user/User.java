@@ -46,7 +46,7 @@ public class User extends BaseEntity {
         this.password  = password;
     }
 
-    public void updateMonitoringSshInfoId(Long monitoringSshInfoId) {
+    public void updateMonitoringSshInfo(Long monitoringSshInfoId) {
         this.monitoringSshId = monitoringSshInfoId;
     }
 
