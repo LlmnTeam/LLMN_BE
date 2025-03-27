@@ -1,4 +1,4 @@
-package com.example.llmn.common.utils;
+package com.example.llmn.integration.email;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;

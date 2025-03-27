@@ -2,8 +2,10 @@ package com.example.llmn.domain.user;
 
 import com.example.llmn.common.exceptions.CustomException;
 import com.example.llmn.common.exceptions.ExceptionCode;
+import com.example.llmn.domain.user.model.request.*;
+import com.example.llmn.domain.user.model.response.*;
 import com.example.llmn.security.JWTProvider;
-import com.example.llmn.common.utils.EmailUtils;
+import com.example.llmn.integration.email.EmailService;
 import com.example.llmn.domain.metric.MetricRepository;
 import com.example.llmn.domain.remote.SshInfo;
 import com.example.llmn.domain.alarm.AlarmRepository;
@@ -11,8 +13,6 @@ import com.example.llmn.domain.project.ProjectRepository;
 import com.example.llmn.domain.remote.SSHService;
 import com.example.llmn.domain.remote.SshInfoRepository;
 import com.example.llmn.domain.summary.SummaryRepository;
-import com.example.llmn.domain.user.model.UserRequest;
-import com.example.llmn.domain.user.model.UserResponse;
 import com.example.llmn.integration.redis.RedisService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,19 +21,15 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.reactive.function.client.WebClient;
 
-import java.nio.file.Path;
 import java.util.*;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 import static com.example.llmn.common.constants.GlobalConstants.DELIMITER;
 import static com.example.llmn.common.constants.GlobalConstants.PREFIX_CODE;
-import static com.example.llmn.common.utils.EmailUtils.generateVerificationCode;
-import static com.example.llmn.common.utils.FileUtils.*;
-import static com.example.llmn.common.utils.MailTemplate.VERIFICATION_CODE;
+import static com.example.llmn.integration.email.EmailConstants.MAIL_TEMPLATE_FOR_CODE;
+import static com.example.llmn.integration.email.EmailService.generateVerificationCode;
+import static com.example.llmn.integration.email.MailTemplate.VERIFICATION_CODE;
 import static com.example.llmn.common.utils.UriUtils.buildURI;
 import static com.example.llmn.integration.redis.RedisConstants.*;
 
@@ -53,7 +49,8 @@ public class UserService {
     private final RedisService redisService;
     private final SummaryRepository summaryRepository;
     private final WebClient webClient;
-    private final EmailUtils mailUtils;
+    private final EmailService mailUtils;
+    private final UserValidator userValidator;
 
     @Value("${validate_key.uri}")
     private String requestValidateKeyUri;
@@ -61,8 +58,6 @@ public class UserService {
     @Value("${update_env.uri}")
     private String updateEnvUri;
 
-    private static final String MAIL_TEMPLATE_FOR_CODE = "verification_code_email.html";
-    private static final String SSH_DIRECTORY = "ssh";
     private static final String MODEL_KEY_CODE = "code";
     private static final String OPEN_API_KEY = "OPENAI_API_KEY";
     private static final String CODE_TO_EMAIL_KEY_PREFIX = "codeToEmail";
@@ -70,12 +65,12 @@ public class UserService {
     private static final long VERIFICATION_CODE_EXPIRATION_MS = 175 * 1000L;
 
     @Transactional
-    public void join(UserRequest.JoinDTO requestDTO) {
-        validateJoinRequest(requestDTO);
+    public void join(JoinReq requestDTO) {
+        userValidator.validateJoinRequest(requestDTO);
 
         User user = saveUser(requestDTO);
 
-        List<SshInfo> sshInfos = saveSshInfos(requestDTO.sshInfos(), user);
+        List<SshInfo> sshInfos = sshService.saveSshInfos(requestDTO.sshInfos(), user);
         setMonitoringSshInfo(requestDTO.monitoringSshHost(), sshInfos, user);
 
         updateApiKey(requestDTO.openAiKey());
@@ -83,7 +78,7 @@ public class UserService {
 
     @Async
     public void sendCodeByEmail(String email, String codeType) {
-        checkAlreadySendCode(email, codeType);
+        userValidator.validateAlreadySendCode(email, codeType);
 
         String verificationCode = generateVerificationCode();
         storeVerificationCode(email, codeType, verificationCode);
@@ -93,18 +88,17 @@ public class UserService {
     }
 
     @Transactional
-    public void updateConfiguration(UserRequest.UpdateConfigurationDTO requestDTO, Long userId) {
-        User user = userRepository.findById(userId).orElseThrow(
-                () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
-        );
+    public void updateConfiguration(UpdateConfigurationReq requestDTO, Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new CustomException(ExceptionCode.USER_NOT_FOUND));
 
-        checkNoDuplicateSshHosts(requestDTO.sshInfos());
-        checkIsSshHostsEmpty(requestDTO.sshInfos());
-        checkMonitoringSshHostSelected(requestDTO);
+        userValidator.validateNoDuplicateSshHosts(requestDTO.sshInfos());
+        userValidator.validateIsSshHostsEmpty(requestDTO.sshInfos());
+        userValidator.validateMonitoringSshHostSelected(requestDTO);
 
         List<SshInfo> sshInfos = sshInfoRepository.findByUserId(userId);
-        updateSshInfo(sshInfos, requestDTO.sshInfos());
-        List<SshInfo> newSshHosts = saveNewSshInfos(sshInfos, requestDTO.sshInfos(), user);
+        sshService.updateStoredSshInfo(sshInfos, requestDTO.sshInfos());
+        List<SshInfo> newSshHosts = sshService.saveNewSshInfos(sshInfos, requestDTO.sshInfos(), user);
 
         SshInfo monitoringSshInfo = findMonitoringSshInfo(sshInfos, newSshHosts, requestDTO.monitoringSshHost());
         user.updateConfiguration(requestDTO.nickName(), requestDTO.receivingAlarm(), monitoringSshInfo.getId());
@@ -114,30 +108,19 @@ public class UserService {
 
     @Transactional
     public void updateMonitoringSsh(Long userId, String monitoringSshHost) {
-        User user = userRepository.findById(userId).orElseThrow(
-                () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
-        );
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new CustomException(ExceptionCode.USER_NOT_FOUND));
 
         SshInfo monitoringSshInfo = findMonitoringSshInfo(userId, monitoringSshHost);
         user.updateMonitoringSshInfoId(monitoringSshInfo.getId());
     }
 
-    public Path uploadSSHKey(MultipartFile file) {
-        validateFileExist(file);
-        createDirectoryIfNotExist(SSH_DIRECTORY);
-
-        Path path = getFilePath(SSH_DIRECTORY, file);
-        writeFile(file, path);
-
-        return path;
-    }
-
     public void updateApiKey(String value) {
-        UserResponse.EnvUpdateDTO responseDTO = webClient.post()
+        EnvUpdateDTO responseDTO = webClient.post()
                 .uri(buildURI(updateEnvUri))
-                .bodyValue(new UserRequest.EnvUpdateDTO(OPEN_API_KEY, value))
+                .bodyValue(new EnvUpdateReq(OPEN_API_KEY, value))
                 .retrieve()
-                .bodyToMono(UserResponse.EnvUpdateDTO.class)
+                .bodyToMono(EnvUpdateDTO.class)
                 .block();
 
         if (isUpdateSuccess(responseDTO)) {
@@ -146,7 +129,7 @@ public class UserService {
     }
 
     @Transactional
-    public void resetPassword(UserRequest.ResetPasswordDTO requestDTO) {
+    public void resetPassword(ResetPasswordReq requestDTO) {
         String email = getEmailByVerificationCode(requestDTO);
         if (email == null) {
             throw new CustomException(ExceptionCode.BAD_APPROACH);
@@ -158,9 +141,8 @@ public class UserService {
 
     @Transactional
     public void withdrawMember(Long userId) {
-        User user = userRepository.findById(userId).orElseThrow(
-                () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
-        );
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new CustomException(ExceptionCode.USER_NOT_FOUND));
 
         alarmRepository.deleteByUserId(userId);
         projectRepository.deleteByUserId(userId);
@@ -174,42 +156,41 @@ public class UserService {
         userRepository.delete(user);
     }
 
-    public UserResponse.VerifyEmailCodeDTO verifyCode(UserRequest.VerifyCodeDTO requestDTO, String codeType) {
+    public VerifyEmailCodeRes verifyCode(VerifyCodeReq requestDTO, String codeType) {
         if (redisService.isNotStoredValue(getCodeTypeKey(codeType), requestDTO.email(), requestDTO.code()))
-            return new UserResponse.VerifyEmailCodeDTO(false);
+            return new VerifyEmailCodeRes(false);
 
         cacheVerificationInfoIfRecovery(requestDTO, codeType);
 
-        return new UserResponse.VerifyEmailCodeDTO(true);
+        return new VerifyEmailCodeRes(true);
     }
 
-    public UserResponse.CheckEmailExistDTO checkEmailExist(String email) {
+    public CheckEmailExistRes checkEmailExist(String email) {
         boolean isValid = userRepository.doesNotExistByEmail(email);
-        return new UserResponse.CheckEmailExistDTO(isValid);
+        return new CheckEmailExistRes(isValid);
     }
 
-    @Transactional
-    public UserResponse.CheckNickNameDTO checkNickNameDuplicate(UserRequest.CheckNickDTO requestDTO) {
+    public CheckNickNameRes checkNickNameDuplicate(CheckNickReq requestDTO) {
         boolean isDuplicate = userRepository.existsByNickname(requestDTO.nickName());
-        return new UserResponse.CheckNickNameDTO(isDuplicate);
+        return new CheckNickNameRes(isDuplicate);
     }
 
-    public UserResponse.CheckAccountExistDTO checkLocalAccountExist(UserRequest.EmailDTO requestDTO) {
+    public CheckAccountExistRes checkLocalAccountExist(EmailReq requestDTO) {
         boolean isValid = userRepository.findByEmail(requestDTO.email()).isPresent();
-        return new UserResponse.CheckAccountExistDTO(isValid);
+        return new CheckAccountExistRes(isValid);
     }
 
-    public UserResponse.VerifySshConnectDTO verifySshConnect(UserRequest.VerifySshConnectDTO requestDTO) {
+    public VerifySshConnectRes verifySshConnect(VerifySshConnectReq requestDTO) {
         boolean isValid = sshService.checkConnectionValid(requestDTO.remoteHost(), requestDTO.remoteName(), requestDTO.remoteKeyPath());
-        return new UserResponse.VerifySshConnectDTO(isValid);
+        return new VerifySshConnectRes(isValid);
     }
 
-    public UserResponse.ValidateOpenAIKeyDTO validateOpenAIKey(String apiKey) {
+    public ValidateOpenAIKeyRes validateOpenAIKey(String apiKey) {
         return webClient.post()
                 .uri(buildURI(requestValidateKeyUri))
-                .bodyValue(new UserRequest.RequestValidateKeyDTO(apiKey))
+                .bodyValue(new RequestValidateKeyReq(apiKey))
                 .retrieve()
-                .bodyToMono(UserResponse.ValidateOpenAIKeyDTO.class)
+                .bodyToMono(ValidateOpenAIKeyRes.class)
                 .block();
     }
 
@@ -219,75 +200,40 @@ public class UserService {
         }
 
         Long userId = JWTProvider.extractUserIdFromToken(accessToken);
-        if (redisService.isNotStoredValue(REDIS_KEY_ACCESS_TOKEN, String.valueOf(userId), accessToken)) {
+        if (redisService.isNotStoredValue(REDIS_KEY_ACCESS_TOKEN, String.valueOf(userId), accessToken))
             throw new CustomException(ExceptionCode.ACCESS_TOKEN_WRONG);
-        }
 
         return userId;
     }
 
-    public UserResponse.ValidateAccessTokenDTO findNickName(Long userId) {
+    public ValidateAccessTokenRes findNickName(Long userId) {
         String nickName = userRepository.findNickName(userId).orElse(null);
-        return new UserResponse.ValidateAccessTokenDTO(nickName);
+        return new ValidateAccessTokenRes(nickName);
     }
 
-    public UserResponse.FindCloudInfoDTO findCloudInfo(Long userId) {
-        User user = userRepository.findById(userId).orElseThrow(
-                () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
-        );
+    public FindCloudInfoRes findCloudInfo(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new CustomException(ExceptionCode.USER_NOT_FOUND));
 
         List<SshInfo> sshInfos = sshInfoRepository.findByUserId(userId);
-        UserResponse.CloudInfoDTO selectedCloud = findSelectedCloud(sshInfos, user.getMonitoringSshId());
-        List<UserResponse.CloudInfoDTO> cloudInfos = sshInfos.stream()
-                .map(this::convertToCloudInfoDTO)
-                .toList();
+        SshInfo selectedSshInfo = sshInfos.stream()
+                .filter(sshInfo -> sshInfo.getId().equals(user.getMonitoringSshId()))
+                .findFirst()
+                .orElseThrow(() -> new CustomException(ExceptionCode.MONITORING_SSH_NOT_FOUND));
 
-        return new UserResponse.FindCloudInfoDTO(cloudInfos, selectedCloud);
+        return FindCloudInfoRes.from(sshInfos, selectedSshInfo);
     }
 
-    public UserResponse.FindConfigurationInfoDTO findConfigurationInfo(Long userId) {
-        User user = userRepository.findById(userId).orElseThrow(
-                () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
-        );
+    public FindConfigurationInfoRes findConfigurationInfo(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new CustomException(ExceptionCode.USER_NOT_FOUND));
 
         List<SshInfo> sshInfos = sshInfoRepository.findByUserId(userId);
-        List<UserResponse.SshInfoDTO> sshInfoDTOS = sshInfos.stream()
-                .map(this::createSshInfoDTO)
-                .toList();
 
-        return new UserResponse.FindConfigurationInfoDTO(
-                user.getNickName(),
-                sshInfoDTOS,
-                user.getMonitoringSshId(),
-                user.isReceivingAlarm());
+        return FindConfigurationInfoRes.from(user, sshInfos);
     }
 
-    private void validateJoinRequest(UserRequest.JoinDTO requestDTO) {
-        validatePassword(requestDTO);
-        checkIsSshHostsEmpty(requestDTO.sshInfos());
-        checkNoDuplicateSshHosts(requestDTO.sshInfos());
-        checkAlreadyJoin(requestDTO.email());
-        checkDuplicateNickname(requestDTO.nickName());
-    }
-
-    private void validatePassword(UserRequest.JoinDTO requestDTO) {
-        if (!requestDTO.password().equals(requestDTO.passwordConfirm())) {
-            throw new CustomException(ExceptionCode.USER_PASSWORD_WRONG);
-        }
-    }
-
-    private void checkAlreadyJoin(String email) {
-        if (userRepository.existsByEmail(email))
-            throw new CustomException(ExceptionCode.USER_EMAIL_EXIST);
-    }
-
-    private void checkDuplicateNickname(String nickName) {
-        if (userRepository.existsByNickname(nickName))
-            throw new CustomException(ExceptionCode.USER_NICKNAME_EXIST);
-    }
-
-
-    private User saveUser(UserRequest.JoinDTO joinRequestDTO) {
+    private User saveUser(JoinReq joinRequestDTO) {
         User user = User.builder()
                 .nickName(joinRequestDTO.nickName())
                 .email(joinRequestDTO.email())
@@ -296,25 +242,8 @@ public class UserService {
                 .build();
 
         userRepository.save(user);
+
         return user;
-    }
-
-    private List<SshInfo> saveSshInfos(List<UserRequest.SshInfoDTO> requestSshInfos, User user) {
-        List<SshInfo> sshInfos = new ArrayList<>();
-
-        requestSshInfos.forEach(sshInfoDTO -> {
-            SshInfo sshInfo = SshInfo.builder()
-                    .user(user)
-                    .remoteName(sshInfoDTO.remoteName())
-                    .remoteHost(sshInfoDTO.remoteHost())
-                    .remoteKeyPath(sshInfoDTO.remoteKeyPath())
-                    .build();
-
-            sshInfoRepository.save(sshInfo);
-            sshInfos.add(sshInfo);
-        });
-
-        return sshInfos;
     }
 
     private void setMonitoringSshInfo(String monitoringSshHost, List<SshInfo> sshInfos, User user) {
@@ -322,17 +251,10 @@ public class UserService {
                 .filter(sshInfo -> sshInfo.getRemoteHost().equals(monitoringSshHost))
                 .findFirst();
 
-        if (monitoringSshInfo.isEmpty()) {
+        if (monitoringSshInfo.isEmpty())
             throw new CustomException(ExceptionCode.MONITORING_SSH_NOT_SELECT);
-        }
 
         user.updateMonitoringSshInfoId(monitoringSshInfo.get().getId());
-    }
-
-    private void checkAlreadySendCode(String email, String codeType) {
-        if (redisService.isValueExist(getCodeTypeKey(codeType), email)) {
-            throw new CustomException(ExceptionCode.ALREADY_SEND_EMAIL);
-        }
     }
 
     private void storeVerificationCode(String email, String codeType, String verificationCode) {
@@ -343,75 +265,6 @@ public class UserService {
         Map<String, Object> templateModel = new HashMap<>();
         templateModel.put(MODEL_KEY_CODE, verificationCode);
         return templateModel;
-    }
-
-    private void checkMonitoringSshHostSelected(UserRequest.UpdateConfigurationDTO requestDTO) {
-        if (requestDTO.sshInfos().stream()
-                .noneMatch(sshInfoDTO -> sshInfoDTO.remoteHost().equals(requestDTO.monitoringSshHost()))) {
-            throw new CustomException(ExceptionCode.MONITORING_SSH_NOT_SELECT);
-        }
-    }
-
-    private void updateSshInfo(List<SshInfo> storedSshInfos, List<UserRequest.SshInfoDTO> newSshInfoRequests) {
-        Map<String, UserRequest.SshInfoDTO> newSshInfoMap = createNewSshInfoMap(newSshInfoRequests);
-
-        storedSshInfos.forEach(sshInfo -> {
-            if (isIncludedInRequest(sshInfo, newSshInfoMap)) {
-                UserRequest.SshInfoDTO matchingSshInfoDTO = newSshInfoMap.get(sshInfo.getRemoteHost());
-                updateSshInfo(sshInfo, matchingSshInfoDTO);
-            } else {
-                metricRepository.deleteBySShInfoId(sshInfo.getId());
-                sshInfoRepository.delete(sshInfo);
-            }
-        });
-    }
-
-    private Map<String, UserRequest.SshInfoDTO> createNewSshInfoMap(List<UserRequest.SshInfoDTO> newSshInfoRequests) {
-        return newSshInfoRequests.stream()
-                .collect(Collectors.toMap(
-                        UserRequest.SshInfoDTO::remoteHost,
-                        Function.identity(),
-                        (existing, replacement) -> existing // 중복 키 발생 시 기존 값 유지
-                ));
-    }
-
-    private boolean isIncludedInRequest(SshInfo sshInfo, Map<String, UserRequest.SshInfoDTO> newSshInfoMap) {
-        return newSshInfoMap.containsKey(sshInfo.getRemoteHost());
-    }
-
-    private void updateSshInfo(SshInfo sshInfo, UserRequest.SshInfoDTO sshInfoDTO) {
-        sshInfo.updateSshInfo(
-                sshInfoDTO.remoteHost(),
-                sshInfoDTO.remoteName(),
-                sshInfoDTO.remoteKeyPath(),
-                true);
-    }
-
-    private List<SshInfo> saveNewSshInfos(List<SshInfo> existingSshInfos, List<UserRequest.SshInfoDTO> newSshInfoRequests, User user) {
-        Set<String> existingRemoteHosts = createExistingRemoteHostSet(existingSshInfos);
-
-        return newSshInfoRequests.stream()
-                .filter(sshInfoDTO -> !existingRemoteHosts.contains(sshInfoDTO.remoteHost()))
-                .map(sshInfoDTO -> saveSshInfo(sshInfoDTO, user))
-                .toList();
-    }
-
-    private Set<String> createExistingRemoteHostSet(List<SshInfo> existingSshInfos) {
-        return existingSshInfos.stream()
-                .map(SshInfo::getRemoteHost)
-                .collect(Collectors.toSet());
-    }
-
-    private SshInfo saveSshInfo(UserRequest.SshInfoDTO sshInfoDTO, User user) {
-        SshInfo newSshInfo = SshInfo.builder()
-                .user(user)
-                .remoteHost(sshInfoDTO.remoteHost())
-                .remoteName(sshInfoDTO.remoteName())
-                .remoteKeyPath(sshInfoDTO.remoteKeyPath())
-                .build();
-
-        sshInfoRepository.save(newSshInfo);
-        return newSshInfo;
     }
 
     private SshInfo findMonitoringSshInfo(List<SshInfo> sshInfos, List<SshInfo> addedSshHosts, String monitoringSshHost) {
@@ -437,66 +290,28 @@ public class UserService {
                 .orElseThrow(() -> new CustomException(ExceptionCode.MONITORING_SSH_NOT_SELECT));
     }
 
-    private boolean isUpdateSuccess(UserResponse.EnvUpdateDTO responseDTO) {
+    private boolean isUpdateSuccess(EnvUpdateDTO responseDTO) {
         return responseDTO == null || !responseDTO.success();
     }
 
-    private String getEmailByVerificationCode(UserRequest.ResetPasswordDTO requestDTO) {
+    private String getEmailByVerificationCode(ResetPasswordReq requestDTO) {
         return redisService.getValueInString(CODE_TO_EMAIL_KEY_PREFIX, requestDTO.code());
     }
 
     private void updatePassword(String email, String newPassword) {
-        User user = userRepository.findByEmail(email).orElseThrow(
-                () -> new CustomException(ExceptionCode.USER_EMAIL_NOT_FOUND)
-        );
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new CustomException(ExceptionCode.USER_EMAIL_NOT_FOUND));
 
         user.updatePassword(passwordEncoder.encode(newPassword));
     }
 
     // 계정 복구 로직에서 요청으로 들어온 코드를 가지고 이메일을 얻기 위해 저장해놓는다 (보안 상 로직)
-    private void cacheVerificationInfoIfRecovery(UserRequest.VerifyCodeDTO requestDTO, String codeType) {
+    private void cacheVerificationInfoIfRecovery(VerifyCodeReq requestDTO, String codeType) {
         if (CODE_TYPE_RECOVERY.equals(codeType))
             redisService.storeValue(CODE_TO_EMAIL_KEY_PREFIX, requestDTO.code(), requestDTO.email(), 5 * 60 * 1000L);
     }
 
-    private UserResponse.CloudInfoDTO findSelectedCloud(List<SshInfo> sshInfos, Long monitoringSshId) {
-        return sshInfos.stream()
-                .filter(sshInfo -> sshInfo.getId().equals(monitoringSshId))
-                .map(this::convertToCloudInfoDTO)
-                .findFirst()
-                .orElseThrow(() -> new CustomException(ExceptionCode.MONITORING_SSH_NOT_FOUND));
-    }
-
-    private UserResponse.SshInfoDTO createSshInfoDTO(SshInfo sshInfo) {
-        return new UserResponse.SshInfoDTO(
-                sshInfo.getId(),
-                sshInfo.getRemoteName(),
-                sshInfo.getRemoteHost(),
-                sshInfo.getRemoteKeyPath(),
-                sshInfo.isWorking());
-    }
-
     private String getCodeTypeKey(String codeType) {
         return PREFIX_CODE + codeType;
-    }
-
-    private UserResponse.CloudInfoDTO convertToCloudInfoDTO(SshInfo sshInfo) {
-        return new UserResponse.CloudInfoDTO(sshInfo.getRemoteName(), sshInfo.getRemoteHost());
-    }
-
-    private void checkNoDuplicateSshHosts(List<UserRequest.SshInfoDTO> sshInfos) {
-        Set<String> remoteHostSet = sshInfos.stream()
-                .map(UserRequest.SshInfoDTO::remoteHost)
-                .collect(Collectors.toSet());
-
-        if (remoteHostSet.size() < sshInfos.size()) {
-            throw new CustomException(ExceptionCode.DUPLICATE_SSH_HOST);
-        }
-    }
-
-    private void checkIsSshHostsEmpty(List<UserRequest.SshInfoDTO> sshInfoDTOS) {
-        if (sshInfoDTOS.isEmpty()) {
-            throw new CustomException(ExceptionCode.SSH_INFO_EMPTY);
-        }
     }
 }

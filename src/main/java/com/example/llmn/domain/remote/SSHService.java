@@ -2,22 +2,29 @@ package com.example.llmn.domain.remote;
 
 import com.example.llmn.common.exceptions.CustomException;
 import com.example.llmn.common.exceptions.ExceptionCode;
+import com.example.llmn.domain.metric.MetricRepository;
 import com.example.llmn.domain.remote.model.SshInfoDTO;
+import com.example.llmn.domain.user.User;
 import com.example.llmn.domain.user.UserRepository;
+import com.example.llmn.domain.user.model.request.SshInfoReq;
 import com.example.llmn.integration.minasshd.MinaSshdService;
 import com.example.llmn.integration.redis.RedisService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.nio.file.Path;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static com.example.llmn.common.constants.GlobalConstants.DELIMITER;
+import static com.example.llmn.common.utils.FileUtils.*;
+import static com.example.llmn.common.utils.FileUtils.writeFile;
+import static com.example.llmn.integration.minasshd.MinaSshdConstants.*;
 import static com.example.llmn.integration.redis.RedisConstants.REDIS_KEY_SSH;
 import static com.example.llmn.integration.redis.RedisConstants.REDIS_EXP_SSH;
 
@@ -29,16 +36,13 @@ public class SSHService {
     private final RedisService redisService;
     private final UserRepository userRepository;
     private final SshInfoRepository sshInfoRepository;
+    private final MetricRepository metricRepository;
     private final Map<Long, MinaSshdService> executorSession = new ConcurrentHashMap<>();
-
-    public static final String UPTIME_COMMAND = "uptime";
-    public static final String UPTIME_COMMAND_RESPONSE = "load average";
 
     @Transactional
     public void initCommend(Long userId){
-        Long monitoringSshId = userRepository.findMonitoringSshId(userId).orElseThrow(
-                () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
-        );
+        Long monitoringSshId = userRepository.findMonitoringSshId(userId)
+                .orElseThrow(() -> new CustomException(ExceptionCode.USER_NOT_FOUND));
 
         MinaSshdService executor = getSshExecutor(monitoringSshId, true);
         executor.flushInitialMessage();
@@ -46,9 +50,8 @@ public class SSHService {
 
     @Transactional
     public String executeCommandInShell(String command, boolean isFirstExecution, Long userId){
-        Long monitoringSshId = userRepository.findMonitoringSshId(userId).orElseThrow(
-                () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
-        );
+        Long monitoringSshId = userRepository.findMonitoringSshId(userId)
+                .orElseThrow(() -> new CustomException(ExceptionCode.USER_NOT_FOUND));
 
         MinaSshdService executor = getSshExecutor(monitoringSshId, isFirstExecution);
         return executor.executeCommandInShell(command);
@@ -62,9 +65,8 @@ public class SSHService {
 
     @Transactional
     public void stopCommend(Long userId){
-        Long monitoringSshId = userRepository.findMonitoringSshId(userId).orElseThrow(
-                () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
-        );
+        Long monitoringSshId = userRepository.findMonitoringSshId(userId)
+                .orElseThrow(() -> new CustomException(ExceptionCode.USER_NOT_FOUND));
 
         MinaSshdService executor = executorSession.get(monitoringSshId);
         if (executor != null) {
@@ -75,18 +77,11 @@ public class SSHService {
 
     @Transactional
     public void executeSigInt(Long userId){
-        Long monitoringSshId = userRepository.findMonitoringSshId(userId).orElseThrow(
-                () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
-        );
+        Long monitoringSshId = userRepository.findMonitoringSshId(userId)
+                .orElseThrow(() -> new CustomException(ExceptionCode.USER_NOT_FOUND));
 
         MinaSshdService executor = getSshExecutor(monitoringSshId, false);
         executor.sendSigint();
-    }
-
-    @Scheduled(cron = "0 32 12 * * *")
-    public void checkSshConnection(){
-        List<SshInfo> sshInfos = sshInfoRepository.findAll();
-        sshInfos.forEach(sshInfo -> sshInfo.updateIsWorking(checkConnectionValid(sshInfo.getId())));
     }
 
     public boolean checkConnectionValid(String remoteHost, String remoteName, String remoteKeyPath) {
@@ -97,11 +92,62 @@ public class SSHService {
         return response.contains(UPTIME_COMMAND_RESPONSE);
     }
 
-    public boolean checkConnectionValid(Long sshInfoId) {
-        MinaSshdService executor = getSshExecutor(sshInfoId, false);
-        String response = executor.executeCommandOnce(UPTIME_COMMAND);
+    @Transactional
+    public List<SshInfo> saveSshInfos(List<SshInfoReq> requestSshInfos, User user) {
+        List<SshInfo> sshInfos = new ArrayList<>();
 
-        return response.contains(UPTIME_COMMAND_RESPONSE);
+        requestSshInfos.forEach(sshInfoReq -> {
+            SshInfo sshInfo = SshInfo.builder()
+                    .user(user)
+                    .remoteName(sshInfoReq.remoteName())
+                    .remoteHost(sshInfoReq.remoteHost())
+                    .remoteKeyPath(sshInfoReq.remoteKeyPath())
+                    .build();
+
+            sshInfoRepository.save(sshInfo);
+            sshInfos.add(sshInfo);
+        });
+
+        return sshInfos;
+    }
+
+    @Transactional
+    public List<SshInfo> saveNewSshInfos(List<SshInfo> existingSshInfos, List<SshInfoReq> newSshInfoRequests, User user) {
+        Set<String> existingRemoteHosts = createExistingRemoteHostSet(existingSshInfos);
+
+        return newSshInfoRequests.stream()
+                .filter(sshInfoReq -> !existingRemoteHosts.contains(sshInfoReq.remoteHost()))
+                .map(sshInfoReq -> saveSshInfo(sshInfoReq, user))
+                .toList();
+    }
+
+    @Transactional
+    public void updateStoredSshInfo(List<SshInfo> storedSshInfos, List<SshInfoReq> newSshInfoRequests) {
+        Map<String, SshInfoReq> newSshInfoMap = createNewSshInfoMap(newSshInfoRequests);
+
+        storedSshInfos.forEach(sshInfo -> {
+            if (isIncludedInRequest(sshInfo, newSshInfoMap)) {
+                SshInfoReq matchingSshInfoReq = newSshInfoMap.get(sshInfo.getRemoteHost());
+                sshInfo.updateSshInfo(
+                        matchingSshInfoReq.remoteHost(),
+                        matchingSshInfoReq.remoteName(),
+                        matchingSshInfoReq.remoteKeyPath(),
+                        true);
+            } else {
+                metricRepository.deleteBySShInfoId(sshInfo.getId());
+                sshInfoRepository.delete(sshInfo);
+            }
+        });
+    }
+
+    public Path uploadSSHKey(MultipartFile file) {
+        validateFileExist(file);
+        createDirectoryIfNotExist(SSH_DIRECTORY);
+
+        Path path = getFilePath(SSH_DIRECTORY, file);
+        writeFile(file, path);
+
+        return path;
     }
 
     public synchronized MinaSshdService getSshExecutor(Long sshInfoId, boolean isFirstExecution) {
@@ -160,5 +206,37 @@ public class SSHService {
     private void cacheSshInfo(Long sshInfoId, SshInfo sshInfo) {
         String combinedInfo = String.join(DELIMITER, sshInfo.getRemoteHost(), sshInfo.getRemoteName(), sshInfo.getRemoteKeyPath());
         redisService.storeValue(REDIS_KEY_SSH, sshInfoId.toString(), combinedInfo, REDIS_EXP_SSH);
+    }
+
+    private Map<String, SshInfoReq> createNewSshInfoMap(List<SshInfoReq> newSshInfoRequests) {
+        return newSshInfoRequests.stream()
+                .collect(Collectors.toMap(
+                        SshInfoReq::remoteHost,
+                        Function.identity(),
+                        (existing, replacement) -> existing // 중복 키 발생 시 기존 값 유지
+                ));
+    }
+
+    private boolean isIncludedInRequest(SshInfo sshInfo, Map<String, SshInfoReq> newSshInfoMap) {
+        return newSshInfoMap.containsKey(sshInfo.getRemoteHost());
+    }
+
+    private Set<String> createExistingRemoteHostSet(List<SshInfo> existingSshInfos) {
+        return existingSshInfos.stream()
+                .map(SshInfo::getRemoteHost)
+                .collect(Collectors.toSet());
+    }
+
+    private SshInfo saveSshInfo(SshInfoReq sshInfoReq, User user) {
+        SshInfo newSshInfo = SshInfo.builder()
+                .user(user)
+                .remoteHost(sshInfoReq.remoteHost())
+                .remoteName(sshInfoReq.remoteName())
+                .remoteKeyPath(sshInfoReq.remoteKeyPath())
+                .build();
+
+        sshInfoRepository.save(newSshInfo);
+
+        return newSshInfo;
     }
 }

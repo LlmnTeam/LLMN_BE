@@ -11,6 +11,10 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.nio.file.Path;
 
 @Controller
 @RequiredArgsConstructor
@@ -41,5 +45,11 @@ public class SshController {
     public ResponseEntity<?> interruptCommand(@AuthenticationPrincipal CustomUserDetails userDetails) {
         sshService.executeSigInt(userDetails.getUser().getId());
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, null));
+    }
+
+    @PostMapping("/accounts/ssh")
+    public ResponseEntity<?> uploadSSHKey(@RequestParam("file") MultipartFile file) {
+        Path path = sshService.uploadSSHKey(file);
+        return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.CREATED, path));
     }
 }

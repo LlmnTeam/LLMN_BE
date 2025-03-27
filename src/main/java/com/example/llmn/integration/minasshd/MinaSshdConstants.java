@@ -23,4 +23,9 @@ public class MinaSshdConstants {
     public static final int SSH_PORT = 22;
 
     public static final int ASCII_SIGINT_SIGNAL = 3; // ASCII 0x03은 SIGINT 신호
+
+    public static final String UPTIME_COMMAND = "uptime";
+    public static final String UPTIME_COMMAND_RESPONSE = "load average";
+
+    public static final String SSH_DIRECTORY = "ssh";
 }

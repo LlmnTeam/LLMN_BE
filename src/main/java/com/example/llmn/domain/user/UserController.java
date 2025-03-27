@@ -1,5 +1,7 @@
 package com.example.llmn.domain.user;
 
+import com.example.llmn.domain.user.model.request.*;
+import com.example.llmn.domain.user.model.response.*;
 import com.example.llmn.security.userdetails.CustomUserDetails;
 import com.example.llmn.common.utils.ApiUtils;
 import com.example.llmn.domain.user.model.UserRequest;
@@ -27,33 +29,27 @@ public class UserController {
     private static final String CODE_TYPE_JOIN = "join";
 
     @PostMapping("/accounts")
-    public ResponseEntity<?> join(@RequestBody @Valid UserRequest.JoinDTO requestDTO){
+    public ResponseEntity<?> join(@RequestBody @Valid JoinReq requestDTO){
         userService.join(requestDTO);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.CREATED, null));
     }
 
-    @PostMapping("/accounts/ssh")
-    public ResponseEntity<?> uploadSSHKey(@RequestParam("file") MultipartFile file) {
-        Path path = userService.uploadSSHKey(file);
-        return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.CREATED, path));
-    }
-
     @PostMapping("/accounts/check/email")
-    public ResponseEntity<?> checkEmailAndSendCode(@RequestBody @Valid UserRequest.EmailDTO requestDTO) {
-        UserResponse.CheckEmailExistDTO responseDTO = userService.checkEmailExist(requestDTO.email());
+    public ResponseEntity<?> checkEmailAndSendCode(@RequestBody @Valid EmailReq requestDTO) {
+        CheckEmailExistRes responseDTO = userService.checkEmailExist(requestDTO.email());
         if (responseDTO.isValid()) userService.sendCodeByEmail(requestDTO.email(), CODE_TYPE_JOIN);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 
     @PostMapping("/accounts/check/nick")
-    public ResponseEntity<?> checkNickname(@RequestBody @Valid UserRequest.CheckNickDTO requestDTO){
-        UserResponse.CheckNickNameDTO responseDTO = userService.checkNickNameDuplicate(requestDTO);
+    public ResponseEntity<?> checkNickname(@RequestBody @Valid CheckNickReq requestDTO){
+        CheckNickNameRes responseDTO = userService.checkNickNameDuplicate(requestDTO);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 
     @PostMapping("/accounts/verify/code")
-    public ResponseEntity<?> verifyCode(@RequestBody @Valid UserRequest.VerifyCodeDTO requestDTO, @RequestParam String codeType){
-        UserResponse.VerifyEmailCodeDTO responseDTO = userService.verifyCode(requestDTO, codeType);
+    public ResponseEntity<?> verifyCode(@RequestBody @Valid VerifyCodeReq requestDTO, @RequestParam String codeType){
+        VerifyEmailCodeRes responseDTO = userService.verifyCode(requestDTO, codeType);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 
@@ -64,20 +60,20 @@ public class UserController {
     }
 
     @PostMapping("/accounts/validate/ssh")
-    public ResponseEntity<?> verifySshConnect(@RequestBody @Valid UserRequest.VerifySshConnectDTO requestDTO){
-        UserResponse.VerifySshConnectDTO responseDTO = userService.verifySshConnect(requestDTO);
+    public ResponseEntity<?> verifySshConnect(@RequestBody @Valid VerifySshConnectReq requestDTO){
+        VerifySshConnectRes responseDTO = userService.verifySshConnect(requestDTO);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 
     @PostMapping("/accounts/validate/key")
-    public ResponseEntity<?> validateOpenAIKey(@RequestBody @Valid UserRequest.ValidateOpenAIKeyDTO requestDTO){
-        UserResponse.ValidateOpenAIKeyDTO responseDTO = userService.validateOpenAIKey(requestDTO.apiKey());
+    public ResponseEntity<?> validateOpenAIKey(@RequestBody @Valid ValidateOpenAIKeyReq requestDTO){
+        ValidateOpenAIKeyRes responseDTO = userService.validateOpenAIKey(requestDTO.apiKey());
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 
     @GetMapping("/cloud")
     public ResponseEntity<?> findCloudInfo(@AuthenticationPrincipal CustomUserDetails userDetails) {
-        UserResponse.FindCloudInfoDTO responseDTO = userService.findCloudInfo(userDetails.getUser().getId());
+        FindCloudInfoRes responseDTO = userService.findCloudInfo(userDetails.getUser().getId());
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 
@@ -89,12 +85,12 @@ public class UserController {
 
     @GetMapping("/accounts/info")
     public ResponseEntity<?> findConfigurationInfo(@AuthenticationPrincipal CustomUserDetails userDetails) {
-        UserResponse.FindConfigurationInfoDTO responseDTO = userService.findConfigurationInfo(userDetails.getUser().getId());
+        FindConfigurationInfoRes responseDTO = userService.findConfigurationInfo(userDetails.getUser().getId());
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 
     @PatchMapping("/accounts")
-    public ResponseEntity<?> updateConfiguration(@RequestBody @Valid UserRequest.UpdateConfigurationDTO requestDTO, @AuthenticationPrincipal CustomUserDetails userDetails) {
+    public ResponseEntity<?> updateConfiguration(@RequestBody @Valid UpdateConfigurationReq requestDTO, @AuthenticationPrincipal CustomUserDetails userDetails) {
         userService.updateConfiguration(requestDTO, userDetails.getUser().getId());
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, null));
     }
@@ -106,14 +102,14 @@ public class UserController {
     }
 
     @PostMapping("/accounts/recovery/code")
-    public ResponseEntity<?> sendCodeForRecovery(@RequestBody @Valid UserRequest.EmailDTO requestDTO) {
-        UserResponse.CheckAccountExistDTO responseDTO = userService.checkLocalAccountExist(requestDTO);
+    public ResponseEntity<?> sendCodeForRecovery(@RequestBody @Valid EmailReq requestDTO) {
+        CheckAccountExistRes responseDTO = userService.checkLocalAccountExist(requestDTO);
         if (responseDTO.isValid()) userService.sendCodeByEmail(requestDTO.email(), CODE_TYPE_JOIN);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 
     @PostMapping("/accounts/recovery/reset")
-    public ResponseEntity<?> resetPassword(@RequestBody @Valid UserRequest.ResetPasswordDTO requestDTO){
+    public ResponseEntity<?> resetPassword(@RequestBody @Valid ResetPasswordReq requestDTO){
         userService.resetPassword(requestDTO);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, null));
     }
@@ -128,7 +124,7 @@ public class UserController {
     @PostMapping("/validate/accessToken")
     public ResponseEntity<?> validateAccessToken(@CookieValue String accessToken){
         Long userId = userService.validateAccessTokenInRedis(accessToken);
-        UserResponse.ValidateAccessTokenDTO responseDTO = userService.findNickName(userId);
+        ValidateAccessTokenRes responseDTO = userService.findNickName(userId);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 }

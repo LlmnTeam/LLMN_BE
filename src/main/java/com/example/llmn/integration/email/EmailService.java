@@ -1,4 +1,4 @@
-package com.example.llmn.common.utils;
+package com.example.llmn.integration.email;
 
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
@@ -17,19 +17,19 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+import static com.example.llmn.common.constants.GlobalConstants.CHAR_SET;
+import static com.example.llmn.common.constants.GlobalConstants.UTF_EIGHT_ENCODING;
+
 @Component
 @RequiredArgsConstructor
 @Slf4j
-public class EmailUtils {
+public class EmailService {
 
     private final TemplateEngine templateEngine;
     private final JavaMailSender mailSender;
 
     @Value("${spring.mail.username}")
     private String serviceMailAccount;
-
-    private static final String UTF_EIGHT_ENCODING = "UTF-8";
-    private static final String CHAR_SET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 
     @Async
     public void sendMail(String toEmail, String subject, String templateName, Map<String, Object> templateModel) {
