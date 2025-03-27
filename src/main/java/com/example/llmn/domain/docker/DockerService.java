@@ -29,9 +29,8 @@ public class DockerService {
     private final ProjectRepository projectRepository;
 
     public boolean stopContainer(String containerName, Long projectId) {
-        Long sshInfoId = projectRepository.findSshInfoId(projectId).orElseThrow(
-                () -> new CustomException(ExceptionCode.PROJECT_NOT_FOUND)
-        );
+        Long sshInfoId = projectRepository.findSshInfoId(projectId)
+                .orElseThrow(() -> new CustomException(ExceptionCode.PROJECT_NOT_FOUND));
 
         String command = buildContainerCommand(COMMAND_CONTAINER_STOP, containerName);
         String commandResponse = sshService.executeCommandOnce(command, sshInfoId);
@@ -40,9 +39,8 @@ public class DockerService {
     }
 
     public boolean restartContainer(String containerName, Long projectId) {
-        Long sshInfoId = projectRepository.findSshInfoId(projectId).orElseThrow(
-                () -> new CustomException(ExceptionCode.PROJECT_NOT_FOUND)
-        );
+        Long sshInfoId = projectRepository.findSshInfoId(projectId)
+                .orElseThrow(() -> new CustomException(ExceptionCode.PROJECT_NOT_FOUND));
 
         String command = buildContainerCommand(COMMAND_CONTAINER_RESTART, containerName);
         String commandResponse = sshService.executeCommandOnce(command, sshInfoId);
