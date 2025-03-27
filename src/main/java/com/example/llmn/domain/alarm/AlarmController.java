@@ -1,5 +1,7 @@
 package com.example.llmn.domain.alarm;
 
+import com.example.llmn.domain.alarm.model.response.FindAlarmListRes;
+import com.example.llmn.domain.alarm.model.request.ReadAlarmReq;
 import com.example.llmn.security.userdetails.CustomUserDetails;
 import com.example.llmn.common.utils.ApiUtils;
 import lombok.RequiredArgsConstructor;
@@ -20,13 +22,13 @@ public class AlarmController {
     private final AlarmService alarmService;
 
     @GetMapping("/alarms")
-    public ResponseEntity<?> findAlarmList(@AuthenticationPrincipal CustomUserDetails userDetails){
-        AlarmResponse.FindAlarmListDTO responseDTO = alarmService.findAlarmList(userDetails.getUser().getId());
+    public ResponseEntity<?> findAlarmList(@AuthenticationPrincipal CustomUserDetails userDetails) {
+        FindAlarmListRes responseDTO = alarmService.findAlarmList(userDetails.getUser().getId());
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 
     @PostMapping("/alarms/read")
-    public ResponseEntity<?> readAlarm(@RequestBody AlarmRequest.ReadAlarmDTO requestDTO, @AuthenticationPrincipal CustomUserDetails userDetails){
+    public ResponseEntity<?> readAlarm(@RequestBody ReadAlarmReq requestDTO, @AuthenticationPrincipal CustomUserDetails userDetails) {
         alarmService.readAlarm(requestDTO, userDetails.getUser().getId());
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, null));
     }

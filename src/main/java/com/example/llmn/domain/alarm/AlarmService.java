@@ -2,6 +2,8 @@ package com.example.llmn.domain.alarm;
 
 import com.example.llmn.common.exceptions.CustomException;
 import com.example.llmn.common.exceptions.ExceptionCode;
+import com.example.llmn.domain.alarm.model.response.FindAlarmListRes;
+import com.example.llmn.domain.alarm.model.request.ReadAlarmReq;
 import com.example.llmn.domain.user.User;
 import com.example.llmn.domain.user.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -22,9 +24,8 @@ public class AlarmService {
 
     @Transactional
     public void generateAlarm(Long receiverId, String content, AlarmType alarmType){
-        User receiver = userRepository.findById(receiverId).orElseThrow(
-                () -> new CustomException(ExceptionCode.USER_NOT_FOUND)
-        );
+        User receiver = userRepository.findById(receiverId)
+                .orElseThrow(() -> new CustomException(ExceptionCode.USER_NOT_FOUND));
 
         if(receiver.doesNotReceivingAlarm()) return;
 
@@ -33,26 +34,18 @@ public class AlarmService {
                 .content(content)
                 .alarmType(alarmType)
                 .build();
+
         alarmRepository.save(alarm);
     }
 
-    public AlarmResponse.FindAlarmListDTO findAlarmList(Long userId){
+    public FindAlarmListRes findAlarmList(Long userId) {
         List<Alarm> alarms = alarmRepository.findByReceiverId(userId);
-        List<AlarmResponse.AlarmDTO> alarmDTOS = alarms.stream()
-                .map(alarm -> new AlarmResponse.AlarmDTO(
-                        alarm.getId(),
-                        alarm.getContent(),
-                        alarm.getReadDate(),
-                        alarm.getAlarmType(),
-                        alarm.isRead() ))
-                .toList();
-
-        return new AlarmResponse.FindAlarmListDTO(alarmDTOS);
+        return FindAlarmListRes.from(alarms);
     }
 
     @Transactional
-    public void readAlarm(AlarmRequest.ReadAlarmDTO readAlarmDTO, Long userId) {
-        List<Long> alarmIds = readAlarmDTO.alarmIds();
+    public void readAlarm(ReadAlarmReq readAlarmReq, Long userId) {
+        List<Long> alarmIds = readAlarmReq.alarmIds();
         List<Alarm> alarms = alarmRepository.findByIdsWithUser(alarmIds);
 
         for (Alarm alarm : alarms) {
@@ -66,7 +59,6 @@ public class AlarmService {
     public void deleteReadAlarm(){
         LocalDateTime previousDate = LocalDateTime.now().minusDays(3);
         List<Alarm> readAlarm = alarmRepository.findReadBeforeDate(previousDate);
-
         alarmRepository.deleteAll(readAlarm);
     }
 }
