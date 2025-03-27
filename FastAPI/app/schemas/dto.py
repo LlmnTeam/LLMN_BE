@@ -15,7 +15,6 @@ class LogFilesRequest(BaseModel):
     logFiles: list[LogFile]
     question: str
     isFirstQuestion: bool
-    apiKey: str
 
 class ValidateAPIRequest(BaseModel):
     apiKey: str

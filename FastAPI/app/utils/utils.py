@@ -1,7 +1,7 @@
 import os
 from fastapi import Request, HTTPException, status
 from jose import JWTError, jwt
-from app.settings import SECRET_KEY, ALGORITHM, logs_dir
+from app.core.config import SECRET_KEY, ALGORITHM, logs_dir
 from app.schemas.dto import LogFilesRequest
 from app.services.conversation_manager import ConversationManager
 

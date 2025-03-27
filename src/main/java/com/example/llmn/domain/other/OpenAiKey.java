@@ -35,12 +35,9 @@ public class OpenAiKey extends BaseEntity {
         this.user = user;
     }
 
-    public void assignToUser(User user) {
+    public void updateKeyValue(String keyValue, User user) {
         this.user = user;
-        this.tempIdentifier = null; // 사용자에게 할당되면 임시 식별자는 더 이상 필요 없음
-    }
-
-    public void updateKeyValue(String keyValue) {
         this.keyValue = keyValue;
+        this.tempIdentifier = null; // 사용자에게 할당되면 임시 식별자는 더 이상 필요 없음
     }
 }

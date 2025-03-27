@@ -2,6 +2,7 @@
 **/application.properties
 **/application-local.properties
 **/application-deploy.properties
+docker-compose.yml
 
 HELP.md
 .gradle

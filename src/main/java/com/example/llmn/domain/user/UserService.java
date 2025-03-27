@@ -17,6 +17,7 @@ import com.example.llmn.domain.remote.SSHService;
 import com.example.llmn.domain.remote.SshInfoRepository;
 import com.example.llmn.domain.summary.SummaryRepository;
 import com.example.llmn.integration.redis.RedisService;
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -55,6 +56,7 @@ public class UserService {
     private final WebClient webClient;
     private final EmailService emailService;
     private final UserValidator userValidator;
+    private final EntityManager entityManager;
 
     @Value("${validate_key.uri}")
     private String requestValidateKeyUri;
@@ -68,6 +70,7 @@ public class UserService {
         List<SshInfo> sshInfos = sshService.saveSshInfos(requestDTO.sshInfos(), user);
         sshService.setMonitoringSshInfo(requestDTO.monitoringSshHost(), sshInfos, user);
 
+        entityManager.flush();
         updateOpenAIKey(requestDTO.openAiKey(), requestDTO.email());
     }
 
@@ -169,13 +172,16 @@ public class UserService {
     public void updateOpenAIKey(String apiKey, String email) {
         // 이메일을 임시 식별자로 사용
         Optional<OpenAiKey> existingKey = openAiKeyRepository.findByTempIdentifier(email);
+        User user= userRepository.findByEmail(email)
+                .orElseThrow(() -> new CustomException(ExceptionCode.USER_NOT_FOUND));
 
         if (existingKey.isPresent()) {
-            existingKey.get().updateKeyValue(apiKey);
+            existingKey.get().updateKeyValue(apiKey, user);
         } else {
             OpenAiKey openAiKey = OpenAiKey.builder()
                     .keyValue(apiKey)
                     .tempIdentifier(email)
+                    .user(user)
                     .build();
             openAiKeyRepository.save(openAiKey);
         }

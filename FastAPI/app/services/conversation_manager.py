@@ -1,4 +1,4 @@
-from app.settings import r, encoding, logger, app_settings
+from app.core.config import r, encoding, logger, settings
 from langchain_openai import ChatOpenAI
 
 class ConversationManager:

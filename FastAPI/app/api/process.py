@@ -1,3 +1,4 @@
+# app/api/process.py
 import logging
 
 from fastapi import APIRouter, Depends
@@ -10,9 +11,12 @@ from app.services.generate_summaries import (
     generate_trend_summary, generate_recommend, generate_hourly_summary,
     validate_openai_api_key
 )
+from app.crud.openai_key import find_key_by_user_id
 from app.services.conversation_manager import ConversationManager
 from app.services.rag_service import Rag_Service
 from app.utils.utils import combine_logs_and_question, get_user_id_from_token
+from fastapi import APIRouter, Depends, HTTPException 
+from app.db.session import get_db_context  
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -71,13 +75,20 @@ async def process_logs_and_question(
     request: LogFilesRequest,
     user_id: int = Depends(get_user_id_from_token)
 ):
+    # 사용자 ID로 데이터베이스에서 API 키 조회
+    async with get_db_context() as db:
+        key_obj = await find_key_by_user_id(db, user_id)
+        if not key_obj:
+            raise HTTPException(status_code=404, detail="userId 찾기 실패")
+        api_key = key_obj.key_value  # key_value 속성 추출
+
     conversation_manager = ConversationManager(user_id)
 
     # 로그와 질문을 포함한 최종 질문 생성
     final_question = combine_logs_and_question(request, conversation_manager)
 
     # RAG 서비스 초기화 (API 키 전달)
-    rag_service = Rag_Service(request.api_key)
+    rag_service = Rag_Service(api_key)
 
     # 스트리밍된 응답을 수집하기 위한 리스트
     response_collector = []
