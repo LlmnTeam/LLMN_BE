@@ -12,7 +12,7 @@ import com.example.llmn.domain.metric.MetricRepository;
 import com.example.llmn.domain.remote.SshInfo;
 import com.example.llmn.domain.alarm.AlarmRepository;
 import com.example.llmn.domain.project.ProjectRepository;
-import com.example.llmn.domain.remote.SSHService;
+import com.example.llmn.domain.remote.SecureShellManager;
 import com.example.llmn.domain.remote.SshInfoRepository;
 import com.example.llmn.domain.summary.SummaryRepository;
 import com.example.llmn.integration.redis.RedisService;
@@ -45,7 +45,7 @@ public class UserService {
     private final MetricRepository metricRepository;
     private final AlarmRepository alarmRepository;
     private final OpenAiKeyService openAiKeyService;
-    private final SSHService sshService;
+    private final SecureShellManager secureShellManager;
     private final RedisService redisService;
     private final SummaryRepository summaryRepository;
     private final EmailService emailService;
@@ -57,8 +57,8 @@ public class UserService {
 
         User user = saveUser(requestDTO);
 
-        List<SshInfo> sshInfos = sshService.saveSshInfos(requestDTO.sshInfos(), user);
-        sshService.setMonitoringSshInfo(requestDTO.monitoringSshHost(), sshInfos, user);
+        List<SshInfo> sshInfos = secureShellManager.createSshConfigurations(requestDTO.sshInfos(), user);
+        secureShellManager.setMonitoringTarget(requestDTO.monitoringSshHost(), sshInfos, user);
 
         openAiKeyService.saveOpenAIKey(requestDTO.openAiKey(), user);
     }
@@ -84,8 +84,8 @@ public class UserService {
         userValidator.validateMonitoringSshHostSelected(requestDTO);
 
         List<SshInfo> sshInfos = sshInfoRepository.findByUserId(userId);
-        sshService.updateExistingSshConfigurations(sshInfos, requestDTO.sshInfos());
-        List<SshInfo> newSshHosts = sshService.addNewSshConfigurations(sshInfos, requestDTO.sshInfos(), user);
+        secureShellManager.updateExistingSshConfigurations(sshInfos, requestDTO.sshInfos());
+        List<SshInfo> newSshHosts = secureShellManager.addNewSshConfigurations(sshInfos, requestDTO.sshInfos(), user);
 
         SshInfo monitoringSshInfo = findMonitoringSshInfo(sshInfos, newSshHosts, requestDTO.monitoringSshHost());
         user.updateConfiguration(requestDTO.nickName(), requestDTO.receivingAlarm(), monitoringSshInfo.getId());
@@ -98,7 +98,7 @@ public class UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new CustomException(ExceptionCode.USER_NOT_FOUND));
 
-        SshInfo monitoringSshInfo = sshService.findMonitoringSshInfo(userId, monitoringSshHost);
+        SshInfo monitoringSshInfo = secureShellManager.findMonitoringSshConfig(userId, monitoringSshHost);
         user.updateMonitoringSshInfo(monitoringSshInfo.getId());
     }
 
@@ -153,7 +153,7 @@ public class UserService {
     }
 
     public VerifySshConnectRes checkSshConnect(VerifySshConnectReq requestDTO) {
-        boolean isValid = sshService.checkConnectionValid(requestDTO.remoteHost(), requestDTO.remoteName(), requestDTO.remoteKeyPath());
+        boolean isValid = secureShellManager.testSshConnection(requestDTO.remoteHost(), requestDTO.remoteName(), requestDTO.remoteKeyPath());
         return new VerifySshConnectRes(isValid);
     }
 

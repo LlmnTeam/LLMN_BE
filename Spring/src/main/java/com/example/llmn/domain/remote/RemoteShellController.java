@@ -19,37 +19,37 @@ import java.nio.file.Path;
 @Controller
 @RequiredArgsConstructor
 @RequestMapping("/api")
-public class SshController {
+public class RemoteShellController {
 
-    private final SSHService sshService;
+    private final SecureShellManager secureShellManager;
 
     @PostMapping("/command/init")
     public ResponseEntity<?> initCommend(@AuthenticationPrincipal CustomUserDetails userDetails){
-        sshService.initCommend(userDetails.getUser().getId());
+        secureShellManager.initializeShellSession(userDetails.getUser().getId());
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, null));
     }
 
     @PostMapping("/command/home")
     public ResponseEntity<?> executeCommandInShell(@RequestBody ExecuteCommandReq requestDTO, @AuthenticationPrincipal CustomUserDetails userDetails) {
-        String response = sshService.executeCommandInShell(requestDTO.command(), requestDTO.isFirstExecution(), userDetails.getUser().getId());
+        String response = secureShellManager.executeShellCommand(requestDTO.command(), requestDTO.isFirstExecution(), userDetails.getUser().getId());
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, response));
     }
 
     @PostMapping("/command/terminate")
     public ResponseEntity<?> terminateCommand(@AuthenticationPrincipal CustomUserDetails userDetails) {
-        sshService.stopCommend(userDetails.getUser().getId());
+        secureShellManager.terminateShellSession(userDetails.getUser().getId());
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, null));
     }
 
     @PostMapping("/command/interrupt")
     public ResponseEntity<?> interruptCommand(@AuthenticationPrincipal CustomUserDetails userDetails) {
-        sshService.executeSigInt(userDetails.getUser().getId());
+        secureShellManager.sendInterruptSignal(userDetails.getUser().getId());
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, null));
     }
 
     @PostMapping("/accounts/ssh")
     public ResponseEntity<?> uploadSSHKey(@RequestParam("file") MultipartFile file) {
-        Path path = sshService.uploadSSHKey(file);
+        Path path = secureShellManager.uploadSSHKey(file);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.CREATED, path));
     }
 }

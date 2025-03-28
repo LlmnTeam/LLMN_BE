@@ -62,6 +62,11 @@ public enum ExceptionCode {
     // OpenAI
     API_KEY_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 키입니다."),
 
+    // SSH
+    SSH_USER_SESSION_LIMIT_EXCEEDED(HttpStatus.BAD_REQUEST, "SSH 세션 사용 제한을 초과하였습니다."),
+    SSH_CONNECTION_LIMIT_EXCEEDED(HttpStatus.BAD_REQUEST, "SSH 연결 제한을 초과하였습니다"),
+    SSH_COMMAND_TIMEOUT(HttpStatus.REQUEST_TIMEOUT, "명령 시간 타임아웃이 발생했습니다"),
+
     // 프로젝트 관련 에러
     PROJECT_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 프로젝트를 찾을 수 없습니다."),
     SSH_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 SSH 정보를 찾을 수 없습니다."),

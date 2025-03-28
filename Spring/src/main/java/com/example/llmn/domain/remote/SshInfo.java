@@ -54,6 +54,10 @@ public class SshInfo extends BaseEntity {
         this.isWorking = isWorking;
     }
 
+    public long getUserId(){
+        return user.getId();
+    }
+
     public boolean isMonitoringSsh(Long monitoringSshId) {
         return this.id.equals(monitoringSshId);
     }

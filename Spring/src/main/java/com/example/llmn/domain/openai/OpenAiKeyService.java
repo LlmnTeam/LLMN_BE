@@ -38,7 +38,7 @@ public class OpenAiKeyService {
 
     @Transactional
     public void updateOpenAIKey(String apiKey, String email) {
-        Optional<OpenAiKey> existingKey = openAiKeyRepository.findByTempIdentifier(email);
+        Optional<OpenAiKey> existingKey = openAiKeyRepository.findByEmail(email);
         User user= userRepository.findByEmail(email)
                 .orElseThrow(() -> new CustomException(ExceptionCode.USER_NOT_FOUND));
 

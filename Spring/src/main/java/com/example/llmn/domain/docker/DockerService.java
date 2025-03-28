@@ -5,7 +5,7 @@ import com.example.llmn.common.exceptions.ExceptionCode;
 import com.example.llmn.domain.project.Project;
 import com.example.llmn.domain.remote.SshInfo;
 import com.example.llmn.domain.project.ProjectRepository;
-import com.example.llmn.domain.remote.SSHService;
+import com.example.llmn.domain.remote.SecureShellManager;
 import com.example.llmn.integration.redis.RedisService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,7 +24,7 @@ import static com.example.llmn.integration.redis.RedisConstants.REDIS_EXP_RESOUR
 @Slf4j
 public class DockerService {
 
-    private final SSHService sshService;
+    private final SecureShellManager secureShellManager;
     private final RedisService redisService;
     private final ProjectRepository projectRepository;
 
@@ -33,7 +33,7 @@ public class DockerService {
                 .orElseThrow(() -> new CustomException(ExceptionCode.PROJECT_NOT_FOUND));
 
         String command = buildContainerCommand(COMMAND_CONTAINER_STOP, containerName);
-        String commandResponse = sshService.executeCommandOnce(command, sshInfoId);
+        String commandResponse = secureShellManager.executeOneTimeCommand(command, sshInfoId);
 
         return isCommandSuccess(containerName, commandResponse);
     }
@@ -43,13 +43,13 @@ public class DockerService {
                 .orElseThrow(() -> new CustomException(ExceptionCode.PROJECT_NOT_FOUND));
 
         String command = buildContainerCommand(COMMAND_CONTAINER_RESTART, containerName);
-        String commandResponse = sshService.executeCommandOnce(command, sshInfoId);
+        String commandResponse = secureShellManager.executeOneTimeCommand(command, sshInfoId);
 
         return isCommandSuccess(containerName, commandResponse);
     }
 
     public List<String> findRunningContainerList(Long sshInfoId) {
-        String commandResponse = sshService.executeCommandOnce(COMMAND_CONTAINER_PS, sshInfoId);
+        String commandResponse = secureShellManager.executeOneTimeCommand(COMMAND_CONTAINER_PS, sshInfoId);
         return parseContainerList(commandResponse);
     }
 
@@ -93,7 +93,7 @@ public class DockerService {
         Map<String, Map<String, String>> resourceUsageMap = new HashMap<>();
 
         for (SshInfo sshInfo : sshInfos) {
-            String commandResponse = sshService.executeCommandOnce(COMMAND_CONTAINER_STATS, sshInfo.getId());
+            String commandResponse = secureShellManager.executeOneTimeCommand(COMMAND_CONTAINER_STATS, sshInfo.getId());
             Map<String, Map<String, String>> parsedUsage = parseCommandResponse(commandResponse);
             resourceUsageMap.putAll(parsedUsage);
         }

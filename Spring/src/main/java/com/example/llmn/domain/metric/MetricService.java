@@ -3,7 +3,7 @@ package com.example.llmn.domain.metric;
 import com.example.llmn.domain.metric.model.response.FindCurrentMetricRes;
 import com.example.llmn.domain.metric.model.response.FindMetricHistoryRes;
 import com.example.llmn.domain.remote.SshInfo;
-import com.example.llmn.domain.remote.SSHService;
+import com.example.llmn.domain.remote.SecureShellManager;
 import com.example.llmn.domain.remote.SshInfoRepository;
 import com.example.llmn.domain.user.UserRepository;
 import com.example.llmn.integration.redis.RedisService;
@@ -32,7 +32,7 @@ public class MetricService {
     private final UserRepository userRepository;
     private final SshInfoRepository sshInfoRepository;
     private final RedisService redisService;
-    private final SSHService sshService;
+    private final SecureShellManager secureShellManager;
 
     public FindCurrentMetricRes findCurrentMetricsForHost(Long sshInfoId) {
         return retrieveMetricsFromCache(sshInfoId)
@@ -92,7 +92,7 @@ public class MetricService {
     }
 
     private Map<String, Double> gatherCpuAndMemoryData(Long sshInfoId) {
-        String topCommandOutput = sshService.executeCommandOnce(CMD_CPU_MEMORY_STATS, sshInfoId);
+        String topCommandOutput = secureShellManager.executeOneTimeCommand(CMD_CPU_MEMORY_STATS, sshInfoId);
         String[] lines = topCommandOutput.split("\n");
 
         Map<String, Double> statsMap = new HashMap<>();
@@ -106,7 +106,7 @@ public class MetricService {
     }
 
     private Map<String, Double> gatherNetworkData(Long sshInfoId) {
-        String networkCommandOutput = sshService.executeCommandOnce(CMD_NETWORK_STATS, sshInfoId);
+        String networkCommandOutput = secureShellManager.executeOneTimeCommand(CMD_NETWORK_STATS, sshInfoId);
         String[] lines = networkCommandOutput.split("\\n");
 
         Map<String, Double> currentNetworkStats = parseNetworkDataIntoMap(lines);

@@ -15,15 +15,8 @@ public interface SshInfoRepository extends JpaRepository<SshInfo, Long> {
     @Query("SELECT s FROM SshInfo s WHERE s.user.id = :userId")
     List<SshInfo> findByUserId(@Param("userId") Long userId);
 
-    @Query("SELECT s.remoteHost FROM SshInfo s")
-    List<String> findAllRemoteHost();
-
     @Query("SELECT s.remoteHost FROM SshInfo s WHERE s.id = :id")
     Optional<String> findHostById(@Param("id") Long id);
-
-    @Modifying
-    @Query("UPDATE SshInfo s SET s.isWorking = :isWorking WHERE s.id = :sshId")
-    void updateIsWorking(@Param("sshId") Long sshId, @Param("isWorking") boolean isWorking);
 
     @Modifying
     @Query("DELETE FROM SshInfo s WHERE s.user.id = :userId")
