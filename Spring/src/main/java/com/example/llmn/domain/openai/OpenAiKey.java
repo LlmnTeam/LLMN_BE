@@ -1,4 +1,4 @@
-package com.example.llmn.domain.other;
+package com.example.llmn.domain.openai;
 
 import com.example.llmn.common.entity.BaseEntity;
 import com.example.llmn.domain.user.User;

@@ -1,4 +1,4 @@
-package com.example.llmn.domain.other;
+package com.example.llmn.domain.dashboard;
 
 import com.example.llmn.domain.user.model.response.FindDashboardRes;
 import com.example.llmn.security.userdetails.CustomUserDetails;

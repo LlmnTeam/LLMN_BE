@@ -58,12 +58,6 @@ public class UserController {
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 
-    @PostMapping("/accounts/validate/key")
-    public ResponseEntity<?> validateOpenAIKey(@RequestBody @Valid ValidateOpenAIKeyReq requestDTO){
-        ValidateOpenAIKeyRes responseDTO = userService.validateOpenAIKey(requestDTO.apiKey());
-        return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
-    }
-
     @GetMapping("/cloud")
     public ResponseEntity<?> findCloudInfo(@AuthenticationPrincipal CustomUserDetails userDetails) {
         FindCloudInfoRes responseDTO = userService.findCloudInfo(userDetails.getUser().getId());
@@ -85,12 +79,6 @@ public class UserController {
     @PatchMapping("/accounts")
     public ResponseEntity<?> updateConfiguration(@RequestBody @Valid UpdateConfigurationReq requestDTO, @AuthenticationPrincipal CustomUserDetails userDetails) {
         userService.updateConfiguration(requestDTO, userDetails.getUser().getId());
-        return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, null));
-    }
-
-    @PatchMapping("/accounts/apiKey")
-    public ResponseEntity<?> updateApiKey(@RequestBody @Valid UpdateApiKeyReq requestDTO){
-        userService.updateOpenAIKey(requestDTO.apiKey(), requestDTO.email());
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, null));
     }
 

@@ -1,4 +1,4 @@
-package com.example.llmn.domain.other;
+package com.example.llmn.domain.dashboard;
 
 import com.example.llmn.domain.metric.MetricService;
 import com.example.llmn.domain.metric.model.response.FindCurrentMetricRes;

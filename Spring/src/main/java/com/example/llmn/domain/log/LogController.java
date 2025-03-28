@@ -46,13 +46,13 @@ public class LogController {
 
     @GetMapping("/summaryProjectLog")
     public ResponseEntity<?> summaryProjectLog(){
-        logScheduler.summaryProjectLog();
+        logScheduler.scheduleProjectLogSummaries();
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, null));
     }
 
     @GetMapping("/summaryPerformance")
     public ResponseEntity<?> summaryPerformance(){
-        logScheduler.summaryPerformance();
+        logScheduler.schedulePerformanceSummaries();
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, null));
     }
 }

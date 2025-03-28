@@ -1,4 +1,4 @@
-package com.example.llmn.domain.other;
+package com.example.llmn.domain.openai;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
@@ -10,5 +10,5 @@ public interface OpenAiKeyRepository extends JpaRepository<OpenAiKey, Long> {
 
     Optional<OpenAiKey> findByTempIdentifier(String tempIdentifier);
 
-    Optional<OpenAiKey> findByUser_Id(Long userId);
+    Optional<OpenAiKey> findByUserId(Long userId);
 }

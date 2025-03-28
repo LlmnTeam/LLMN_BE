@@ -84,4 +84,8 @@ public class Project extends BaseEntity {
                 || lowerCaseKeyword.contains(projectName)
                 || lowerCaseKeyword.contains(containerName);
     }
+
+    public Long getUserId() {
+        return user.getId();
+    }
 }

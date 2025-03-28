@@ -6,6 +6,8 @@ public class MetricConstants {
 
     private MetricConstants() {}
 
+    public static final int METRIC_HISTORY_PREVIOUS_HOUR = 1;
+
     public static final String METRIC_MAP_CPU_USAGE = "cpuUsage";
     public static final String METRIC_MAP_TOTAL_MEMORY = "totalMemory";
     public static final String METRIC_MAP_USED_MEMORY = "usedMemory";

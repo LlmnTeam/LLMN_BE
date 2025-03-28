@@ -2,8 +2,7 @@ package com.example.llmn.domain.user;
 
 import com.example.llmn.common.exceptions.CustomException;
 import com.example.llmn.common.exceptions.ExceptionCode;
-import com.example.llmn.domain.other.OpenAiKey;
-import com.example.llmn.domain.other.OpenAiKeyRepository;
+import com.example.llmn.domain.openai.OpenAiKeyService;
 import com.example.llmn.domain.user.model.request.*;
 import com.example.llmn.domain.user.model.response.*;
 import com.example.llmn.integration.email.model.EmailVerificationTemplate;
@@ -19,12 +18,10 @@ import com.example.llmn.domain.summary.SummaryRepository;
 import com.example.llmn.integration.redis.RedisService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.reactive.function.client.WebClient;
 
 import java.util.*;
 
@@ -33,7 +30,6 @@ import static com.example.llmn.common.constants.GlobalConstants.PREFIX_CODE;
 import static com.example.llmn.integration.email.EmailConstants.*;
 import static com.example.llmn.integration.email.EmailService.generateVerificationCode;
 import static com.example.llmn.integration.email.MailTemplate.VERIFICATION_CODE;
-import static com.example.llmn.common.utils.UriUtils.buildURI;
 import static com.example.llmn.integration.redis.RedisConstants.*;
 
 @Service
@@ -48,16 +44,12 @@ public class UserService {
     private final SshInfoRepository sshInfoRepository;
     private final MetricRepository metricRepository;
     private final AlarmRepository alarmRepository;
-    private final OpenAiKeyRepository openAiKeyRepository;
+    private final OpenAiKeyService openAiKeyService;
     private final SSHService sshService;
     private final RedisService redisService;
     private final SummaryRepository summaryRepository;
-    private final WebClient webClient;
     private final EmailService emailService;
     private final UserValidator userValidator;
-
-    @Value("${validate_key.uri}")
-    private String requestValidateKeyUri;
 
     @Transactional
     public void join(JoinReq requestDTO) {
@@ -68,7 +60,7 @@ public class UserService {
         List<SshInfo> sshInfos = sshService.saveSshInfos(requestDTO.sshInfos(), user);
         sshService.setMonitoringSshInfo(requestDTO.monitoringSshHost(), sshInfos, user);
 
-        saveOpenAIKey(requestDTO.openAiKey(), user);
+        openAiKeyService.saveOpenAIKey(requestDTO.openAiKey(), user);
     }
 
     @Async
@@ -165,30 +157,6 @@ public class UserService {
         return new VerifySshConnectRes(isValid);
     }
 
-    @Transactional
-    public void updateOpenAIKey(String apiKey, String email) {
-        Optional<OpenAiKey> existingKey = openAiKeyRepository.findByTempIdentifier(email);
-        User user= userRepository.findByEmail(email)
-                .orElseThrow(() -> new CustomException(ExceptionCode.USER_NOT_FOUND));
-
-        if (existingKey.isPresent()) {
-            existingKey.get().updateKeyValue(apiKey, user);
-        } else {
-            saveOpenAIKey(apiKey, user);
-        }
-
-        validateOpenAIKey(apiKey);
-    }
-
-    public ValidateOpenAIKeyRes validateOpenAIKey(String apiKey) {
-        return webClient.post()
-                .uri(buildURI(requestValidateKeyUri))
-                .bodyValue(new RequestValidateKeyReq(apiKey))
-                .retrieve()
-                .bodyToMono(ValidateOpenAIKeyRes.class)
-                .block();
-    }
-
     public Long checkAccessToken(String accessToken) {
         if (JWTProvider.isInvalidJwtFormat(accessToken))
             throw new CustomException(ExceptionCode.TOKEN_WRONG);
@@ -267,15 +235,6 @@ public class UserService {
     private void cacheVerificationInfoIfRecovery(VerifyCodeReq requestDTO, String codeType) {
         if (codeType.equals(CODE_TYPE_RECOVERY))
             redisService.storeValue(REDIS_KEY_CODE_TO_EMAIL, requestDTO.code(), requestDTO.email(), 5 * 60 * 1000L);
-    }
-
-    private void saveOpenAIKey(String apiKey, User user) {
-        OpenAiKey openAiKey = OpenAiKey.builder()
-                .keyValue(apiKey)
-                .tempIdentifier(null)
-                .user(user)
-                .build();
-        openAiKeyRepository.save(openAiKey);
     }
 
     private String getCodeTypeKey(String codeType) {

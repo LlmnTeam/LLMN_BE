@@ -37,35 +37,9 @@ import static com.example.llmn.integration.elasticsearch.ElasticSearchConstants.
 public class LogService {
 
     private final ElasticSearchService elasticSearchService;
-    private final SshInfoRepository sshInfoRepository;
 
     private static final String CONTAINER_NAME_FIELD = "name";
     private static final String UNKNOWN_CONTAINER = "unknown_container";
-
-    @Scheduled(fixedRate = 60000)
-    @SuppressWarnings("rawtypes")
-    public void collectAndPersistLogs() {
-        List<SshInfo> sshConfigurations = sshInfoRepository.findAll();
-
-        for(SshInfo sshConfig : sshConfigurations) {
-            SearchResponse<Map> searchResponse = elasticSearchService.searchUnprocessedDocuments(
-                    getCurrentLogIndexName(),
-                    sshConfig.getRemoteHost(),
-                    Map.class,
-                    MAX_LOG_RECORDS_PER_QUERY
-            );
-
-            List<Map<String, Object>> rawLogDocuments = convertElasticsearchResultToLogMap(searchResponse);
-            List<Map<String, Object>> processedLogs = standardizeLogFields(rawLogDocuments);
-
-            elasticSearchService.updateDocuments(getCurrentLogIndexName(), processedLogs, sshConfig.getRemoteHost());
-            persistLogsToFiles(processedLogs, sshConfig.getId());
-        }
-    }
-
-    public void deleteLogsBefore(Instant cutoffTime, String elasticSearchHost) {
-        elasticSearchService.deleteDocumentsBefore(ELASTICSEARCH_LOG_INDEX_PATTERN, cutoffTime, elasticSearchHost);
-    }
 
     @SuppressWarnings("rawtypes")
     public List<LogDataDTO> searchLog(Instant startTime, Instant endTime, String logLevel, String containerName, String elasticSearchHost) {
@@ -90,7 +64,7 @@ public class LogService {
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
-    private List<Map<String, Object>> convertElasticsearchResultToLogMap(SearchResponse<Map> searchResponse){
+    public List<Map<String, Object>> convertElasticsearchResultToLogMap(SearchResponse<Map> searchResponse){
         if (searchResponse.hits() == null || searchResponse.hits().hits() == null)
             return Collections.emptyList();
 
@@ -107,7 +81,7 @@ public class LogService {
                 .toList();
     }
 
-    private List<Map<String, Object>> standardizeLogFields(List<Map<String, Object>> logDocuments) {
+    public List<Map<String, Object>> standardizeLogFields(List<Map<String, Object>> logDocuments) {
         logDocuments.forEach(logDocument -> {
             String containerName = getContainerNameFromLog(logDocument);
             String message = getLogMessage(logDocument);
@@ -117,6 +91,20 @@ public class LogService {
         });
 
         return logDocuments;
+    }
+
+    public void persistLogsToFiles(List<Map<String, Object>> logDocuments, Long sshId) {
+        createDirectoryIfNotExist(LOGS_DIRECTORY);
+
+        Date now = new Date();
+        String timestampForFileName = formatDate(now, LOG_TITLE_FORMAT);
+        String timestampForText = formatDate(now, LOG_TEXT_FORMAT);
+
+        Map<String, List<Map<String, Object>>> groupedLogMap = groupLogsByContainerName(logDocuments);
+        groupedLogMap.forEach((containerName, containerLogs) -> {
+            String fileName = createLogFileName(containerName, timestampForFileName, sshId);
+            writeLogsToFile(fileName, containerLogs, timestampForText);
+        });
     }
 
     @SuppressWarnings("unchecked")
@@ -146,20 +134,6 @@ public class LogService {
         logDocument.put(ES_FIELD_PROCESSED, true);
         logDocument.put(ES_FIELD_MESSAGE, message);
         logDocument.remove(ES_FIELD_CONTAINER_OBJECT);
-    }
-
-    private void persistLogsToFiles(List<Map<String, Object>> logDocuments, Long sshId) {
-        createDirectoryIfNotExist(LOGS_DIRECTORY);
-
-        Date now = new Date();
-        String timestampForFileName = formatDate(now, LOG_TITLE_FORMAT);
-        String timestampForText = formatDate(now, LOG_TEXT_FORMAT);
-
-        Map<String, List<Map<String, Object>>> groupedLogMap = groupLogsByContainerName(logDocuments);
-        groupedLogMap.forEach((containerName, containerLogs) -> {
-            String fileName = createLogFileName(containerName, timestampForFileName, sshId);
-            writeLogsToFile(fileName, containerLogs, timestampForText);
-        });
     }
 
     private Map<String, List<Map<String, Object>>> groupLogsByContainerName(List<Map<String, Object>> logDocuments) {
@@ -260,10 +234,5 @@ public class LogService {
 
     private String extractTimestampFromLog(String log) {
         return log.substring(1, 17);
-    }
-
-    private String getCurrentLogIndexName() {
-        // 오늘 날짜를 기반으로 인덱스 이름 생성
-        return ELASTICSEARCH_LOG_INDEX_PREFIX + getTodayDateInString();
     }
 }
