@@ -1,6 +1,5 @@
 package com.example.llmn.common.utils;
 
-import com.example.llmn.domain.metric.MetricResponse;
 import com.example.llmn.domain.metric.model.response.FindCurrentMetricRes;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;

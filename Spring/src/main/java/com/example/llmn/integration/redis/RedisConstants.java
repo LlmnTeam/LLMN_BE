@@ -12,15 +12,18 @@ public class RedisConstants {
     public static final String REDIS_KEY_SSH = "SSH";
 
     public static final String REDIS_KEY_CODE_TO_EMAIL = "codeToEmail";
+    public static final Long REDIS_EXP_VERIFICATION_CODE_MS = 175 * 1000L;  // 회원 가입 코드 유효시간
+
     public static final String REDIS_KEY_NETWORK_REC = "network:received";
     public static final String REDIS_KEY_NETWORK_TRANS = "network:transmitted";
     public static final String REDIS_KEY_RESOURCE = "resource";
+
+    public static final String REDIS_KEY_METRIC = "metric";
+    public static final Long REDIS_EXP_METRIC_MS = 10 * 60 * 1000L; // 10분
 
     public static final Long REDIS_EXP_RESOURCE = 10 * 60 * 1000L; // 10분
     public static final Long REDIS_EXP_SSH = 60L * 60 * 24 * 30; // 30일
 
     public static final int REDIS_TIMEOUT_SSH = 60000; // 1분
     public static final String REDIS_CHANNEL_SSH = "ssh-command-output"; // 고정된 Redis 채널 이름
-
-    public static final long VERIFICATION_CODE_EXPIRATION_MS = 175 * 1000L;  // 회원 가입 코드 유효시간
 }

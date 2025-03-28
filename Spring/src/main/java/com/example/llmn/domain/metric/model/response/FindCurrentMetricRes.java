@@ -15,11 +15,11 @@ public record FindCurrentMetricRes(
 
     public static FindCurrentMetricRes from(Map<String, Double> cpuAndMemoryMetrics, Map<String, Double> networkMetrics) {
         return new FindCurrentMetricRes(
-                cpuAndMemoryMetrics.getOrDefault(METRIC_MAP_CPU_USAGE, DEFAULT_METRIC_VALUE),
-                cpuAndMemoryMetrics.getOrDefault(METRIC_MAP_TOTAL_MEMORY, DEFAULT_METRIC_VALUE),
-                cpuAndMemoryMetrics.getOrDefault(METRIC_MAP_USED_MEMORY, DEFAULT_METRIC_VALUE),
-                networkMetrics.getOrDefault(METRIC_MAP_NETWORK_RECEIVED, DEFAULT_METRIC_VALUE),
-                networkMetrics.getOrDefault(METRIC_MAP_NETWORK_SENT, DEFAULT_METRIC_VALUE)
+                cpuAndMemoryMetrics.getOrDefault(KEY_CPU_USAGE, DEFAULT_METRIC_VALUE),
+                cpuAndMemoryMetrics.getOrDefault(KEY_TOTAL_MEMORY, DEFAULT_METRIC_VALUE),
+                cpuAndMemoryMetrics.getOrDefault(KEY_USED_MEMORY, DEFAULT_METRIC_VALUE),
+                networkMetrics.getOrDefault(KEY_NETWORK_RECEIVED, DEFAULT_METRIC_VALUE),
+                networkMetrics.getOrDefault(KEY_NETWORK_SENT, DEFAULT_METRIC_VALUE)
         );
     }
 }

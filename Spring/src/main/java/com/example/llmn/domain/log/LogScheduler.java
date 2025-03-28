@@ -36,7 +36,7 @@ import static com.example.llmn.common.utils.DateTimeUtils.formatLocalDateTime;
 import static com.example.llmn.common.utils.DateTimeUtils.getTodayDateInString;
 import static com.example.llmn.common.utils.UriUtils.buildURI;
 import static com.example.llmn.domain.log.LogConstants.*;
-import static com.example.llmn.domain.metric.MetricConstants.METRIC_HISTORY_PREVIOUS_HOUR;
+import static com.example.llmn.domain.metric.MetricConstants.DEFAULT_METRIC_HISTORY_HOURS;
 
 @Service
 @RequiredArgsConstructor
@@ -212,7 +212,7 @@ public class LogScheduler {
     }
 
     private Optional<PerformanceSummaryRes> requestPerformanceSummary(Long sshInfoId, Long userId) {
-        FindMetricHistoryRes metricHistory = metricService.findMetricHistory(METRIC_HISTORY_PREVIOUS_HOUR, sshInfoId);
+        FindMetricHistoryRes metricHistory = metricService.findHistoricalMetrics(DEFAULT_METRIC_HISTORY_HOURS, sshInfoId);
 
         String formattedMetricData = formatPerformanceMetricsData(metricHistory);
         PerformanceSummaryRes summaryResponse = sendSummaryRequest(performanceSummaryServiceUrl, formattedMetricData, PerformanceSummaryRes.class, userId);

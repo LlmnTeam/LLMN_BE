@@ -202,7 +202,7 @@ public class UserService {
     }
 
     private void storeVerificationCode(String email, String codeType, String verificationCode) {
-        redisService.storeValue(getCodeTypeKey(codeType), email, verificationCode, VERIFICATION_CODE_EXPIRATION_MS);
+        redisService.storeValue(getCodeTypeKey(codeType), email, verificationCode, REDIS_EXP_VERIFICATION_CODE_MS);
     }
 
     private SshInfo findMonitoringSshInfo(List<SshInfo> sshInfos, List<SshInfo> addedSshHosts, String monitoringSshHost) {
