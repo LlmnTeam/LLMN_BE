@@ -60,9 +60,8 @@ public class DockerService {
 
     public Map<String, Map<String, String>> findContainersResourceUsage(List<Project> projects, Long userId, boolean isUsingCache) {
         Map<String, Map<String, String>> cachedResourceUsage = retrieveCachedResourceUsage(isUsingCache, userId);
-        if (hasCachedValue(cachedResourceUsage)) {
+        if (hasCachedValue(cachedResourceUsage))
             return cachedResourceUsage;
-        }
 
         List<SshInfo> sshInfos = extractUniqueSshInfos(projects);
         Map<String, Map<String, String>> resourceUsage = fetchResourceUsageFromSsh(sshInfos);

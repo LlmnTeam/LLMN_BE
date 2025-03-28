@@ -91,7 +91,7 @@ public class LogScheduler {
             fetchMetricSummary(monitoringSshInfoId, user.getId())
                     .ifPresent(performanceSummaryRes -> {
                         saveSummary(user, performanceSummaryRes.performanceSummary(), SummaryType.PERFORMANCE);
-                        alarmService.generateAlarm(user.getId(), PERFORMANCE_SUMMARY_ALARM, AlarmType.UPDATE);
+                        alarmService.generateAlarm(user.getId(), PERFORMANCE_SUMMARY_UPDATE_MESSAGE, AlarmType.UPDATE);
                     });
         }
     }
@@ -105,7 +105,7 @@ public class LogScheduler {
                     .ifPresent(hourlySummaryRes -> {
                         User user = userRepository.getReferenceById(userId);
                         saveSummary(user, hourlySummaryRes.hourlySummary(), SummaryType.HOURLY);
-                        alarmService.generateAlarm(userId, HOURLY_SUMMARY_ALARM, AlarmType.UPDATE);
+                        alarmService.generateAlarm(userId, HOURLY_SUMMARY_UPDATE_MESSAGE, AlarmType.UPDATE);
                     });
         }
     }
@@ -119,7 +119,7 @@ public class LogScheduler {
                     .ifPresent(dailySummaryRes -> {
                         User user = userRepository.getReferenceById(userId);
                         saveSummary(user, dailySummaryRes.dailySummary(), SummaryType.DAILY);
-                        alarmService.generateAlarm(userId, DAILY_SUMMARY_ALARM, AlarmType.UPDATE);
+                        alarmService.generateAlarm(userId, DAILY_SUMMARY_UPDATE_MESSAGE, AlarmType.UPDATE);
                     });
         }
     }
@@ -133,7 +133,7 @@ public class LogScheduler {
                     .ifPresent(trendSummaryRes -> {
                         User user = userRepository.getReferenceById(userId);
                         saveSummary(user, trendSummaryRes.trendSummary(), SummaryType.TEND);
-                        alarmService.generateAlarm(userId, TREND_SUMMARY_ALARM, AlarmType.UPDATE);
+                        alarmService.generateAlarm(userId, TREND_SUMMARY_UPDATE_MESSAGE, AlarmType.UPDATE);
                     });
         }
     }
@@ -147,7 +147,7 @@ public class LogScheduler {
                     .ifPresent(recommendationDTO -> {
                         User user = userRepository.getReferenceById(userId);
                         saveSummary(user, recommendationDTO.recommend(), SummaryType.RECOMMENDATION);
-                        alarmService.generateAlarm(userId, RECOMMENDATION_ALARM, AlarmType.UPDATE);
+                        alarmService.generateAlarm(userId, RECOMMENDATION_UPDATE_MESSAGE, AlarmType.UPDATE);
                     });
         }
     }
@@ -172,7 +172,7 @@ public class LogScheduler {
     }
 
     private String buildSummaryRequestBody(String containerName, String logMessage) {
-        return LOG_DATA_HEADER +
+        return LOG_DATA_SECTION_HEADER +
                 "Application Name: " + containerName + "\n" +
                 "Log Content: " + logMessage + "\n";
     }
@@ -200,7 +200,7 @@ public class LogScheduler {
 
     private String buildSummaryRequestBody(FindMetricHistoryRes metricHistory) {
         StringBuilder summaryRequestBody = new StringBuilder();
-        summaryRequestBody.append(PERFORMANCE_SUMMARY_HEADER);
+        summaryRequestBody.append(PERFORMANCE_SUMMARY_SECTION_HEADER);
         appendCpuMetrics(summaryRequestBody, metricHistory);
         appendMemoryMetrics(summaryRequestBody, metricHistory);
         appendNetworkInMetrics(summaryRequestBody, metricHistory);
@@ -254,7 +254,7 @@ public class LogScheduler {
 
     private String buildHourlySummaryRequestBody(List<Summary> performanceSummaries, List<Summary> logSummaries) {
         StringBuilder summaryRequestBody = new StringBuilder();
-        appendSummaryWithHeader(summaryRequestBody, PERFORMANCE_SUMMARY_HEADER, performanceSummaries);
+        appendSummaryWithHeader(summaryRequestBody, PERFORMANCE_SUMMARY_SECTION_HEADER, performanceSummaries);
         appendLogSummary(summaryRequestBody, logSummaries);
 
         return summaryRequestBody.toString();
@@ -273,7 +273,7 @@ public class LogScheduler {
 
     private String buildDailySummaryRequestBody(List<Summary> performanceSummaries, List<Summary> logSummaries) {
         StringBuilder summaryRequestBody = new StringBuilder();
-        appendSummaryWithHeader(summaryRequestBody, PERFORMANCE_SUMMARY_HEADER, performanceSummaries);
+        appendSummaryWithHeader(summaryRequestBody, PERFORMANCE_SUMMARY_SECTION_HEADER, performanceSummaries);
         appendLogSummary(summaryRequestBody, logSummaries);
 
         return summaryRequestBody.toString();
@@ -291,7 +291,7 @@ public class LogScheduler {
 
     private String buildTendSummaryRequestBody(List<Summary> dailySummaries) {
         StringBuilder summaryRequestBody = new StringBuilder();
-        appendSummaryWithHeader(summaryRequestBody, WEEKLY_TREND_HEADER, dailySummaries);
+        appendSummaryWithHeader(summaryRequestBody, WEEKLY_TREND_SECTION_HEADER, dailySummaries);
 
         return summaryRequestBody.toString();
     }
@@ -309,7 +309,7 @@ public class LogScheduler {
 
     private String buildRecommendRequestBody(List<Summary> performanceSummaries, List<Summary> logSummaries) {
         StringBuilder summaryRequestBody = new StringBuilder();
-        appendSummaryWithHeader(summaryRequestBody, PERFORMANCE_SUMMARY_HEADER, performanceSummaries);
+        appendSummaryWithHeader(summaryRequestBody, PERFORMANCE_SUMMARY_SECTION_HEADER, performanceSummaries);
         appendLogSummary(summaryRequestBody, logSummaries);
 
         return summaryRequestBody.toString();
@@ -319,7 +319,7 @@ public class LogScheduler {
         summaryRequestBody.append(header);
 
         if (summaries.isEmpty()) {
-            summaryRequestBody.append(NO_SUMMARY_DATA);
+            summaryRequestBody.append(EMPTY_SUMMARY_DATA_MESSAGE);
         } else {
             for (Summary summary : summaries) {
                 summaryRequestBody.append("Summary Date: ")
@@ -333,10 +333,10 @@ public class LogScheduler {
     }
 
     private void appendLogSummary(StringBuilder summaryRequestBody, List<Summary> summaries) {
-        summaryRequestBody.append(APPLICATION_LOG_SUMMARY_HEADER);
+        summaryRequestBody.append(APPLICATION_LOG_SUMMARY_SECTION_HEADER);
 
         if (summaries.isEmpty()) {
-            summaryRequestBody.append(NO_SUMMARY_DATA);
+            summaryRequestBody.append(EMPTY_SUMMARY_DATA_MESSAGE);
         } else {
             for (Summary summary : summaries) {
                 summaryRequestBody.append("Application Name: ")

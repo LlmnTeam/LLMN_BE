@@ -27,7 +27,8 @@ public class AlarmService {
         User receiver = userRepository.findById(receiverId)
                 .orElseThrow(() -> new CustomException(ExceptionCode.USER_NOT_FOUND));
 
-        if(receiver.doesNotReceivingAlarm()) return;
+        if(receiver.doesNotReceivingAlarm())
+            return;
 
         Alarm alarm = Alarm.builder()
                 .receiver(receiver)
@@ -49,7 +50,9 @@ public class AlarmService {
         List<Alarm> alarms = alarmRepository.findByIdsWithUser(alarmIds);
 
         for (Alarm alarm : alarms) {
-            if (alarm.isNotOwnedBy(userId)) continue;
+            if (alarm.isNotOwnedBy(userId))
+                continue;
+
             alarm.updateIsRead(true, LocalDateTime.now());
         }
     }

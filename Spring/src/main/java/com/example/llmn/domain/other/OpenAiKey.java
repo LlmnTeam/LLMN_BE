@@ -21,9 +21,6 @@ public class OpenAiKey extends BaseEntity {
     @Column(nullable = false)
     private String keyValue;
 
-    @Column(unique = true)
-    private String tempIdentifier; // 임시 식별자 (이메일 또는 랜덤 값)
-
     @OneToOne
     @JoinColumn(name = "user_id")
     private User user;
@@ -31,13 +28,11 @@ public class OpenAiKey extends BaseEntity {
     @Builder
     public OpenAiKey(String keyValue, String tempIdentifier, User user) {
         this.keyValue = keyValue;
-        this.tempIdentifier = tempIdentifier;
         this.user = user;
     }
 
     public void updateKeyValue(String keyValue, User user) {
         this.user = user;
         this.keyValue = keyValue;
-        this.tempIdentifier = null; // 사용자에게 할당되면 임시 식별자는 더 이상 필요 없음
     }
 }

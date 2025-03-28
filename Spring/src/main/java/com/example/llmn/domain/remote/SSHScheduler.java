@@ -28,10 +28,9 @@ public class SSHScheduler {
         });
     }
 
-    public boolean checkConnectionValid(Long sshInfoId) {
+    private boolean checkConnectionValid(Long sshInfoId) {
         MinaSshdService executor = sshService.getSshExecutor(sshInfoId, false);
         String response = executor.executeCommandOnce(UPTIME_COMMAND);
-
         return response.contains(UPTIME_COMMAND_RESPONSE);
     }
 }

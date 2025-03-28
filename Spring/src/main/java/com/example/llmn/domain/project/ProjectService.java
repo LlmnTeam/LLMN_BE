@@ -32,7 +32,7 @@ import static com.example.llmn.common.utils.DateTimeUtils.parseDateTimeFromLogFi
 import static com.example.llmn.common.utils.FileUtils.*;
 import static com.example.llmn.domain.docker.DockerConstants.DOCKER_RESOURCE_KEY_CPU;
 import static com.example.llmn.domain.docker.DockerConstants.DOCKER_RESOURCE_KEY_MEMORY;
-import static com.example.llmn.domain.log.LogConstants.LOG_FILE_SUFFIX;
+import static com.example.llmn.domain.log.LogConstants.LOG_FILE_NAME_SUFFIX;
 
 @Service
 @RequiredArgsConstructor
@@ -306,7 +306,7 @@ public class ProjectService {
 
     private List<String> findLogFilesByContainerName(String containerName) {
         return findTextFiles(LOGS_DIRECTORY).stream()
-                .filter(logFile -> logFile.startsWith(containerName + LOG_FILE_SUFFIX))
+                .filter(logFile -> logFile.startsWith(containerName + LOG_FILE_NAME_SUFFIX))
                 .toList();
     }
 

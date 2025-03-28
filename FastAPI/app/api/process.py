@@ -101,7 +101,7 @@ async def process_logs_and_question(
 
         # async 루프 완료(스트리밍이 종료) => 대화 히스토리에 저장
         complete_response = ''.join(response_collector)
-        conversation_manager.add_to_history(request.question, complete_response)
+        conversation_manager.add_to_history(request.question, complete_response, api_key)
 
     return StreamingResponse(stream_response(), media_type='text/event-stream')
     

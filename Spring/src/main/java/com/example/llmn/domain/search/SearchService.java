@@ -21,7 +21,7 @@ import static com.example.llmn.common.constants.GlobalConstants.BLANK_STRING;
 import static com.example.llmn.common.utils.DateTimeUtils.*;
 import static com.example.llmn.common.utils.FileUtils.LOGS_DIRECTORY;
 import static com.example.llmn.common.utils.FileUtils.findTextFiles;
-import static com.example.llmn.domain.log.LogConstants.LOG_FILE_URI_TEMPLATE;
+import static com.example.llmn.domain.log.LogConstants.PROJECT_LOG_URI_TEMPLATE;
 
 @Service
 @RequiredArgsConstructor
@@ -79,7 +79,7 @@ public class SearchService {
     }
 
     private String buildLogViewRedirectURI(Long projectId, String fileName) {
-        return String.format(LOG_FILE_URI_TEMPLATE, projectId, fileName);
+        return String.format(PROJECT_LOG_URI_TEMPLATE, projectId, fileName);
     }
 
     private List<InsightDTO> searchInsights(List<Project> projects, String keyword, LocalDateTime startDate, LocalDateTime endDate) {

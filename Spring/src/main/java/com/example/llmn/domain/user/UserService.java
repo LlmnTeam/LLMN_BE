@@ -17,7 +17,6 @@ import com.example.llmn.domain.remote.SSHService;
 import com.example.llmn.domain.remote.SshInfoRepository;
 import com.example.llmn.domain.summary.SummaryRepository;
 import com.example.llmn.integration.redis.RedisService;
-import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -56,7 +55,6 @@ public class UserService {
     private final WebClient webClient;
     private final EmailService emailService;
     private final UserValidator userValidator;
-    private final EntityManager entityManager;
 
     @Value("${validate_key.uri}")
     private String requestValidateKeyUri;
@@ -70,8 +68,7 @@ public class UserService {
         List<SshInfo> sshInfos = sshService.saveSshInfos(requestDTO.sshInfos(), user);
         sshService.setMonitoringSshInfo(requestDTO.monitoringSshHost(), sshInfos, user);
 
-        entityManager.flush();
-        updateOpenAIKey(requestDTO.openAiKey(), requestDTO.email());
+        saveOpenAIKey(requestDTO.openAiKey(), user);
     }
 
     @Async
@@ -170,7 +167,6 @@ public class UserService {
 
     @Transactional
     public void updateOpenAIKey(String apiKey, String email) {
-        // 이메일을 임시 식별자로 사용
         Optional<OpenAiKey> existingKey = openAiKeyRepository.findByTempIdentifier(email);
         User user= userRepository.findByEmail(email)
                 .orElseThrow(() -> new CustomException(ExceptionCode.USER_NOT_FOUND));
@@ -178,12 +174,7 @@ public class UserService {
         if (existingKey.isPresent()) {
             existingKey.get().updateKeyValue(apiKey, user);
         } else {
-            OpenAiKey openAiKey = OpenAiKey.builder()
-                    .keyValue(apiKey)
-                    .tempIdentifier(email)
-                    .user(user)
-                    .build();
-            openAiKeyRepository.save(openAiKey);
+            saveOpenAIKey(apiKey, user);
         }
 
         validateOpenAIKey(apiKey);
@@ -198,7 +189,7 @@ public class UserService {
                 .block();
     }
 
-    public Long validateAccessToken(String accessToken) {
+    public Long checkAccessToken(String accessToken) {
         if (JWTProvider.isInvalidJwtFormat(accessToken))
             throw new CustomException(ExceptionCode.TOKEN_WRONG);
 
@@ -239,8 +230,7 @@ public class UserService {
                 .receivingAlarm(joinRequestDTO.receivingAlarm())
                 .build();
 
-        userRepository.save(user);
-        return user;
+        return userRepository.save(user);
     }
 
     private void storeVerificationCode(String email, String codeType, String verificationCode) {
@@ -263,10 +253,6 @@ public class UserService {
         redisService.storeValue(REDIS_KEY_SSH, userId.toString(), combinedInfo, REDIS_EXP_SSH);
     }
 
-    private boolean isUpdateSuccess(EnvUpdateDTO responseDTO) {
-        return responseDTO == null || !responseDTO.success();
-    }
-
     private String getEmailByVerificationCode(ResetPasswordReq requestDTO) {
         return redisService.getValueInString(REDIS_KEY_CODE_TO_EMAIL, requestDTO.code());
     }
@@ -281,6 +267,15 @@ public class UserService {
     private void cacheVerificationInfoIfRecovery(VerifyCodeReq requestDTO, String codeType) {
         if (codeType.equals(CODE_TYPE_RECOVERY))
             redisService.storeValue(REDIS_KEY_CODE_TO_EMAIL, requestDTO.code(), requestDTO.email(), 5 * 60 * 1000L);
+    }
+
+    private void saveOpenAIKey(String apiKey, User user) {
+        OpenAiKey openAiKey = OpenAiKey.builder()
+                .keyValue(apiKey)
+                .tempIdentifier(null)
+                .user(user)
+                .build();
+        openAiKeyRepository.save(openAiKey);
     }
 
     private String getCodeTypeKey(String codeType) {
