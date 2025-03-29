@@ -38,9 +38,8 @@ import static com.example.llmn.integration.redis.RedisConstants.REDIS_EXP_SSH;
 public class SecureShellManager {
 
     private final RedisService redisService;
-    private final UserRepository userRepository;
+    private final SshConfigService sshConfigService;
     private final SshInfoRepository sshInfoRepository;
-    private final MetricRepository metricRepository;
     private final SshConnectionPool sshConnectionPool;
 
     private final Map<Long, SessionInfo> activeSessionsById = new ConcurrentHashMap<>();
@@ -48,30 +47,23 @@ public class SecureShellManager {
     private final Map<Long, Object> userLocks = new ConcurrentHashMap<>();
 
     public void initializeShellSession(Long userId) {
-        Long monitoringSshId = getUserMonitoringSshId(userId);
-
+        Long monitoringSshId = sshConfigService.getUserMonitoringSshId(userId);
         Object userLock = getUserLock(userId);
+
         synchronized (userLock) {
             validateUserSessionLimit(userId);
-
             SecureShellClient sshClient = getOrCreateSshClient(monitoringSshId, true, userId);
             sshClient.clearInitialConnectionMessages();
         }
     }
 
     public String executeShellCommand(String command, boolean isInitialCommand, Long userId) {
-        Long monitoringSshId = getUserMonitoringSshId(userId);
-
+        Long monitoringSshId = sshConfigService.getUserMonitoringSshId(userId);
         Object userLock = getUserLock(userId);
+
         synchronized (userLock) {
             SecureShellClient sshClient = getOrCreateSshClient(monitoringSshId, isInitialCommand, userId);
-
-            SessionInfo sessionInfo = activeSessionsById.get(monitoringSshId);
-            if (sessionInfo != null) {
-                sessionInfo.updateAccessTime();
-                sessionInfo.incrementCommandCount();
-            }
-
+            updateSessionInfo(monitoringSshId);
             return sshClient.runCommandInInteractiveShell(command);
         }
     }
@@ -90,92 +82,158 @@ public class SecureShellManager {
     }
 
     public void terminateShellSession(Long userId) {
-        Long monitoringSshId = getUserMonitoringSshId(userId);
-
+        Long monitoringSshId = sshConfigService.getUserMonitoringSshId(userId);
         Object userLock = getUserLock(userId);
+
         synchronized (userLock) {
             SessionInfo sessionInfo = activeSessionsById.get(monitoringSshId);
-
             if (sessionInfo != null) {
-                sessionInfo.client.closeQuietly();
-
-                activeSessionsById.remove(monitoringSshId);
-
-                Set<Long> userSessions = userSessionMap.get(userId);
-                if (userSessions != null) {
-                    userSessions.remove(monitoringSshId);
-                    if (userSessions.isEmpty())
-                        userSessionMap.remove(userId);
-                }
+                closeAndRemoveSession(monitoringSshId, userId);
             }
         }
     }
 
     public void sendInterruptSignal(Long userId) {
-        Long monitoringSshId = getUserMonitoringSshId(userId);
-
+        Long monitoringSshId = sshConfigService.getUserMonitoringSshId(userId);
         Object userLock = getUserLock(userId);
+
         synchronized (userLock) {
             SecureShellClient sshClient = getOrCreateSshClient(monitoringSshId, false, userId);
             sshClient.sendInterruptSignal();
 
-            SessionInfo sessionInfo = activeSessionsById.get(monitoringSshId);
-            if (sessionInfo != null)
-                sessionInfo.updateAccessTime();
+            updateSessionAccessTime(monitoringSshId);
         }
     }
 
-    public SecureShellClient getOrCreateSshClient(Long sshInfoId, boolean forceNewConnection, Long userId) {
-        SessionInfo existingSession = activeSessionsById.get(sshInfoId);
+    public SecureShellClient getOrCreateSshClient(Long sshInfoId, boolean isNewConnection, Long userId) {
+        if (!isNewConnection) {
+            SecureShellClient existingClient = tryUseExistingSession(sshInfoId, userId);
+            if (existingClient != null) return existingClient;
+        }
 
-        // 1. 강제 새 연결이 아니고 기존 세션이 있는 경우
-        if (!forceNewConnection && existingSession != null) {
-            // 1.1 연결이 끊어진 경우 - 재연결 시도
-            if (!existingSession.client.isConnected()) {
-                log.info("<SSHD> 세션 {}의 연결이 끊김, 재연결 시도", sshInfoId);
+        ensureSessionLimitNotExceeded();
 
-                boolean reconnected = existingSession.client.attemptReconnect();
-                if (reconnected) {
-                    existingSession.updateAccessTime();
-                    return existingSession.client;
-                } else {
-                    log.warn("<SSHD> 세션 {} 재연결 실패, 새 연결 생성", sshInfoId);
+        cleanupExistingSession(sshInfoId, userId);
 
-                    // 기존 연결 정리
-                    existingSession.client.closeQuietly();
-                    activeSessionsById.remove(sshInfoId);
+        return createNewSshClient(sshInfoId, userId);
+    }
 
-                    Set<Long> userSessions = userSessionMap.get(userId);
-                    if (userSessions != null) {
-                        userSessions.remove(sshInfoId);
-                    }
-                }
-            } else {
-                // 1.2 정상 연결된 세션이면 그대로 사용
-                existingSession.updateAccessTime();
-                return existingSession.client;
+    @Scheduled(fixedRate = 60 * 60 * 1000) // 1시간마다 실행
+    public void cleanupResources() {
+        // 1. 유휴 세션 정리
+        List<Long> idleSessions = findIdleSessions();
+        removeIdleSessions(idleSessions);
+        log.info("<SSHD> 유휴 세션 정리 완료: {} 개 세션 제거됨", idleSessions.size());
+
+        // 2. 사용자 락 정리
+        Set<Long> usersWithoutSessions = findUsersWithoutActiveSessions();
+        removeLocksForUsers(usersWithoutSessions);
+        log.info("<SSHD> 미사용 사용자 락 정리 완료: {} 개 락 제거됨", usersWithoutSessions.size());
+    }
+
+    public boolean testSshConnection(String remoteHost, String remoteName, String remoteKeyPath) {
+        SecureShellClient sshClient = new SecureShellClient(remoteHost, remoteName, remoteKeyPath);
+        try {
+            String response = sshClient.runSingleCommand(CONNECTION_TEST_COMMAND);
+            return response.contains(CONNECTION_TEST_SUCCESS_MARKER);
+        } finally {
+            sshClient.closeQuietly();
+        }
+    }
+
+    private Object getUserLock(Long userId) {
+        return userLocks.computeIfAbsent(userId, k -> new Object());
+    }
+
+    private void updateSessionInfo(Long sessionId) {
+        SessionInfo sessionInfo = activeSessionsById.get(sessionId);
+        if (sessionInfo != null) {
+            sessionInfo.updateAccessTime();
+            sessionInfo.incrementCommandCount();
+        }
+    }
+
+    private void closeAndRemoveSession(Long sessionId, Long userId) {
+        SessionInfo sessionInfo = activeSessionsById.get(sessionId);
+        if (sessionInfo == null) return;
+
+        sessionInfo.client.closeQuietly();
+        activeSessionsById.remove(sessionId);
+
+        removeSessionFromUserMap(sessionId, userId);
+    }
+
+    private void removeSessionFromUserMap(Long sessionId, Long userId) {
+        Set<Long> userSessions = userSessionMap.get(userId);
+        if (userSessions != null) {
+            userSessions.remove(sessionId);
+            if (userSessions.isEmpty()) {
+                userSessionMap.remove(userId);
             }
         }
+    }
 
-        // 2. 세션 수 제한 확인
+    private void updateSessionAccessTime(Long sessionId) {
+        SessionInfo sessionInfo = activeSessionsById.get(sessionId);
+        if (sessionInfo != null)
+            sessionInfo.updateAccessTime();
+    }
+
+    private SecureShellClient tryUseExistingSession(Long sshInfoId, Long userId) {
+        SessionInfo existingSession = activeSessionsById.get(sshInfoId);
+        if (existingSession == null) {
+            return null;
+        }
+
+        // 연결 끊김 확인 및 재연결 시도
+        if (!existingSession.client.isConnected()) {
+            return handleDisconnectedSession(existingSession, sshInfoId, userId);
+        }
+
+        // 정상 연결된 세션 사용
+        existingSession.updateAccessTime();
+        return existingSession.client;
+    }
+
+    private SecureShellClient handleDisconnectedSession(SessionInfo session, Long sshInfoId, Long userId) {
+        log.info("<SSHD> 세션 {}의 연결이 끊김, 재연결 시도", sshInfoId);
+
+        if (session.client.attemptReconnect()) {
+            session.updateAccessTime();
+            return session.client;
+        }
+
+        log.warn("<SSHD> 세션 {} 재연결 실패, 새 연결 생성", sshInfoId);
+        removeSessionFromMaps(session, sshInfoId, userId);
+        return null;
+    }
+
+    private void removeSessionFromMaps(SessionInfo session, Long sshInfoId, Long userId) {
+        session.client.closeQuietly();
+        activeSessionsById.remove(sshInfoId);
+
+        removeSessionFromUserMap(sshInfoId, userId);
+    }
+
+    private void ensureSessionLimitNotExceeded() {
         if (activeSessionsById.size() >= GLOBAL_MAX_SESSIONS) {
-            cleanupIdleSessions();
+            List<Long> idleSessions = findIdleSessions();
+            removeIdleSessions(idleSessions);
 
-            if (activeSessionsById.size() >= GLOBAL_MAX_SESSIONS) // 여전히 제한 초과 시
+            if (activeSessionsById.size() >= GLOBAL_MAX_SESSIONS) { // 여전히 제한 초과 시
                 throw new CustomException(ExceptionCode.SSH_CONNECTION_LIMIT_EXCEEDED);
+            }
         }
+    }
 
-        // 3. 기존 연결이 있지만 새로운 필요한 경우 기존 연결 정리
+    private void cleanupExistingSession(Long sshInfoId, Long userId) {
+        SessionInfo existingSession = activeSessionsById.get(sshInfoId);
         if (existingSession != null) {
-            existingSession.client.closeQuietly();
-            activeSessionsById.remove(sshInfoId);
-
-            Set<Long> userSessions = userSessionMap.get(userId);
-            if (userSessions != null)
-                userSessions.remove(sshInfoId);
+            removeSessionFromMaps(existingSession, sshInfoId, userId);
         }
+    }
 
-        // 4. SSH 정보 가져오고 새 클라이언트 생성과 세션 정보 업데이트
+    private SecureShellClient createNewSshClient(Long sshInfoId, Long userId) {
         SshInfoDTO sshConfig = getConnectionConfig(sshInfoId);
         if (sshConfig == null)
             throw new CustomException(ExceptionCode.SSH_NOT_FOUND);
@@ -187,51 +245,44 @@ public class SecureShellManager {
                     sshConfig.remoteKeyPath()
             );
 
-            SessionInfo newSession = new SessionInfo(userId, newClient);
-            activeSessionsById.put(sshInfoId, newSession);
-
-            userSessionMap.computeIfAbsent(userId, k -> ConcurrentHashMap.newKeySet())
-                    .add(sshInfoId);
-
+            registerNewSession(newClient, sshInfoId, userId);
             return newClient;
         } catch (Exception e) {
             throw new CustomException(ExceptionCode.SSH_CONNECT_FAIL);
         }
     }
 
-    @Scheduled(fixedRate = 60 * 60 * 1000) // 1시간마다 실행
-    public void cleanupUnusedResources() {
-        // 활성 세션이 없는 사용자의 락 객체 제거
+    private void registerNewSession(SecureShellClient client, Long sshInfoId, Long userId) {
+        SessionInfo newSession = new SessionInfo(userId, client);
+        activeSessionsById.put(sshInfoId, newSession);
+
+        userSessionMap.computeIfAbsent(userId, k -> ConcurrentHashMap.newKeySet())
+                .add(sshInfoId);
+    }
+
+    private Set<Long> findUsersWithoutActiveSessions() {
         Set<Long> usersWithoutSessions = new HashSet<>(userLocks.keySet());
         usersWithoutSessions.removeAll(userSessionMap.keySet());
-        for (Long userId : usersWithoutSessions) {
+        return usersWithoutSessions;
+    }
+
+    private void removeLocksForUsers(Set<Long> userIds) {
+        for (Long userId : userIds) {
             userLocks.remove(userId);
         }
     }
 
-    @Scheduled(fixedRate = 30 * 60 * 1000)
-    public void cleanupIdleSessions() {
+    private List<Long> findIdleSessions() {
         List<Long> sessionsToRemove = new ArrayList<>();
 
-        // 세션 순회하며 유휴 시간 확인
         for (Map.Entry<Long, SessionInfo> entry : activeSessionsById.entrySet()) {
             try {
                 Long sessionId = entry.getKey();
                 SessionInfo sessionInfo = entry.getValue();
 
-                // 세션이 타임아웃 되었는지 확인
-                if (sessionInfo.getIdleTimeMillis() > SESSION_IDLE_TIMEOUT) {
+                if (isSessionIdle(sessionInfo)) {
                     sessionsToRemove.add(sessionId);
-
-                    sessionInfo.client.closeQuietly();
-
-                    Set<Long> userSessions = userSessionMap.get(sessionInfo.userId);
-                    if (userSessions != null) {
-                        userSessions.remove(sessionId);
-                        if (userSessions.isEmpty()) {
-                            userSessionMap.remove(sessionInfo.userId);
-                        }
-                    }
+                    closeSessionAndUpdateMaps(sessionInfo, sessionId);
                 }
             } catch (Exception e) {
                 log.error("세션 정리 중 오류: {}", e.getMessage(), e);
@@ -239,6 +290,26 @@ public class SecureShellManager {
             }
         }
 
+        return sessionsToRemove;
+    }
+
+    private boolean isSessionIdle(SessionInfo sessionInfo) {
+        return sessionInfo.getIdleTimeMillis() > SESSION_IDLE_TIMEOUT;
+    }
+
+    private void closeSessionAndUpdateMaps(SessionInfo sessionInfo, Long sessionId) {
+        sessionInfo.client.closeQuietly();
+
+        Set<Long> userSessions = userSessionMap.get(sessionInfo.userId);
+        if (userSessions != null) {
+            userSessions.remove(sessionId);
+            if (userSessions.isEmpty()) {
+                userSessionMap.remove(sessionInfo.userId);
+            }
+        }
+    }
+
+    private void removeIdleSessions(List<Long> sessionsToRemove) {
         for (Long sessionId : sessionsToRemove) {
             try {
                 activeSessionsById.remove(sessionId);
@@ -248,125 +319,40 @@ public class SecureShellManager {
         }
     }
 
-    @Transactional
-    public List<SshInfo> createSshConfigurations(List<SshInfoReq> sshConfigRequests, User user) {
-        List<SshInfo> createdConfigs = new ArrayList<>();
-
-        sshConfigRequests.forEach(sshInfoReq -> {
-            SshInfo sshInfo = SshInfo.builder()
-                    .user(user)
-                    .remoteName(sshInfoReq.remoteName())
-                    .remoteHost(sshInfoReq.remoteHost())
-                    .remoteKeyPath(sshInfoReq.remoteKeyPath())
-                    .build();
-
-            sshInfoRepository.save(sshInfo);
-            createdConfigs.add(sshInfo);
-        });
-
-        return createdConfigs;
-    }
-
-    public SshInfo findMonitoringSshConfig(Long userId, String monitoringSshHost) {
-        return sshInfoRepository.findByUserId(userId).stream()
-                .filter(config -> config.getRemoteHost().equals(monitoringSshHost))
-                .findFirst()
-                .orElseThrow(() -> new CustomException(ExceptionCode.MONITORING_SSH_NOT_SELECT));
-    }
-
-    @Transactional
-    public List<SshInfo> addNewSshConfigurations(List<SshInfo> existingConfigs, List<SshInfoReq> requestedConfigs, User user) {
-        Set<String> existingHostAddresses = extractHostAddresses(existingConfigs);
-
-        // 기존에 없는 새 호스트 주소만 필터링 후 저장
-        return requestedConfigs.stream()
-                .filter(sshInfoReq -> !existingHostAddresses.contains(sshInfoReq.remoteHost()))
-                .map(sshInfoReq -> createAndSaveSshConfig(sshInfoReq, user))
-                .toList();
-    }
-
-    @Transactional
-    public void updateExistingSshConfigurations(List<SshInfo> existingSshConfigs, List<SshInfoReq> requestedSshConfigs) {
-        // Map<String(호스트 주소), SshInfoReq(SSH 구성)> 형태로 변환
-        Map<String, SshInfoReq> configRequestsByHost = mapHostToSshConfigRequest(requestedSshConfigs);
-
-        // 각 기존 SSH 구성을 순회하면서 업데이트 또는 삭제
-        existingSshConfigs.forEach(existingConfig -> {
-            if (configRequestsByHost.containsKey(existingConfig.getRemoteHost())) {
-                SshInfoReq updatedConfig = configRequestsByHost.get(existingConfig.getRemoteHost());
-                existingConfig.updateSshInfo(updatedConfig.remoteHost(), updatedConfig.remoteName(), updatedConfig.remoteKeyPath(), true);
-            } else {
-                metricRepository.deleteBySShInfoId(existingConfig.getId());
-                sshInfoRepository.delete(existingConfig);
-            }
-        });
-    }
-
-    @Transactional
-    public void setMonitoringTarget(String monitoringSshHost, List<SshInfo> availableConfigs, User user) {
-        Optional<SshInfo> matchingConfig = availableConfigs.stream()
-                .filter(config -> config.getRemoteHost().equals(monitoringSshHost))
-                .findFirst();
-
-        if (matchingConfig.isEmpty())
-            throw new CustomException(ExceptionCode.MONITORING_SSH_NOT_SELECT);
-
-        user.updateMonitoringSshInfo(matchingConfig.get().getId());
-    }
-
-    public Path uploadSSHKey(MultipartFile keyFile) {
-        validateFileExist(keyFile);
-        createDirectoryIfNotExist(SSH_KEYS_DIRECTORY);
-
-        Path keyPath = getFilePath(SSH_KEYS_DIRECTORY, keyFile);
-        writeFile(keyFile, keyPath);
-
-        return keyPath;
-    }
-
-    public boolean testSshConnection(String remoteHost, String remoteName, String remoteKeyPath) {
-        SecureShellClient sshClient = new SecureShellClient(remoteHost, remoteName, remoteKeyPath);
-        String response = sshClient.runSingleCommand(CONNECTION_TEST_COMMAND);
-        sshClient.closeQuietly();
-
-        return response.contains(CONNECTION_TEST_SUCCESS_MARKER);
-    }
-
-    private Object getUserLock(Long userId) {
-        return userLocks.computeIfAbsent(userId, k -> new Object());
-    }
-
-    private Long getUserMonitoringSshId(Long userId) {
-        return userRepository.findMonitoringSshId(userId)
-                .orElseThrow(() -> new CustomException(ExceptionCode.USER_NOT_FOUND));
-    }
-
     private void validateUserSessionLimit(Long userId) {
         Set<Long> userSessions = userSessionMap.get(userId);
-        if (userSessions != null && userSessions.size() >= MAX_SESSIONS_PER_USER) {
-            // 1. 유효하지 않은 세션 참조 정리 (맵 불일치 방지)
-            userSessions.removeIf(sessionId -> !activeSessionsById.containsKey(sessionId));
+        if (userSessions == null || userSessions.size() < MAX_SESSIONS_PER_USER){
+            return;
+        }
 
-            // 2. 정리 후에도 여전히 제한을 초과하는지 확인
-            if (userSessions.size() >= MAX_SESSIONS_PER_USER) {
-                Optional<Long> oldestSessionId = findOldestSessionForUser(userId);
+        cleanInvalidUserSessions(userSessions);
 
-                // 3. 가장 오래된 세션 종료
-                if (oldestSessionId.isPresent()) {
-                    Long sessionId = oldestSessionId.get();
-                    SessionInfo sessionInfo = activeSessionsById.get(sessionId);
+        // 정리 후에도 여전히 제한을 초과하는지 확인
+        if (userSessions.size() >= MAX_SESSIONS_PER_USER)
+            handleSessionLimitExceeded(userSessions, userId);
+    }
 
-                    if (sessionInfo != null) {
-                        sessionInfo.client.closeQuietly();
-                        activeSessionsById.remove(sessionId);
-                        userSessions.remove(sessionId);
-                    }
-                } else {
-                    // 4. findOldestSessionForUser가 빈 결과를 반환한 경우 (이론상 발생하지 않아야 함) => 초기화
-                    log.warn("<SSHD> 사용자 {} 세션 맵 불일치 감지, 세션 맵 초기화", userId);
-                    userSessions.clear();
-                }
-            }
+    private void cleanInvalidUserSessions(Set<Long> userSessions) {
+        userSessions.removeIf(sessionId -> !activeSessionsById.containsKey(sessionId));
+    }
+
+    private void handleSessionLimitExceeded(Set<Long> userSessions, Long userId) {
+        Optional<Long> oldestSessionId = findOldestSessionForUser(userId);
+
+        if (oldestSessionId.isPresent()) {
+            terminateOldestSession(oldestSessionId.get(), userSessions);
+        } else { // 맵 불일치가 감지된 경우 초기화
+            userSessions.clear();
+        }
+    }
+
+    private void terminateOldestSession(Long sessionId, Set<Long> userSessions) {
+        SessionInfo sessionInfo = activeSessionsById.get(sessionId);
+
+        if (sessionInfo != null) {
+            sessionInfo.client.closeQuietly();
+            activeSessionsById.remove(sessionId);
+            userSessions.remove(sessionId);
         }
     }
 
@@ -386,11 +372,7 @@ public class SecureShellManager {
                 .orElseGet(() -> fetchConfigFromDatabase(sshInfoId)
                         .map(sshInfo -> {
                             cacheConnectionConfig(sshInfoId, sshInfo);
-                            return new SshInfoDTO(
-                                    sshInfo.getRemoteHost(),
-                                    sshInfo.getRemoteName(),
-                                    sshInfo.getRemoteKeyPath()
-                            );
+                            return new SshInfoDTO(sshInfo);
                         })
                         .orElseThrow(() -> new CustomException(ExceptionCode.SSH_NOT_FOUND)));
     }
@@ -424,31 +406,5 @@ public class SecureShellManager {
         );
 
         redisService.storeValue(REDIS_KEY_SSH, sshInfoId.toString(), configString, REDIS_EXP_SSH);
-    }
-
-    private Map<String, SshInfoReq> mapHostToSshConfigRequest(List<SshInfoReq> configRequests) {
-        return configRequests.stream()
-                .collect(Collectors.toMap(
-                        SshInfoReq::remoteHost,
-                        Function.identity(),
-                        (existing, replacement) -> existing // 중복 키 발생 시 기존 값 유지
-                ));
-    }
-
-    private Set<String> extractHostAddresses(List<SshInfo> configs) {
-        return configs.stream()
-                .map(SshInfo::getRemoteHost)
-                .collect(Collectors.toSet());
-    }
-
-    private SshInfo createAndSaveSshConfig(SshInfoReq sshInfoReq, User user) {
-        SshInfo newSshConfig = SshInfo.builder()
-                .user(user)
-                .remoteHost(sshInfoReq.remoteHost())
-                .remoteName(sshInfoReq.remoteName())
-                .remoteKeyPath(sshInfoReq.remoteKeyPath())
-                .build();
-
-        return sshInfoRepository.save(newSshConfig);
     }
 }

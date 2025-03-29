@@ -22,6 +22,7 @@ import java.nio.file.Path;
 public class RemoteShellController {
 
     private final SecureShellManager secureShellManager;
+    private final SshConfigService sshConfigService;
 
     @PostMapping("/command/init")
     public ResponseEntity<?> initCommend(@AuthenticationPrincipal CustomUserDetails userDetails){
@@ -49,7 +50,7 @@ public class RemoteShellController {
 
     @PostMapping("/accounts/ssh")
     public ResponseEntity<?> uploadSSHKey(@RequestParam("file") MultipartFile file) {
-        Path path = secureShellManager.uploadSSHKey(file);
+        Path path = sshConfigService.uploadSSHKey(file);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.CREATED, path));
     }
 }

@@ -19,6 +19,8 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+import static com.example.llmn.common.constants.GlobalConstants.SORT_BY_DATE;
+
 @Controller
 @RequiredArgsConstructor
 @RequestMapping("/api")
@@ -26,7 +28,6 @@ public class ProjectController {
 
     private final ProjectService projectService;
     private final DockerService dockerService;
-    private static final String SORT_BY_DATE = "createdDate";
     private static final boolean USING_CACHE = true;
     private static final boolean NOT_USING_CACHE = false;
 
