@@ -80,9 +80,8 @@ public class ProjectService {
         Project project = projectRepository.findByIdWithUserAndSshInfo(projectId)
                 .orElseThrow(() -> new CustomException(ExceptionCode.USER_NOT_FOUND));
 
-        if (project.isNotOwnedBy(userId)) {
+        if (project.isNotOwnedBy(userId))
             throw new CustomException(ExceptionCode.USER_FORBIDDEN);
-        }
 
         ContainerStatus containerStatus = findContainerStatus(requestDTO, project.getSshInfo().getId());
         project.updateProject(requestDTO.projectName(), requestDTO.containerName(), requestDTO.description(), containerStatus);
@@ -220,18 +219,16 @@ public class ProjectService {
                 .toList();
     }
 
-    private List<ProjectDTO> createProjectResList(List<Project> projects, Map<String, Map<String, String>> containersResourceMap, List<String> runningContainers) {
+    private List<ProjectDTO> createProjectResList(List<Project> projects, Map<String, Map<String, String>> containersResourceMap,
+                                                  List<String> runningContainers) {
         return projects.stream()
-                .map(project -> createProjectRes(containersResourceMap, runningContainers, project))
+                .map(project -> {
+                    ContainerStatus containerStatus = getContainerStatus(runningContainers, project);
+                    String cpuUsage = getResourceUsageFromMap(containersResourceMap, project.getContainerName(), DOCKER_RESOURCE_KEY_CPU);
+                    String memoryUsage = getResourceUsageFromMap(containersResourceMap, project.getContainerName(), DOCKER_RESOURCE_KEY_MEMORY);
+                    return new ProjectDTO(project, containerStatus, cpuUsage, memoryUsage);
+                })
                 .toList();
-    }
-
-    private ProjectDTO createProjectRes(Map<String, Map<String, String>> containersResourceMap, List<String> runningContainers, Project project) {
-        ContainerStatus containerStatus = getContainerStatus(runningContainers, project);
-        String cpuUsage = getResourceUsageFromMap(containersResourceMap, project.getContainerName(), DOCKER_RESOURCE_KEY_CPU);
-        String memoryUsage = getResourceUsageFromMap(containersResourceMap, project.getContainerName(), DOCKER_RESOURCE_KEY_MEMORY);
-
-        return new ProjectDTO(project, containerStatus, cpuUsage, memoryUsage);
     }
 
     private ContainerStatus getContainerStatus(List<String> runningContainerList, Project project) {
@@ -250,9 +247,8 @@ public class ProjectService {
                 .max(this::compareLogFileDates) // 최신 파일 찾기
                 .orElse(null);
 
-        if (latestLogFile == null) {
+        if (latestLogFile == null)
             return BLANK_STRING;
-        }
 
         return parseLastTwoLogs(readFileAsString(latestLogFile));
     }

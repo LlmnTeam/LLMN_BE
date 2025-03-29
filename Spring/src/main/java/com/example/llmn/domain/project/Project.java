@@ -67,7 +67,7 @@ public class Project extends BaseEntity {
     }
 
     public boolean isConnected(){
-        return containerStatus.equals(ContainerStatus.NOT_CONNECTED);
+        return containerStatus.equals(ContainerStatus.WORKING);
     }
     
     public boolean isNotOwnedBy(Long userId){
@@ -76,13 +76,13 @@ public class Project extends BaseEntity {
 
     public boolean isProjectRelatedToKeyword(String keyword) {
         String lowerCaseKeyword = keyword.toLowerCase();
-        String projectName = getProjectName().toLowerCase();
-        String containerName = getContainerName().toLowerCase();
+        String projectNameLowerCase = getProjectName().toLowerCase();
+        String containerNameLowerCase = getContainerName().toLowerCase();
 
-        return projectName.contains(lowerCaseKeyword)
-                || containerName.contains(lowerCaseKeyword)
-                || lowerCaseKeyword.contains(projectName)
-                || lowerCaseKeyword.contains(containerName);
+        return projectNameLowerCase.contains(lowerCaseKeyword)
+                || containerNameLowerCase.contains(lowerCaseKeyword)
+                || lowerCaseKeyword.contains(projectNameLowerCase)
+                || lowerCaseKeyword.contains(containerNameLowerCase);
     }
 
     public Long getUserId() {

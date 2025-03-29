@@ -39,12 +39,7 @@ public class SecureShellClient implements AutoCloseable {
     private final SshConnectionConfig connectionConfig;
     private final byte[] outputBuffer;
 
-    private static final JedisPool jedisPool = new JedisPool(
-            new JedisPoolConfig(),
-            REDIS_HOST,
-            REDIS_PORT,
-            REDIS_TIMEOUT_SSH
-    );
+    private static final JedisPool jedisPool = new JedisPool(new JedisPoolConfig(), REDIS_HOST, REDIS_PORT, REDIS_TIMEOUT_SSH);
 
     public SecureShellClient(String host, String username, String privateKeyPath) {
         this.connectionConfig = new SshConnectionConfig(host, username, privateKeyPath);
@@ -80,7 +75,6 @@ public class SecureShellClient implements AutoCloseable {
 
             if (result == null)
                 return !isConnected() ? DISCONNECTED : FAIL_COMMAND;
-
             return result;
         } catch (IOException e) {
             return FAIL_COMMAND;
@@ -269,9 +263,8 @@ public class SecureShellClient implements AutoCloseable {
             readAndAppendAvailableOutput(outputBuilder);
 
             // 누적된 출력이 존재하면 prompt 상태를 확인한다.
-            if (!outputBuilder.isEmpty() && isCommandPromptReady(outputBuilder.toString())) {
+            if (!outputBuilder.isEmpty() && isCommandPromptReady(outputBuilder.toString()))
                 return outputBuilder.toString();
-            }
 
             // 새로운 데이터가 없더라도, 누적된 출력이 있는 경우 재확인
             if (!outputBuilder.isEmpty()) {
@@ -281,8 +274,7 @@ public class SecureShellClient implements AutoCloseable {
                 }
             }
 
-            // 정해진 간격만큼 대기 후 다음 루프 실행
-            Thread.sleep(POLLING_INTERVAL_MS);
+            Thread.sleep(POLLING_INTERVAL_MS); // 정해진 간격만큼 대기 후 다음 루프 실행
         }
 
         // 타임아웃이 발생한 경우 누적된 출력이 있다면 경고 메시지를 덧붙여 반환한다.
@@ -369,58 +361,33 @@ public class SecureShellClient implements AutoCloseable {
         }
     }
 
-    private <T extends Closeable> void closeResource(T resource, String resourceName) {
-        if (resource != null) {
-            try {
-                resource.close();
-            } catch (Exception e) {
-                log.debug("<SSHD> 닫기 실패 {}: {}", resourceName, e.getMessage());
+    private void closeResource(Object resource, String resourceName) {
+        if (resource == null) return;
+        try {
+            if (resource instanceof AutoCloseable) {
+                ((AutoCloseable) resource).close();
+            } else if (resource instanceof ClientChannel) {
+                ((ClientChannel) resource).close(false);
+            } else if (resource instanceof ClientSession) {
+                ((ClientSession) resource).close(false);
             }
-        }
-    }
-
-    private void closeResource(SshClient client, String resourceName) {
-        if (client != null) {
-            try {
-                client.stop();
-            } catch (Exception e) {
-                log.debug("<SSHD> 닫기 실패 {}: {}", resourceName, e.getMessage());
-            }
-        }
-    }
-
-    private void closeResource(ClientChannel channel, String resourceName) {
-        if (channel != null) {
-            try {
-                channel.close(false);
-            } catch (Exception e) {
-                log.debug("<SSHD> 닫기 실패 {}: {}", resourceName, e.getMessage());
-            }
-        }
-    }
-
-    private void closeResource(ClientSession session, String resourceName) {
-        if (session != null) {
-            try {
-                session.close(false);
-            } catch (Exception e) {
-                log.debug("<SSHD> 닫기 실패 {}: {}", resourceName, e.getMessage());
-            }
+        } catch (Exception e) {
+            log.debug("<SSHD> 닫기 실패 {}: {}", resourceName, e.getMessage());
         }
     }
 
     private void logConnectionFailure(Exception e) {
         if (e instanceof java.net.ConnectException) {
-            log.error("<SSHD> Cannot connect to server: host={}, port={}",
+            log.error("<SSHD> 서버에 연결할 수 없습니다: 호스트={}, 포트={}",
                     connectionConfig.getHost(), SSH_PORT);
         } else if (e instanceof java.net.SocketTimeoutException) {
-            log.error("<SSHD> Connection timeout: host={}, timeout={} seconds",
+            log.error("<SSHD> 연결 시간 초과: 호스트={}, 제한 시간={}초",
                     connectionConfig.getHost(), SSH_CONNECTION_TIMEOUT);
         } else if (e.getMessage() != null && e.getMessage().contains("Auth fail")) {
-            log.error("<SSHD> Authentication failed: username={}, keyPath={}",
+            log.error("<SSHD> 인증 실패: 사용자명={}, 키 경로={}",
                     connectionConfig.getUsername(), connectionConfig.getPrivateKeyPath());
         } else {
-            log.error("<SSHD> SSH session connection failed: host={}, username={}",
+            log.error("<SSHD> SSH 세션 연결 실패: 호스트={}, 사용자명={}",
                     connectionConfig.getHost(), connectionConfig.getUsername(), e);
         }
     }
