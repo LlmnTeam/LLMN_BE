@@ -1,3 +1,4 @@
+# app/services/generate_summaries.py
 from langchain_openai import ChatOpenAI
 from langchain.prompts import PromptTemplate
 import logging

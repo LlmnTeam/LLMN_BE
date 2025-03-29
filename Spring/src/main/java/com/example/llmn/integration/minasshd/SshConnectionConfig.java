@@ -1,6 +1,7 @@
 package com.example.llmn.integration.minasshd;
 
 public class SshConnectionConfig {
+
     private final String host;
     private final String username;
     private final String privateKeyPath;

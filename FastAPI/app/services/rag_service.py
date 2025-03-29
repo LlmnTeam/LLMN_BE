@@ -1,3 +1,4 @@
+# app/services/rag_service.py
 from queue import Queue
 from threading import Thread
 import asyncio
@@ -29,8 +30,7 @@ class StreamingHandler(BaseCallbackHandler):
         print("\ngeneration concluded")
         self._queue.put(self._stop_signal)
 
-class Rag_Service:
-    # 스트리밍 핸들러와 LLM을 초기화
+class RagService:
     def __init__(self, api_key: str):
         self.streamer_queue = Queue() # 토큰을 비동기적으로 전달하기 위한 저장소로 사용
         self.streaming_handler = StreamingHandler(queue=self.streamer_queue)

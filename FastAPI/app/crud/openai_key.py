@@ -1,7 +1,7 @@
 # app/crud/openai_key.py
 import logging
 from sqlalchemy.future import select
-from app.models.openai_key import OpenAIKey
+from app.schemas.openai_key import OpenAIKey
 from app.utils.retry import with_db_retry
 
 logger = logging.getLogger(__name__)

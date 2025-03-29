@@ -1,4 +1,4 @@
-# app/models/openai_key.py
+# app/shcemas/openai_key.py
 from sqlalchemy import Column, Integer, String, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
 

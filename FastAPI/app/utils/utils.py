@@ -2,7 +2,7 @@ import os
 from fastapi import Request, HTTPException, status
 from jose import JWTError, jwt
 from app.core.config import SECRET_KEY, ALGORITHM, logs_dir
-from app.schemas.dto import LogFilesRequest
+from app.models import LogFilesRequest
 from app.services.conversation_manager import ConversationManager
 
 def read_log_file(file_path: str):

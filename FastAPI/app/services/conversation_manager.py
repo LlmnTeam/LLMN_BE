@@ -1,3 +1,4 @@
+# app/services/conversation_manager.py
 from app.core.config import r, encoding, logger, settings
 from langchain_openai import ChatOpenAI
 
