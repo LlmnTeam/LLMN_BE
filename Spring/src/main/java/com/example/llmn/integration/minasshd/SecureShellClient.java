@@ -23,6 +23,7 @@ import java.security.KeyPair;
 import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 
 import static com.example.llmn.integration.minasshd.MinaSshdConstants.*;
 import static com.example.llmn.integration.redis.RedisConstants.*;
@@ -262,7 +263,6 @@ public class SecureShellClient implements AutoCloseable {
         while (System.currentTimeMillis() - startTime < COMMAND_TIMEOUT) {
             readAndAppendAvailableOutput(outputBuilder);
 
-            // 누적된 출력이 존재하면 prompt 상태를 확인한다.
             if (!outputBuilder.isEmpty() && isCommandPromptReady(outputBuilder.toString()))
                 return outputBuilder.toString();
 
@@ -277,7 +277,6 @@ public class SecureShellClient implements AutoCloseable {
             Thread.sleep(POLLING_INTERVAL_MS); // 정해진 간격만큼 대기 후 다음 루프 실행
         }
 
-        // 타임아웃이 발생한 경우 누적된 출력이 있다면 경고 메시지를 덧붙여 반환한다.
         if (!outputBuilder.isEmpty()) {
             return outputBuilder + "\n[명령어 실행 시간 초과]";
         }
@@ -300,11 +299,24 @@ public class SecureShellClient implements AutoCloseable {
     }
 
     private void publishToRedis(String outputChunk) {
-        if (redisClient != null) {
+        if (redisClient == null) return;
+
+        for (int retries = 0; retries <= MAX_REDIS_PUBLISH_RETRIES; retries++) {
             try {
                 redisClient.publish(REDIS_CHANNEL_SSH, outputChunk);
+                return; // 성공시 즉시 반환
             } catch (Exception e) {
-                log.warn("<SSHD> Redis 메시지 발행 실패: {}", e.getMessage());
+                if (retries == MAX_REDIS_PUBLISH_RETRIES) {
+                    log.warn("<SSHD> Redis 메시지 발행 최종 실패: {}", e.getMessage());
+                    break;
+                }
+
+                try {
+                    Thread.sleep(REDIS_RETRY_DELAY);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
             }
         }
     }
@@ -346,9 +358,28 @@ public class SecureShellClient implements AutoCloseable {
     }
 
     private boolean isCommandPromptReady(String result) {
-        return result.matches(".*[$#>]\\s*$") ||
+        // 기본 셸 프롬프트 패턴들
+        if (result.matches(".*[$#>]\\s*$") ||
                 result.contains(SHELL_PROMPT_UBUNTU) ||
-                result.endsWith(SHELL_PROMPT_DOLLAR);
+                result.endsWith(SHELL_PROMPT_DOLLAR)) {
+            return true;
+        }
+
+        // 추가 셸 프롬프트 패턴들
+        Pattern[] promptPatterns = {
+                Pattern.compile(".*@.*:.*[#$]\\s*$"), // 사용자@호스트:경로$ 형식
+                Pattern.compile(".*\\]\\$\\s*$"),     // ]$ 형식
+                Pattern.compile(".*\\}\\s*$"),        // 중괄호로 끝나는 프롬프트(zsh)
+                Pattern.compile(".*\\d+>\\s*$")       // 숫자> 형식
+        };
+
+        for (Pattern pattern : promptPatterns) {
+            if (pattern.matcher(result).find()) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private void applyReconnectionDelay(int attempt) throws InterruptedException {

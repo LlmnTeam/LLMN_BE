@@ -61,7 +61,6 @@ public class RedisWebSocketHandler extends TextWebSocketHandler implements Dispo
         if (redisSubscriberThread != null) {
             redisSubscriberThread.interrupt();
         }
-        log.info("Redis WebSocket Handler 종료됨");
     }
 
     private void startRedisSubscription() {
@@ -79,21 +78,22 @@ public class RedisWebSocketHandler extends TextWebSocketHandler implements Dispo
             try {
                 log.info("Redis 연결 시도 중... (시도 {}/{})", attempts + 1, MAX_RETRY_ATTEMPTS);
                 subscribeToRedis();
-                return; // 연결 성공시 종료
+                return;
             } catch (JedisConnectionException e) {
                 attempts++;
-                if (attempts >= MAX_RETRY_ATTEMPTS) {
-                    log.error("최대 재시도 횟수 초과. Redis 연결 시도 중단");
-                    return;
-                }
+                log.error("Redis 연결 실패: {}", e.getMessage());
+
+                if (attempts >= MAX_RETRY_ATTEMPTS)
+                    break;
 
                 try {
                     Thread.sleep(retryInterval);
-                    retryInterval = Math.min(retryInterval * 2, MAX_RETRY_INTERVAL); // 지수 백오프 적용 (최대 30초까지)
                 } catch (InterruptedException ie) {
                     Thread.currentThread().interrupt();
-                    return;
+                    break;
                 }
+
+                retryInterval = Math.min(retryInterval * 2, MAX_RETRY_INTERVAL); // 지수 백오프 적용
             }
         }
     }
@@ -103,17 +103,9 @@ public class RedisWebSocketHandler extends TextWebSocketHandler implements Dispo
             log.info("Redis 서버에 연결됨: {}:{}", redisHost, REDIS_PORT);
             jedis.ping(); // 연결 테스트
             jedis.subscribe(subscriber, REDIS_CHANNEL);
-        } catch (Exception e) {
+        } catch (JedisConnectionException e) {
             log.error("Redis 구독 중 오류 발생: {}", e.getMessage());
-            if (running.get()) {
-                log.info("Redis 재연결 시도 중...");
-                try {
-                    Thread.sleep(INITIAL_RETRY_INTERVAL); // 약간의 지연 후 재연결 시도
-                } catch (InterruptedException ie) {
-                    Thread.currentThread().interrupt();
-                }
-                connectToRedisWithRetry();
-            }
+            throw e;
         }
     }
 

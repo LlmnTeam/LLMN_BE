@@ -26,4 +26,7 @@ public class RedisConstants {
 
     public static final int REDIS_TIMEOUT_SSH = 60000; // 1분
     public static final String REDIS_CHANNEL_SSH = "ssh-command-output"; // 고정된 Redis 채널 이름
+
+    public static final int MAX_REDIS_PUBLISH_RETRIES = 3; // 재시도 횟수 줄임
+    public static final long REDIS_RETRY_DELAY = 200; // 고정 지연 시간
 }
