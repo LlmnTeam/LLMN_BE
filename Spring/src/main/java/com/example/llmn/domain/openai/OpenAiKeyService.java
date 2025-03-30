@@ -6,6 +6,7 @@ import com.example.llmn.domain.user.User;
 import com.example.llmn.domain.user.UserRepository;
 import com.example.llmn.domain.user.model.request.RequestValidateKeyReq;
 import com.example.llmn.domain.user.model.response.ValidateOpenAIKeyRes;
+import com.example.llmn.security.EncryptionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -26,13 +27,14 @@ public class OpenAiKeyService {
     private final OpenAiKeyRepository openAiKeyRepository;
     private final UserRepository userRepository;
     private final WebClient webClient;
+    private final EncryptionService encryptionService;
 
     @Value("${validate_key.uri}")
     private String requestValidateKeyUri;
 
     public String getOpenAiKey(Long userId) {
         return openAiKeyRepository.findByUserId(userId)
-                .map(OpenAiKey::getKeyValue)
+                .map(openAiKey -> encryptionService.decrypt(openAiKey.getKeyValue()))
                 .orElseThrow(() -> new CustomException(ExceptionCode.API_KEY_NOT_FOUND));
     }
 
@@ -42,20 +44,24 @@ public class OpenAiKeyService {
         User user= userRepository.findByEmail(email)
                 .orElseThrow(() -> new CustomException(ExceptionCode.USER_NOT_FOUND));
 
-        if (existingKey.isPresent()) {
-            existingKey.get().updateKeyValue(apiKey, user);
-        } else {
-            saveOpenAIKeyNonTx(apiKey, user);
-        }
-
+        // 원본 키로 OpenAI API를 호출했을 때 처리가 잘 되는지 검증
         validateOpenAIKey(apiKey);
+
+        // 암호화된 키 저장
+        String encryptedKey = encryptionService.encrypt(apiKey);
+
+        if (existingKey.isPresent()) {
+            existingKey.get().updateKeyValue(encryptedKey, user);
+        } else {
+            saveEncryptedKey(encryptedKey, user);
+        }
     }
 
     @Transactional
-    public void saveOpenAIKey(String apiKey, User user) {
+    public void encryptAndSaveOpenAIKey(String apiKey, User user) {
+        String encryptedKey = encryptionService.encrypt(apiKey); // 암호화
         OpenAiKey openAiKey = OpenAiKey.builder()
-                .keyValue(apiKey)
-                .tempIdentifier(null)
+                .keyValue(encryptedKey)
                 .user(user)
                 .build();
         openAiKeyRepository.save(openAiKey);
@@ -70,7 +76,7 @@ public class OpenAiKeyService {
                 .block();
     }
 
-    private void saveOpenAIKeyNonTx(String apiKey, User user) {
+    private void saveEncryptedKey(String apiKey, User user) {
         OpenAiKey openAiKey = OpenAiKey.builder()
                 .keyValue(apiKey)
                 .tempIdentifier(null)

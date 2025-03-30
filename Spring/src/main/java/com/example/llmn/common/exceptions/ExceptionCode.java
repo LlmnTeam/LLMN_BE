@@ -62,6 +62,10 @@ public enum ExceptionCode {
     // OpenAI
     API_KEY_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 키입니다."),
 
+    // 암호화
+    ENCRYPTION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "데이터 암호화 중 오류가 발생했습니다."),
+    DECRYPTION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "데이터 복호화 중 오류가 발생했습니다."),
+
     // SSH
     SSH_USER_SESSION_LIMIT_EXCEEDED(HttpStatus.BAD_REQUEST, "SSH 세션 사용 제한을 초과하였습니다."),
     SSH_CONNECTION_LIMIT_EXCEEDED(HttpStatus.BAD_REQUEST, "SSH 연결 제한을 초과하였습니다"),

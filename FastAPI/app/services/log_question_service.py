@@ -5,6 +5,7 @@ import os
 from typing import List, AsyncGenerator
 from fastapi import HTTPException, status
 from app.models import LogFilesRequest
+from app.services.encryption_service import EncryptionService
 from app.crud.openai_key import find_key_by_user_id
 from app.services.conversation_manager import ConversationManager
 from app.services.rag_service import RagService
@@ -19,6 +20,7 @@ from app.services.prompt_templates import (
 )
 
 logger = logging.getLogger(__name__)
+encryption_service = EncryptionService()
 
 async def get_api_key_for_user(user_id: int) -> str:
     try:
@@ -30,7 +32,18 @@ async def get_api_key_for_user(user_id: int) -> str:
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="사용자 ID에 대한 API 키를 찾을 수 없습니다."
                 )
-            return key_obj.key_value
+            
+            # 암호화된 키 복호화
+            encrypted_key = key_obj.key_value
+            try:
+                decrypted_key = encryption_service.decrypt(encrypted_key)
+                return decrypted_key
+            except Exception as e:
+                logger.error(f"API 키 복호화 실패: {str(e)}")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="API 키 복호화 중 오류가 발생했습니다."
+                )
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

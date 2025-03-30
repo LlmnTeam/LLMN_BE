@@ -62,7 +62,7 @@ public class UserService {
         List<SshInfo> sshInfos = sshConfigService.createSshConfigurations(requestDTO.sshInfos(), user);
         sshConfigService.setMonitoringTarget(requestDTO.monitoringSshHost(), sshInfos, user);
 
-        openAiKeyService.saveOpenAIKey(requestDTO.openAiKey(), user);
+        openAiKeyService.encryptAndSaveOpenAIKey(requestDTO.openAiKey(), user);
     }
 
     @Async

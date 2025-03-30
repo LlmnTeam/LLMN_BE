@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     REDIS_HOST: str
     REDIS_PORT: int
     REDIS_DB: int
+    ENCRYPTION_SECRET_KEY: str
+    JWT_SECRET_KEY: str
+    JWT_ALGORITHM: str 
 
     class Config:
         env_file = None  
@@ -36,5 +39,5 @@ logger = logging.getLogger(__name__)
 encoding = tiktoken.get_encoding('cl100k_base')
 
 # JWT 
-SECRET_KEY = "MySecretKey"
-ALGORITHM = "HS512"
+SECRET_KEY = settings.JWT_SECRET_KEY
+ALGORITHM = settings.JWT_ALGORITHM
