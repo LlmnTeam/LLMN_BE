@@ -1,4 +1,4 @@
-# app/crud/openai_key.py
+# app/crud/openai_key_crud.py
 import logging
 from sqlalchemy.future import select
 from app.schemas.openai_key import OpenAIKey

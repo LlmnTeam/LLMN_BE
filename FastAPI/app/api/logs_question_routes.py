@@ -6,8 +6,8 @@ from fastapi.responses import StreamingResponse
 from app.models import LogFilesRequest
 from app.services.conversation_manager import ConversationManager
 from app.services.rag_service import RagService
+from app.services.api_key_service import get_decrypted_api_key
 from app.services.log_question_service import (
-    get_api_key_for_user,
     prepare_question,
     generate_streaming_response
 )
@@ -22,7 +22,7 @@ async def process_logs_and_question(
     user_id: int = Depends(extract_user_id_from_jwt)
 ) -> StreamingResponse:
     
-    api_key = await get_api_key_for_user(user_id)
+    api_key = await get_decrypted_api_key(user_id)
     
     conversation_manager = ConversationManager(user_id)
     final_question = prepare_question(request, conversation_manager)
