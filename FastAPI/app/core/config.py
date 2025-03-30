@@ -5,8 +5,8 @@ import redis
 import tiktoken
 from pydantic_settings import BaseSettings
 
-# 로그 디렉토리 경로
-logs_dir = os.getenv("LOGS_DIR", "/project/logs")
+LOGS_DIR = os.getenv("LOGS_DIR", "/project/logs")
+ENCODING_NAME = "cl100k_base"
 
 # 환경 설정
 class Settings(BaseSettings):
@@ -23,6 +23,13 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
+# JWT 상수
+SECRET_KEY = settings.JWT_SECRET_KEY
+ALGORITHM = settings.JWT_ALGORITHM
+
+# Tiktoken 인코딩 설정
+encoding = tiktoken.get_encoding('cl100k_base')
+
 # Redis 설정
 r = redis.Redis(
     host=settings.REDIS_HOST,
@@ -34,10 +41,3 @@ r = redis.Redis(
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-# Tiktoken 설정
-encoding = tiktoken.get_encoding('cl100k_base')
-
-# JWT 
-SECRET_KEY = settings.JWT_SECRET_KEY
-ALGORITHM = settings.JWT_ALGORITHM

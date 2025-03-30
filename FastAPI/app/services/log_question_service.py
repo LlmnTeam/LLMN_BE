@@ -10,8 +10,7 @@ from app.crud.openai_key import find_key_by_user_id
 from app.services.conversation_manager import ConversationManager
 from app.services.rag_service import RagService
 from app.db.session import get_db_context
-from app.core.config import logs_dir
-from app.utils.utils import read_log_file
+from app.core.config import LOGS_DIR
 from app.services.prompt_templates import (
     LOG_QUESTION_PERSONA,
     LOG_FILES_SECTION_HEADER,
@@ -65,7 +64,7 @@ def prepare_question(request: LogFilesRequest, conversation_manager: Conversatio
 
         # 로그 파일의 내용을 추가
         for logFile in request.logFiles:
-            file_path = os.path.join(logs_dir, logFile.name)
+            file_path = os.path.join(LOGS_DIR, logFile.name)
             log_content = read_log_file(file_path)
             log_message_builder.append(f"### Log file: {logFile.name} ###\n{log_content}\n")
 
@@ -103,3 +102,12 @@ async def generate_streaming_response(
     except Exception as e:
         error_message = f"응답 생성 중 오류가 발생했습니다: {str(e)}"
         yield error_message
+
+def read_log_file(file_path: str):
+    try:
+        with open(file_path, "r", encoding="utf-8") as file:
+            return file.read()
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"파일을 찾을 수 없습니다: {file_path}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
