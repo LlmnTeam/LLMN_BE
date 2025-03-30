@@ -30,7 +30,7 @@ def with_db_retry(max_retries=3, retry_delay=1.0, backoff_factor=2.0):
                     
                     # 마지막 시도이거나 재시도할 필요가 없는 오류인 경우
                     if attempt >= max_retries or not is_retryable:
-                        logger.error(f"Database operation failed after {attempt+1} attempts: {str(e)}")
+                        logger.error(f"데이터베이스 작업 실패 - 총 {attempt+1}회 시도함: {str(e)}")
                         raise last_exception
                     
                     await asyncio.sleep(current_delay)

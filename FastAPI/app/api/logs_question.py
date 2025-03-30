@@ -1,13 +1,17 @@
 # app/api/logs_routes.py
 import logging
-from fastapi import APIRouter, Depends, HTTPException
+
+from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from app.models import LogFilesRequest
-from app.crud.openai_key import find_key_by_user_id
 from app.services.conversation_manager import ConversationManager
 from app.services.rag_service import RagService
-from app.utils.utils import combine_logs_and_question, get_user_id_from_token
-from app.db.session import get_db_context
+from app.services.log_question_service import (
+    get_api_key_for_user,
+    prepare_question,
+    generate_streaming_response
+)
+from app.utils.utils import get_user_id_from_token
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["logs"])
@@ -16,33 +20,21 @@ router = APIRouter(prefix="/api", tags=["logs"])
 async def process_logs_and_question(
     request: LogFilesRequest,
     user_id: int = Depends(get_user_id_from_token)
-):
-    # 사용자 ID로 데이터베이스에서 API 키 조회
-    async with get_db_context() as db:
-        key_obj = await find_key_by_user_id(db, user_id)
-        if not key_obj:
-            raise HTTPException(status_code=404, detail="userId 찾기 실패")
-        api_key = key_obj.key_value 
-        
+) -> StreamingResponse:
+    
+    api_key = await get_api_key_for_user(user_id)
+    
     conversation_manager = ConversationManager(user_id)
-
-    # 로그와 질문을 포함한 최종 질문 생성
-    final_question = combine_logs_and_question(request, conversation_manager)
-
-    # RAG 서비스 초기화 (API 키 전달)
+    final_question = prepare_question(request, conversation_manager)
     rag_service = RagService(api_key)
-
-    # 스트리밍된 응답을 수집하기 위한 리스트
-    response_collector = []
-
-    async def stream_response():
-        # OpenAI API가 토큰을 생성할 때마다, 응답을 수집하고 바로바로 chunk를 반환
-        async for chunk in rag_service.generate_text_streaming(final_question):
-            response_collector.append(chunk)  
-            yield chunk
-
-        # async 루프 완료(스트리밍이 종료) => 대화 히스토리에 저장
-        complete_response = ''.join(response_collector)
-        conversation_manager.add_to_history(request.question, complete_response, api_key)
-
-    return StreamingResponse(stream_response(), media_type='text/event-stream')
+    
+    return StreamingResponse(
+        generate_streaming_response(
+            rag_service=rag_service,
+            question=final_question,
+            conversation_manager=conversation_manager,
+            original_question=request.question,
+            api_key=api_key
+        ),
+        media_type='text/event-stream'
+    )
