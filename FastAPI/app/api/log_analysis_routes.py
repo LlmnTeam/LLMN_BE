@@ -1,8 +1,8 @@
-# app/api/summary_routes.py
+# app/api/log_analysis_routes.py
 import logging
 from fastapi import APIRouter
 from app.models import LogRequest
-from app.services.generate_summaries import (
+from app.services.log_analysis_service import (
     generate_log_summary, generate_performance_summary,
     generate_daily_summary, generate_trend_summary, generate_hourly_summary,
     generate_recommend

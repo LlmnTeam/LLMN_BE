@@ -1,4 +1,4 @@
-# app/services/generate_summaries.py
+# app/services/log_analysis_service.py
 import logging
 
 from langchain_openai import ChatOpenAI

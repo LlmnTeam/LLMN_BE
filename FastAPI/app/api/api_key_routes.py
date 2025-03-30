@@ -1,8 +1,8 @@
-# app/api/auth_routes.py
+# app/api/api_key_routes.py
 import logging
 from fastapi import APIRouter
 from app.models import ValidateAPIRequest
-from app.services.generate_summaries import validate_openai_api_key
+from app.services.log_analysis_service import validate_openai_api_key
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["authentication"])
