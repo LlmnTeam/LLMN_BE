@@ -5,11 +5,8 @@ import com.example.llmn.domain.log.model.LogDataDTO;
 import com.example.llmn.integration.elasticsearch.ElasticSearchService;
 import com.example.llmn.common.utils.FileUtils;
 import com.example.llmn.common.utils.JsonUtils;
-import com.example.llmn.domain.remote.SshInfo;
-import com.example.llmn.domain.remote.SshInfoRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.io.BufferedWriter;
@@ -43,7 +40,7 @@ public class LogService {
 
     @SuppressWarnings("rawtypes")
     public List<LogDataDTO> searchLog(Instant startTime, Instant endTime, String logLevel, String containerName, String elasticSearchHost) {
-        SearchResponse<Map> response = elasticSearchService.searchWithFilters(
+        SearchResponse<Map> response = elasticSearchService.searchDocumentsWithFilters(
                 ELASTICSEARCH_LOG_INDEX_PATTERN,
                 startTime,
                 endTime,

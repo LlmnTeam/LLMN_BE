@@ -15,7 +15,6 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.*;
 
-import static com.example.llmn.domain.log.LogConstants.*;
 import static com.example.llmn.integration.elasticsearch.ElasticSearchConstants.*;
 
 @Service
@@ -39,30 +38,21 @@ public class ElasticSearchService {
         }
     }
 
-    public void createIndex(String indexName, String elasticSearchHost) {
+    public <T> SearchResponse<T> searchDocumentsWithFilters(String index, Instant startTime, Instant endTime,
+                                                            String logLevel, String containerName,
+                                                            String elasticSearchHost, Class<T> responseType) {
         try {
-            CreateIndexRequest createIndexRequest = new CreateIndexRequest.Builder()
-                    .index(indexName)
-                    .mappings(m -> m
-                            .properties(ES_FIELD_PROCESSED, p -> p.boolean_(b -> b))
-                            .properties(ES_FIELD_TIMESTAMP, p -> p.date(d -> d))
-                            .properties(ES_FIELD_LEVEL, p -> p.keyword(k -> k))
-                            .properties(ES_FIELD_CONTAINER_NAME, p -> p.keyword(k -> k))
-                            .properties(ES_FIELD_MESSAGE, p -> p.text(t -> t))
-                    )
-                    .build();
-
             ElasticsearchClient client = elasticsearchConfig.createElasticsearchClient(elasticSearchHost);
-            client.indices().create(createIndexRequest);
+            SearchRequest searchRequest = buildFilteredSearchRequest(index, startTime, endTime, logLevel, containerName);
+            return client.search(searchRequest, responseType);
         } catch (IOException e) {
-            log.error("<ElasticSearch> {} 인덱스 생성 실패", indexName, e);
+            log.error("<ElasticSearch> {} 인덱스에 대한 필터 검색 실패", index, e);
+            return new SearchResponse.Builder<T>().build();
         }
     }
 
     public <T> void updateDocuments(String index, List<Map<String, Object>> documents, String elasticSearchHost) {
-        if (documents.isEmpty()) {
-            return;
-        }
+        if (documents.isEmpty()) return;
 
         try {
             ElasticsearchClient client = elasticsearchConfig.createElasticsearchClient(elasticSearchHost);
@@ -77,19 +67,6 @@ public class ElasticSearchService {
             }
         } catch (IOException e) {
             log.error("<ElasticSearch> {}에 대한 업데이트 실패", index, e);
-        }
-    }
-
-    public <T> SearchResponse<T> searchWithFilters(String index, Instant startTime, Instant endTime,
-                                                   String logLevel, String containerName,
-                                                   String elasticSearchHost, Class<T> responseType) {
-        try {
-            ElasticsearchClient client = elasticsearchConfig.createElasticsearchClient(elasticSearchHost);
-            SearchRequest searchRequest = buildFilteredSearchRequest(index, startTime, endTime, logLevel, containerName);
-            return client.search(searchRequest, responseType);
-        } catch (IOException e) {
-            log.error("<ElasticSearch> {} 인덱스에 대한 필터 검색 실패", index, e);
-            return new SearchResponse.Builder<T>().build();
         }
     }
 
@@ -112,6 +89,26 @@ public class ElasticSearchService {
                 ))
                 .size(size)
                 .build();
+    }
+
+    private void createIndex(String indexName, String elasticSearchHost) {
+        try {
+            CreateIndexRequest createIndexRequest = new CreateIndexRequest.Builder()
+                    .index(indexName)
+                    .mappings(m -> m
+                            .properties(ES_FIELD_PROCESSED, p -> p.boolean_(b -> b))
+                            .properties(ES_FIELD_TIMESTAMP, p -> p.date(d -> d))
+                            .properties(ES_FIELD_LEVEL, p -> p.keyword(k -> k))
+                            .properties(ES_FIELD_CONTAINER_NAME, p -> p.keyword(k -> k))
+                            .properties(ES_FIELD_MESSAGE, p -> p.text(t -> t))
+                    )
+                    .build();
+
+            ElasticsearchClient client = elasticsearchConfig.createElasticsearchClient(elasticSearchHost);
+            client.indices().create(createIndexRequest);
+        } catch (IOException e) {
+            log.error("<ElasticSearch> {} 인덱스 생성 실패", indexName, e);
+        }
     }
 
     private UpdateRequest<Map<String, Object>, Map<String, Object>> buildUpdateRequest(String index, Map<String, Object> document, String id) {

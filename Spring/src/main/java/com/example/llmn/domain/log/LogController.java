@@ -25,6 +25,7 @@ public class LogController {
     private final LogService logService;
     private final LogScheduler logScheduler;
 
+    // 테스트용
     @GetMapping("/logs")
     public ResponseEntity<?> searchLogs(@RequestParam Instant startTime,
                                         @RequestParam Instant endTime,
