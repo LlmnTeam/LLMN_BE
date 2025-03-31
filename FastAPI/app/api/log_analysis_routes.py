@@ -14,7 +14,7 @@ router = APIRouter(prefix="/process", tags=["summaries"])
 @router.post("/logSummary")
 async def process_log_summary(request: LogRequest):
     log_summary, is_urgent = await generate_log_summary(request.content, request.apiKey)
-    
+        
     return {
         "logSummary": log_summary,
         "isUrgent": is_urgent

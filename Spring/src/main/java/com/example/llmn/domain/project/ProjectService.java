@@ -47,13 +47,6 @@ public class ProjectService {
     private final UserRepository userRepository;
 
     @Transactional
-    @Scheduled(cron = "0 0 0,12 * * *")
-    public void initEmergency() {
-        List<Project> projects = projectRepository.findAll();
-        projects.forEach(project -> project.updateIsUrgent(false));
-    }
-
-    @Transactional
     public CreateProjectRes createProject(CreateProjectReq requestDTO, Long userId) {
         ContainerStatus containerStatus = determineContainerStatus(requestDTO);
         boolean isUrgent = containerStatus.isProjectUrgent();
@@ -83,7 +76,7 @@ public class ProjectService {
         if (project.isNotOwnedBy(userId))
             throw new CustomException(ExceptionCode.USER_FORBIDDEN);
 
-        ContainerStatus containerStatus = findContainerStatus(requestDTO, project.getSshInfo().getId());
+        ContainerStatus containerStatus = findContainerStatus(requestDTO.containerName(), project.getSshInfo().getId());
         project.updateProject(requestDTO.projectName(), requestDTO.containerName(), requestDTO.description(), containerStatus);
     }
 
@@ -185,16 +178,16 @@ public class ProjectService {
         return new FindProjectLogByNameRes(project, fileName, logContent);
     }
 
-    private ContainerStatus determineContainerStatus(CreateProjectReq requestDTO) {
-        return requestDTO.containerName() != null ? ContainerStatus.NOT_WORKING : ContainerStatus.NOT_CONNECTED;
-    }
-
-    private ContainerStatus findContainerStatus(UpdateProjectReq requestDTO, Long sshInfoId) {
-        if (requestDTO.containerName() == null) {
+    public ContainerStatus findContainerStatus(String containerName, Long sshInfoId) {
+        if (containerName == null) {
             return ContainerStatus.NOT_CONNECTED;
         }
 
-        return dockerService.isContainerRunning(requestDTO.containerName(), sshInfoId) ? ContainerStatus.WORKING : ContainerStatus.NOT_WORKING;
+        return dockerService.isContainerRunning(containerName, sshInfoId) ? ContainerStatus.WORKING : ContainerStatus.NOT_WORKING;
+    }
+
+    private ContainerStatus determineContainerStatus(CreateProjectReq requestDTO) {
+        return requestDTO.containerName() != null ? ContainerStatus.NOT_WORKING : ContainerStatus.NOT_CONNECTED;
     }
 
     private CloudInstanceDTO createCloudInstanceRes(SshInfo sshInfo) {

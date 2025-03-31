@@ -13,9 +13,9 @@ import java.util.Optional;
 @Repository
 public interface ProjectRepository extends JpaRepository<Project, Long> {
 
-    @EntityGraph(attributePaths = {"user"})
+    @EntityGraph(attributePaths = {"sshInfo"})
     @Query("SELECT p FROM Project p")
-    List<Project> findAllWithUser();
+    List<Project> findAllWithSshInfo();
 
     @EntityGraph(attributePaths = {"user", "sshInfo"})
     @Query("SELECT p FROM Project p WHERE p.id = :projectId")

@@ -66,6 +66,14 @@ public class Project extends BaseEntity {
         this.isUrgent = isUrgent;
     }
 
+    public void updateContainerStatus(ContainerStatus containerStatus){
+        this.containerStatus = containerStatus;
+    }
+
+    public Long getSshInfoId() {
+        return sshInfo.getId();
+    }
+
     public boolean isConnected(){
         return containerStatus.equals(ContainerStatus.WORKING);
     }
