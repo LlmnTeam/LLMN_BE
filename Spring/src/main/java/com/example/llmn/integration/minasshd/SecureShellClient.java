@@ -49,21 +49,17 @@ public class SecureShellClient implements AutoCloseable {
     }
 
     private <T> T executeWithRetryAndReconnect(Callable<T> action) throws IOException, InterruptedException {
-        for (int retry = 0; retry <= MAX_COMMAND_RETRIES; retry++) {
-            if (!isConnected() && !attemptReconnect())
-                return null;
-            try {
-                return action.call();
-            } catch (IOException | InterruptedException e) {
-                // 재시도 횟수가 남았고 연결이 끊겼으면 재연결 후 재시도
-                if (!isConnected() && attemptReconnect() && retry < MAX_COMMAND_RETRIES)
-                    continue;
-                throw e;
-            } catch (Exception e) {
-                throw new CustomException(ExceptionCode.SSH_CONNECT_FAIL);
-            }
+        if (!isConnected() && !attemptReconnect())
+            return null;
+
+        try {
+            return action.call();
+        } catch (IOException | InterruptedException e) {
+            if (!isConnected()) attemptReconnect();
+            throw e;
+        } catch (Exception e) {
+            throw new CustomException(ExceptionCode.SSH_CONNECT_FAIL);
         }
-        return null;
     }
 
     public String runCommandInInteractiveShell(String command) {
@@ -76,6 +72,7 @@ public class SecureShellClient implements AutoCloseable {
 
             if (result == null)
                 return !isConnected() ? DISCONNECTED : FAIL_COMMAND;
+
             return result;
         } catch (IOException e) {
             return FAIL_COMMAND;
@@ -122,7 +119,7 @@ public class SecureShellClient implements AutoCloseable {
         }
     }
 
-    public synchronized boolean attemptReconnect() {
+    public boolean attemptReconnect() {
         for (int attempt = 0; attempt < MAX_RECONNECT_ATTEMPTS; attempt++) {
             try {
                 closeQuietly(); // 기존 자원 정리
