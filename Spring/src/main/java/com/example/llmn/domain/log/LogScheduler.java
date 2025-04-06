@@ -72,25 +72,24 @@ public class LogScheduler {
     @Value("${recommend.uri}")
     private String recommendationServiceUrl;
 
+    @Value("${elasticsearch.uri}")
+    private String elasticsearchUri;
+
     @Scheduled(fixedRate = 60000)
     @SuppressWarnings("rawtypes")
     public void collectAndPersistLogs() {
-        List<SshInfo> sshConfigurations = sshInfoRepository.findAll();
+        SearchResponse<Map> searchResponse = elasticSearchService.searchUnprocessedDocuments(
+                getCurrentLogIndexName(),
+                elasticsearchUri,
+                Map.class,
+                MAX_LOG_RECORDS_PER_QUERY
+        );
 
-        for (SshInfo sshConfig : sshConfigurations) {
-            SearchResponse<Map> searchResponse = elasticSearchService.searchUnprocessedDocuments(
-                    getCurrentLogIndexName(),
-                    sshConfig.getRemoteHost(),
-                    Map.class,
-                    MAX_LOG_RECORDS_PER_QUERY
-            );
+        List<Map<String, Object>> rawLogDocuments = logService.convertElasticsearchResultToLogMap(searchResponse);
+        List<Map<String, Object>> processedLogs = logService.standardizeLogFields(rawLogDocuments);
 
-            List<Map<String, Object>> rawLogDocuments = logService.convertElasticsearchResultToLogMap(searchResponse);
-            List<Map<String, Object>> processedLogs = logService.standardizeLogFields(rawLogDocuments);
-
-            elasticSearchService.updateDocuments(getCurrentLogIndexName(), processedLogs, sshConfig.getRemoteHost());
-            logService.persistLogsToFiles(processedLogs, sshConfig.getId());
-        }
+        elasticSearchService.updateDocuments(getCurrentLogIndexName(), processedLogs, elasticsearchUri);
+        logService.persistLogsToFiles(processedLogs, 1l);
     }
 
     @Transactional
