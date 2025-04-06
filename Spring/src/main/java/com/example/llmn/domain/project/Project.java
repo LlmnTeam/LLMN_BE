@@ -74,6 +74,10 @@ public class Project extends BaseEntity {
         return sshInfo.getId();
     }
 
+    public String getSshInfoRemoteHost(){
+        return sshInfo.getRemoteHost();
+    }
+
     public boolean isConnected(){
         return containerStatus.equals(ContainerStatus.WORKING);
     }

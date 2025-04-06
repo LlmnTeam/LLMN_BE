@@ -7,5 +7,6 @@ public record LogDataDTO(
         Instant timestamp,
         String message,
         boolean isProcessed,
-        String logLevel
+        String logLevel,
+        String serverIp
 ) {}

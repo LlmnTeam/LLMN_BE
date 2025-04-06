@@ -3,6 +3,7 @@ package com.example.llmn.domain.project;
 import com.example.llmn.common.exceptions.CustomException;
 import com.example.llmn.common.exceptions.ExceptionCode;
 import com.example.llmn.domain.docker.ContainerStatus;
+import com.example.llmn.domain.log.LogService;
 import com.example.llmn.domain.project.model.request.CreateProjectReq;
 import com.example.llmn.domain.project.model.request.UpdateProjectReq;
 import com.example.llmn.domain.project.model.response.*;
@@ -19,7 +20,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,11 +28,9 @@ import java.util.*;
 
 import static com.example.llmn.common.constants.GlobalConstants.*;
 import static com.example.llmn.common.utils.DateTimeUtils.formatLocalDateTime;
-import static com.example.llmn.common.utils.DateTimeUtils.parseDateTimeFromLogFile;
 import static com.example.llmn.common.utils.FileUtils.*;
 import static com.example.llmn.domain.docker.DockerConstants.DOCKER_RESOURCE_KEY_CPU;
 import static com.example.llmn.domain.docker.DockerConstants.DOCKER_RESOURCE_KEY_MEMORY;
-import static com.example.llmn.domain.log.LogConstants.LOG_FILE_NAME_SUFFIX;
 
 @Service
 @RequiredArgsConstructor
@@ -41,6 +39,7 @@ import static com.example.llmn.domain.log.LogConstants.LOG_FILE_NAME_SUFFIX;
 public class ProjectService {
 
     private final DockerService dockerService;
+    private final LogService logService;
     private final ProjectRepository projectRepository;
     private final SummaryRepository summaryRepository;
     private final SshInfoRepository sshInfoRepository;
@@ -135,10 +134,10 @@ public class ProjectService {
     }
 
     public FindProjectByIdRes findProjectById(Long projectId) {
-        Project project = projectRepository.findById(projectId)
+        Project project = projectRepository.findByIdWithSshInfo(projectId)
                 .orElseThrow(() -> new CustomException(ExceptionCode.USER_NOT_FOUND));
 
-        String recentLog = findRecentLog(project);
+        String recentLog = logService.findRecentLog(project.getContainerName(), project.getSshInfoRemoteHost());
 
         Optional<Summary> latestSummaryOP = findLatestSummary(project);
         String summaryContent = getContentFromSummary(latestSummaryOP);
@@ -162,10 +161,10 @@ public class ProjectService {
     }
 
     public FindProjectLogListRes findProjectLogList(Long projectId) {
-        String containerName = projectRepository.findContainerNameById(projectId)
+        Project project = projectRepository.findByIdWithSshInfo(projectId)
                 .orElseThrow(() -> new CustomException(ExceptionCode.PROJECT_NOT_FOUND));
 
-        List<String> logFileList = findLogFilesByContainerName(containerName);
+        List<String> logFileList = logService.findLogFilesByContainerName(project.getContainerName(), project.getSshInfoRemoteHost());
         return new FindProjectLogListRes(logFileList);
     }
 
@@ -234,39 +233,6 @@ public class ProjectService {
         return ContainerStatus.NOT_CONNECTED;
     }
 
-    private String findRecentLog(Project project) {
-        String latestLogFile = findTextFiles(LOGS_DIRECTORY).stream()
-                .filter(logFile -> logFile.startsWith(project.getContainerName() + "-log"))
-                .max(this::compareLogFileDates) // 최신 파일 찾기
-                .orElse(null);
-
-        if (latestLogFile == null)
-            return BLANK_STRING;
-
-        return parseLastTwoLogs(readFileAsString(latestLogFile));
-    }
-
-    private int compareLogFileDates(String file1, String file2) {
-        LocalDateTime fileDateTime1 = parseDateTimeFromLogFile(file1);
-        LocalDateTime fileDateTime2 = parseDateTimeFromLogFile(file2);
-        return fileDateTime1.compareTo(fileDateTime2);
-    }
-
-    private String parseLastTwoLogs(String logContent) {
-        String[] logs = splitLogsByDatePattern(logContent);
-        return logs.length <= 2 ? logContent.trim() : formatLastTwoLogs(logs);
-    }
-
-    private String[] splitLogsByDatePattern(String logContent) {
-        return logContent.split("(?=\\[\\d{4}-\\d{2}-\\d{2}_\\d{2}:\\d{2}\\])");
-    }
-
-    private String formatLastTwoLogs(String[] logs) {
-        String lastLog = logs[logs.length - 1].trim();
-        String secondLastLog = logs[logs.length - 2].trim();
-        return secondLastLog + "\n\n" + lastLog;
-    }
-
     private Optional<Summary> findLatestSummary(Project project) {
         Pageable pageable = PageRequest.of(0, 1, Sort.by(Sort.Direction.DESC, SORT_BY_DATE));
         return summaryRepository.findByProject(project, pageable)
@@ -290,12 +256,6 @@ public class ProjectService {
                         formatLocalDateTime(summary.getCreatedDate()),
                         summary.getContent(),
                         summary.isChecked()))
-                .toList();
-    }
-
-    private List<String> findLogFilesByContainerName(String containerName) {
-        return findTextFiles(LOGS_DIRECTORY).stream()
-                .filter(logFile -> logFile.startsWith(containerName + LOG_FILE_NAME_SUFFIX))
                 .toList();
     }
 

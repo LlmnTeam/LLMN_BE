@@ -31,8 +31,9 @@ public class LogController {
                                         @RequestParam Instant endTime,
                                         @RequestParam(required = false) String logLevel,
                                         @RequestParam(required = false) String serviceName,
+                                        @RequestParam(required = false) String serverIp,
                                         @RequestParam String elasticSearchHost) {
-        List<LogDataDTO> responseDTO = logService.searchLog(startTime, endTime, logLevel, serviceName, elasticSearchHost);
+        List<LogDataDTO> responseDTO = logService.searchLog(startTime, endTime, logLevel, serviceName, serverIp, elasticSearchHost);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 

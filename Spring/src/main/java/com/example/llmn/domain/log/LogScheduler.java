@@ -51,7 +51,6 @@ public class LogScheduler {
     private final SummaryRepository summaryRepository;
     private final OpenAiKeyService openAiKeyService;
     private final ProjectRepository projectRepository;
-    private final SshInfoRepository sshInfoRepository;
     private final WebClient webClient;
 
     @Value("${log.summary.uri}")
@@ -89,7 +88,7 @@ public class LogScheduler {
         List<Map<String, Object>> processedLogs = logService.standardizeLogFields(rawLogDocuments);
 
         elasticSearchService.updateDocuments(getCurrentLogIndexName(), processedLogs, elasticsearchUri);
-        logService.persistLogsToFiles(processedLogs, 1l);
+        logService.persistLogsToFiles(processedLogs);
     }
 
     @Transactional
@@ -184,7 +183,7 @@ public class LogScheduler {
     }
 
     private Optional<SummaryRes> requestLogSummaryFromService(String containerName, Long userId) {
-        String recentLogContent = logService.findRecentLogs(containerName);
+        String recentLogContent = logService.findRecentLogs(containerName, elasticsearchUri);
 
         String formattedLogData = formatLogSummaryRequestData(containerName, recentLogContent);
         SummaryRes summaryResponse = sendSummaryRequest(logSummaryServiceUrl, formattedLogData, SummaryRes.class, userId);

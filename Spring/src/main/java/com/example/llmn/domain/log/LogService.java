@@ -21,12 +21,13 @@ import java.util.stream.Stream;
 import static com.example.llmn.common.constants.GlobalConstants.BLANK_STRING;
 import static com.example.llmn.common.constants.GlobalConstants.NO_MESSAGE;
 import static com.example.llmn.common.utils.DateTimeUtils.*;
-import static com.example.llmn.common.utils.FileUtils.createDirectoryIfNotExist;
-import static com.example.llmn.common.utils.FileUtils.findTextFiles;
+import static com.example.llmn.common.utils.FileUtils.*;
 import static com.example.llmn.common.utils.MapUtils.extractBooleanFromMap;
 import static com.example.llmn.common.utils.MapUtils.extractStringFromMap;
 import static com.example.llmn.domain.log.LogConstants.*;
 import static com.example.llmn.integration.elasticsearch.ElasticSearchConstants.*;
+import static com.example.llmn.domain.log.LogConstants.LOGS_DIRECTORY;
+import static com.example.llmn.domain.log.LogConstants.LOG_FILE_NAME_SUFFIX;
 
 @Service
 @RequiredArgsConstructor
@@ -37,15 +38,18 @@ public class LogService {
 
     private static final String CONTAINER_NAME_FIELD = "name";
     private static final String UNKNOWN_CONTAINER = "unknown_container";
+    private static final String UNKNOWN_SERVER_IP = "unknown";
 
     @SuppressWarnings("rawtypes")
-    public List<LogDataDTO> searchLog(Instant startTime, Instant endTime, String logLevel, String containerName, String elasticSearchHost) {
+    public List<LogDataDTO> searchLog(Instant startTime, Instant endTime, String logLevel, String containerName,
+                                      String serverIp, String elasticSearchHost) {
         SearchResponse<Map> response = elasticSearchService.searchDocumentsWithFilters(
                 ELASTICSEARCH_LOG_INDEX_PATTERN,
                 startTime,
                 endTime,
                 logLevel,
                 containerName,
+                serverIp,
                 elasticSearchHost,
                 Map.class
         );
@@ -53,11 +57,25 @@ public class LogService {
         return mapSearchResultsToLogDTOs(response);
     }
 
-    public String findRecentLogs(String containerName) {
-        return findLatestLogFile(containerName)
+    public String findRecentLogs(String containerName, String serverIp) {
+        return findLatestLogFile(containerName, serverIp)
                 .map(FileUtils::readFileAsString)
                 .map(this::extractRecentLogsFromContent)
                 .orElse(BLANK_STRING);
+    }
+
+    public String findRecentLog( String containerName, String serverIp) {
+        String finalServerIp = serverIp.replace(".", "-"); // 파일명에 맞게 IP 형식 변환
+
+        String latestLogFile = findTextFiles(LOGS_DIRECTORY).stream()
+                .filter(logFile -> logFile.startsWith(containerName + "-" + finalServerIp + LOG_FILE_NAME_SUFFIX))
+                .max(this::compareLogFileDates) // 최신 파일 찾기
+                .orElse(null);
+
+        if (latestLogFile == null)
+            return BLANK_STRING;
+
+        return parseLastTwoLogs(readFileAsString(latestLogFile));
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
@@ -83,25 +101,38 @@ public class LogService {
             String containerName = getContainerNameFromLog(logDocument);
             String message = getLogMessage(logDocument);
             String logLevel = determineLogLevel(message);
+            String serverIp = getServerIpFromLog(logDocument);
 
-            enrichAndStructureLogData(logDocument, logLevel, containerName, message);
+            enrichAndStructureLogData(logDocument, logLevel, containerName, message, serverIp);
         });
 
         return logDocuments;
     }
 
-    public void persistLogsToFiles(List<Map<String, Object>> logDocuments, Long sshId) {
+    public void persistLogsToFiles(List<Map<String, Object>> logDocuments) {
         createDirectoryIfNotExist(LOGS_DIRECTORY);
 
         Date now = new Date();
         String timestampForFileName = formatDate(now, LOG_TITLE_FORMAT);
         String timestampForText = formatDate(now, LOG_TEXT_FORMAT);
 
-        Map<String, List<Map<String, Object>>> groupedLogMap = groupLogsByContainerName(logDocuments);
-        groupedLogMap.forEach((containerName, containerLogs) -> {
-            String fileName = createLogFileName(containerName, timestampForFileName, sshId);
+        Map<String, List<Map<String, Object>>> groupedLogMap = groupLogsByContainerNameAndServerIp(logDocuments);
+        groupedLogMap.forEach((key, containerLogs) -> {
+            String[] parts = key.split("@");
+            String containerName = parts[0];
+            String serverIp = parts.length > 1 ? parts[1] : UNKNOWN_SERVER_IP;
+
+            String fileName = createLogFileName(containerName, serverIp, timestampForFileName);
             writeLogsToFile(fileName, containerLogs, timestampForText);
         });
+    }
+
+    public List<String> findLogFilesByContainerName(String containerName, String serverIp) {
+        String finalServerIp = serverIp.replace(".", "-"); // 파일명에 맞게 IP 형식 변환
+
+        return findTextFiles(LOGS_DIRECTORY).stream()
+                .filter(logFile -> logFile.startsWith(containerName + "-" + finalServerIp + LOG_FILE_NAME_SUFFIX))
+                .toList();
     }
 
     @SuppressWarnings("unchecked")
@@ -125,22 +156,34 @@ public class LogService {
                         .orElse(LOG_LEVEL_INFO);
     }
 
-    private void enrichAndStructureLogData(Map<String, Object> logDocument, String logLevel, String containerName, String message) {
+    private String getServerIpFromLog(Map<String, Object> logDocument) {
+        return Optional.ofNullable((String) logDocument.get(ES_FIELD_SERVER_IP))
+                .orElse(UNKNOWN_SERVER_IP);
+    }
+
+    private void enrichAndStructureLogData(Map<String, Object> logDocument, String logLevel, String containerName, String message, String serverIp) {
         logDocument.put(ES_FIELD_LEVEL, logLevel);
         logDocument.put(ES_FIELD_CONTAINER_NAME, containerName);
+        logDocument.put(ES_FIELD_SERVER_IP, serverIp);
         logDocument.put(ES_FIELD_PROCESSED, true);
         logDocument.put(ES_FIELD_MESSAGE, message);
         logDocument.remove(ES_FIELD_CONTAINER_OBJECT);
     }
 
-    private Map<String, List<Map<String, Object>>> groupLogsByContainerName(List<Map<String, Object>> logDocuments) {
+    private Map<String, List<Map<String, Object>>> groupLogsByContainerNameAndServerIp(List<Map<String, Object>> logDocuments) {
         return logDocuments.stream()
-                .collect(Collectors.groupingBy(doc ->
-                        (String) doc.getOrDefault(ES_FIELD_CONTAINER_NAME, UNKNOWN_CONTAINER)));
+                .collect(Collectors.groupingBy(doc -> {
+                    String containerName = (String) doc.getOrDefault(ES_FIELD_CONTAINER_NAME, UNKNOWN_CONTAINER);
+                    String serverIp = (String) doc.getOrDefault(ES_FIELD_SERVER_IP, UNKNOWN_SERVER_IP);
+                    return containerName + "@" + serverIp;
+                }));
     }
 
-    private String createLogFileName(String containerName, String timestampForTitle, Long sshId) {
-        return String.format("logs/%s-log-%s-%d.txt", containerName, timestampForTitle, sshId);
+    private String createLogFileName(String containerName, String serverIp, String timestampForTitle) {
+        return String.format("logs/%s-%s-log-%s.txt",
+                containerName,
+                serverIp.replace(".", "-"),
+                timestampForTitle);
     }
 
     private void writeLogsToFile(String fileName, List<Map<String, Object>> logEntries, String timestamp) {
@@ -176,15 +219,16 @@ public class LogService {
 
     private LogDataDTO createLogDTOFromDocument(Map<String, Object> logDocument) {
         if (logDocument == null)
-            return new LogDataDTO(UNKNOWN_CONTAINER, Instant.now(), NO_MESSAGE, false, LOG_LEVEL_UNKNOWN);
+            return new LogDataDTO(UNKNOWN_CONTAINER, Instant.now(), NO_MESSAGE, false, LOG_LEVEL_UNKNOWN, UNKNOWN_SERVER_IP);
 
         String containerName = extractStringFromMap(logDocument, ES_FIELD_CONTAINER_NAME, UNKNOWN_CONTAINER);
         Instant timestamp = parseInstant((String) logDocument.get(ES_FIELD_TIMESTAMP));
         String formattedMessage = formatLogMessage(logDocument);
         boolean isProcessed = extractBooleanFromMap(logDocument, ES_FIELD_PROCESSED, false);
         String logLevel = extractStringFromMap(logDocument, ES_FIELD_LEVEL, LOG_LEVEL_UNKNOWN);
+        String serverIp = extractStringFromMap(logDocument, ES_FIELD_SERVER_IP, UNKNOWN_SERVER_IP);
 
-        return new LogDataDTO(containerName, timestamp, formattedMessage, isProcessed, logLevel);
+        return new LogDataDTO(containerName, timestamp, formattedMessage, isProcessed, logLevel, serverIp);
     }
 
     private String formatLogMessage(Map<String, Object> logDocument) {
@@ -193,10 +237,14 @@ public class LogService {
                 .orElse(NO_MESSAGE);
     }
 
-    private Optional<String> findLatestLogFile(String containerName) {
+    private Optional<String> findLatestLogFile(String containerName, String serverIp) {
         List<String> logFiles = findTextFiles(LOGS_DIRECTORY);
+        String filePrefix = serverIp != null ?
+                containerName + "-" + serverIp.replace(".", "-") + "-log" :
+                containerName + "-";
+
         return logFiles.stream()
-                .filter(logFile -> logFile.startsWith(containerName + "-log"))
+                .filter(logFile -> logFile.startsWith(filePrefix))
                 .max(this::compareLogFileTimestamps);
     }
 
@@ -208,8 +256,12 @@ public class LogService {
 
     private LocalDateTime extractDateTimeFromLogFileName(String file) {
         // 파일 이름에서 "log-" 뒤부터 ".txt" 앞까지의 부분 추출
-        String dateTimePart = file.substring(file.indexOf("log-") + 4, file.indexOf("-", file.indexOf("_")));
-        return LocalDateTime.parse(dateTimePart, LOG_FILE_FORMATTER);
+        String[] parts = file.split("-log-");
+        if (parts.length > 1) {
+            String dateTimePart = parts[1].substring(0, parts[1].indexOf(".txt"));
+            return LocalDateTime.parse(dateTimePart, LOG_FILE_FORMATTER);
+        }
+        return LocalDateTime.MIN; // 파싱 실패 시 최소값 반환
     }
 
     private String extractRecentLogsFromContent(String fileContent) {
@@ -231,5 +283,22 @@ public class LogService {
 
     private String extractTimestampFromLog(String log) {
         return log.substring(1, 17);
+    }
+
+    private int compareLogFileDates(String file1, String file2) {
+        LocalDateTime fileDateTime1 = parseDateTimeFromLogFile(file1);
+        LocalDateTime fileDateTime2 = parseDateTimeFromLogFile(file2);
+        return fileDateTime1.compareTo(fileDateTime2);
+    }
+
+    private String parseLastTwoLogs(String logContent) {
+        String[] logs = logContent.split("(?=\\[\\d{4}-\\d{2}-\\d{2}_\\d{2}:\\d{2}\\])");
+        return logs.length <= 2 ? logContent.trim() : formatLastTwoLogs(logs);
+    }
+
+    private String formatLastTwoLogs(String[] logs) {
+        String lastLog = logs[logs.length - 1].trim();
+        String secondLastLog = logs[logs.length - 2].trim();
+        return secondLastLog + "\n\n" + lastLog;
     }
 }

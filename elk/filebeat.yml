@@ -4,7 +4,15 @@ filebeat.inputs:
       - /var/lib/docker/containers/*/*.log
     processors:
       - add_docker_metadata: ~
+
+processors:
+  - add_host_metadata:
+      netinfo.enabled: true
+      cache.ttl: 5m
+  - add_fields:
+      target: server
+      fields:
+        ip: '${SERVER_IP:}'  # 환경 변수에서 서버 IP를 가져옴, 없으면 빈 값
       
 output.logstash:
-  hosts: ["logstash:5044"]
-
+  hosts: ["15.164.216:5044"] # ElasticSearch가 있는 서버 IP

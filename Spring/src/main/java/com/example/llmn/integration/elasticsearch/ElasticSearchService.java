@@ -39,11 +39,11 @@ public class ElasticSearchService {
     }
 
     public <T> SearchResponse<T> searchDocumentsWithFilters(String index, Instant startTime, Instant endTime,
-                                                            String logLevel, String containerName,
+                                                            String logLevel, String containerName, String serverIp,
                                                             String elasticSearchHost, Class<T> responseType) {
         try {
             ElasticsearchClient client = elasticsearchConfig.createElasticsearchClient(elasticSearchHost);
-            SearchRequest searchRequest = buildFilteredSearchRequest(index, startTime, endTime, logLevel, containerName);
+            SearchRequest searchRequest = buildFilteredSearchRequest(index, startTime, endTime, logLevel, containerName, serverIp);
             return client.search(searchRequest, responseType);
         } catch (IOException e) {
             log.error("<ElasticSearch> {} 인덱스에 대한 필터 검색 실패", index, e);
@@ -100,6 +100,7 @@ public class ElasticSearchService {
                             .properties(ES_FIELD_TIMESTAMP, p -> p.date(d -> d))
                             .properties(ES_FIELD_LEVEL, p -> p.keyword(k -> k))
                             .properties(ES_FIELD_CONTAINER_NAME, p -> p.keyword(k -> k))
+                            .properties(ES_FIELD_SERVER_IP, p -> p.keyword(k -> k))
                             .properties(ES_FIELD_MESSAGE, p -> p.text(t -> t))
                     )
                     .build();
@@ -119,7 +120,8 @@ public class ElasticSearchService {
                 .build();
     }
 
-    private SearchRequest buildFilteredSearchRequest(String index, Instant startTime, Instant endTime, String logLevel, String containerName) {
+    private SearchRequest buildFilteredSearchRequest(String index, Instant startTime, Instant endTime,
+                                                     String logLevel, String containerName, String serverIp) {
         BoolQuery.Builder boolQuery = new BoolQuery.Builder();
 
         // 시간 범위 필터 추가
@@ -135,6 +137,9 @@ public class ElasticSearchService {
         }
         if (containerName != null && !containerName.isEmpty()) {
             boolQuery.filter(f -> f.term(t -> t.field(ES_FIELD_CONTAINER_NAME).value(containerName)));
+        }
+        if (serverIp != null && !serverIp.isEmpty()) {
+            boolQuery.filter(f -> f.term(t -> t.field(ES_FIELD_SERVER_IP).value(serverIp)));
         }
 
         return new SearchRequest.Builder()
