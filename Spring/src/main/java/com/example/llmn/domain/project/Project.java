@@ -1,7 +1,7 @@
 package com.example.llmn.domain.project;
 
 import com.example.llmn.domain.docker.ContainerStatus;
-import com.example.llmn.domain.remote.SshInfo;
+import com.example.llmn.domain.remote.ServerInstance;
 import com.example.llmn.common.entity.BaseEntity;
 import com.example.llmn.domain.user.User;
 import jakarta.persistence.*;
@@ -26,7 +26,7 @@ public class Project extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "ssh_info_id")
-    private SshInfo sshInfo;
+    private ServerInstance serverInstance;
 
     @Column
     private String projectName;
@@ -45,9 +45,9 @@ public class Project extends BaseEntity {
     private boolean isUrgent;
 
     @Builder
-    public Project(User user, SshInfo sshInfo, String projectName, String containerName, String description, ContainerStatus containerStatus, boolean isUrgent) {
+    public Project(User user, ServerInstance serverInstance, String projectName, String containerName, String description, ContainerStatus containerStatus, boolean isUrgent) {
         this.user = user;
-        this.sshInfo = sshInfo;
+        this.serverInstance = serverInstance;
         this.projectName = projectName;
         this.containerName = containerName;
         this.containerStatus = containerStatus;
@@ -71,11 +71,11 @@ public class Project extends BaseEntity {
     }
 
     public Long getSshInfoId() {
-        return sshInfo.getId();
+        return serverInstance.getId();
     }
 
     public String getSshInfoRemoteHost(){
-        return sshInfo.getRemoteHost();
+        return serverInstance.getRemoteHost();
     }
 
     public boolean isConnected(){

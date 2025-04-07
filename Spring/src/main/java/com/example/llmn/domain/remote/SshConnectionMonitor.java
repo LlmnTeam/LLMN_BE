@@ -16,13 +16,13 @@ import static com.example.llmn.integration.minasshd.MinaSshdConstants.CONNECTION
 @Slf4j
 public class SshConnectionMonitor {
 
-    private final SshInfoRepository sshInfoRepository;
+    private final ServerInstanceRepository serverInstanceRepository;
     private final SecureShellManager secureShellManager;
 
     @Scheduled(cron = "0 32 12 * * *")
     public void checkSshConnection(){
-        List<SshInfo> sshInfos = sshInfoRepository.findAll();
-        sshInfos.forEach(sshInfo -> {
+        List<ServerInstance> serverInstances = serverInstanceRepository.findAll();
+        serverInstances.forEach(sshInfo -> {
             boolean isWorking = checkConnectionValid(sshInfo.getId(), sshInfo.getUserId());
             sshInfo.updateIsWorking(isWorking);
         });

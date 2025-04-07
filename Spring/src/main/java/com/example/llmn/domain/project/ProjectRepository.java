@@ -13,31 +13,28 @@ import java.util.Optional;
 @Repository
 public interface ProjectRepository extends JpaRepository<Project, Long> {
 
-    @EntityGraph(attributePaths = {"sshInfo"})
+    @EntityGraph(attributePaths = {"serverInstance"})
     @Query("SELECT p FROM Project p")
-    List<Project> findAllWithSshInfo();
+    List<Project> findAllWithServerInstance();
 
-    @EntityGraph(attributePaths = {"user", "sshInfo"})
+    @EntityGraph(attributePaths = {"user", "serverInstance"})
     @Query("SELECT p FROM Project p WHERE p.id = :projectId")
-    Optional<Project> findByIdWithUserAndSshInfo(@Param("projectId") Long projectId);
+    Optional<Project> findByIdWithUserAndServerInstance(@Param("projectId") Long projectId);
 
     @Query("SELECT p FROM Project p WHERE p.id = :projectId")
-    Optional<Project> findByIdWithSshInfo(@Param("projectId") Long projectId);
+    Optional<Project> findByIdWithServerInstance(@Param("projectId") Long projectId);
 
     @Query("SELECT p FROM Project p WHERE p.user.id = :userId")
     List<Project> findByUserId(@Param("userId") Long userId);
 
-    @EntityGraph(attributePaths = {"sshInfo"})
+    @EntityGraph(attributePaths = {"serverInstance"})
     @Query("SELECT p FROM Project p WHERE p.user.id = :userId")
-    List<Project> findByUserIdWithSshInfo(@Param("userId") Long userId);
-
-    @Query("SELECT p.containerName FROM Project p WHERE p.id = :projectId")
-    Optional<String> findContainerNameById(@Param("projectId") Long projectId);
+    List<Project> findByUserIdWithServerInstance(@Param("userId") Long userId);
 
     @Query("SELECT s.id FROM Project p " +
-            "JOIN p.sshInfo s " +
+            "JOIN p.serverInstance s " +
             "WHERE p.id = :projectId")
-    Optional<Long> findSshInfoId(@Param("projectId") Long projectId);
+    Optional<Long> findServerInstanceId(@Param("projectId") Long projectId);
 
     @Modifying
     @Query("DELETE FROM Project p WHERE p.user.id = :userId")

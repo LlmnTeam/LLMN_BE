@@ -2,11 +2,7 @@ package com.example.llmn.domain.remote;
 
 import com.example.llmn.common.exceptions.CustomException;
 import com.example.llmn.common.exceptions.ExceptionCode;
-import com.example.llmn.domain.metric.MetricRepository;
 import com.example.llmn.domain.remote.model.SshInfoDTO;
-import com.example.llmn.domain.user.User;
-import com.example.llmn.domain.user.UserRepository;
-import com.example.llmn.domain.user.model.request.SshInfoReq;
 import com.example.llmn.integration.minasshd.SecureShellClient;
 import com.example.llmn.integration.minasshd.SessionInfo;
 import com.example.llmn.integration.minasshd.SshConnectionPool;
@@ -16,17 +12,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartFile;
 
-import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 import static com.example.llmn.common.constants.GlobalConstants.DELIMITER;
-import static com.example.llmn.common.utils.FileUtils.*;
-import static com.example.llmn.common.utils.FileUtils.writeFile;
 import static com.example.llmn.integration.minasshd.MinaSshdConstants.*;
 import static com.example.llmn.integration.redis.RedisConstants.REDIS_KEY_SSH;
 import static com.example.llmn.integration.redis.RedisConstants.REDIS_EXP_SSH;
@@ -39,7 +29,7 @@ public class SecureShellManager {
 
     private final RedisService redisService;
     private final SshConfigService sshConfigService;
-    private final SshInfoRepository sshInfoRepository;
+    private final ServerInstanceRepository serverInstanceRepository;
     private final SshConnectionPool sshConnectionPool;
 
     private final Map<Long, SessionInfo> activeSessionsById = new ConcurrentHashMap<>();
@@ -68,8 +58,8 @@ public class SecureShellManager {
         }
     }
 
-    public String executeOneTimeCommand(String command, Long sshInfoId) {
-        SshInfoDTO sshConfig = getConnectionConfig(sshInfoId);
+    public String executeOneTimeCommand(String command, Long serverInstanceId) {
+        SshInfoDTO sshConfig = getConnectionConfig(serverInstanceId);
         if (sshConfig == null)
             throw new CustomException(ExceptionCode.SSH_NOT_FOUND);
 
@@ -105,17 +95,17 @@ public class SecureShellManager {
         }
     }
 
-    public SecureShellClient getOrCreateSshClient(Long sshInfoId, boolean isNewConnection, Long userId) {
+    public SecureShellClient getOrCreateSshClient(Long serverInstanceId, boolean isNewConnection, Long userId) {
         if (!isNewConnection) {
-            SecureShellClient existingClient = tryUseExistingSession(sshInfoId, userId);
+            SecureShellClient existingClient = tryUseExistingSession(serverInstanceId, userId);
             if (existingClient != null) return existingClient;
         }
 
         ensureSessionLimitNotExceeded();
 
-        cleanupExistingSession(sshInfoId, userId);
+        cleanupExistingSession(serverInstanceId, userId);
 
-        return createNewSshClient(sshInfoId, userId);
+        return createNewSshClient(serverInstanceId, userId);
     }
 
     @Scheduled(fixedRate = 60 * 60 * 1000) // 1시간마다 실행
@@ -179,15 +169,15 @@ public class SecureShellManager {
             sessionInfo.updateAccessTime();
     }
 
-    private SecureShellClient tryUseExistingSession(Long sshInfoId, Long userId) {
-        SessionInfo existingSession = activeSessionsById.get(sshInfoId);
+    private SecureShellClient tryUseExistingSession(Long serverInstanceId, Long userId) {
+        SessionInfo existingSession = activeSessionsById.get(serverInstanceId);
         if (existingSession == null) {
             return null;
         }
 
         // 연결 끊김 확인 및 재연결 시도
         if (!existingSession.client.isConnected()) {
-            return handleDisconnectedSession(existingSession, sshInfoId, userId);
+            return handleDisconnectedSession(existingSession, serverInstanceId, userId);
         }
 
         // 정상 연결된 세션 사용
@@ -195,24 +185,24 @@ public class SecureShellManager {
         return existingSession.client;
     }
 
-    private SecureShellClient handleDisconnectedSession(SessionInfo session, Long sshInfoId, Long userId) {
-        log.info("<SSHD> 세션 {}의 연결이 끊김, 재연결 시도", sshInfoId);
+    private SecureShellClient handleDisconnectedSession(SessionInfo session, Long serverInstanceId, Long userId) {
+        log.info("<SSHD> 세션 {}의 연결이 끊김, 재연결 시도", serverInstanceId);
 
         if (session.client.attemptReconnect()) {
             session.updateAccessTime();
             return session.client;
         }
 
-        log.warn("<SSHD> 세션 {} 재연결 실패, 새 연결 생성", sshInfoId);
-        removeSessionFromMaps(session, sshInfoId, userId);
+        log.warn("<SSHD> 세션 {} 재연결 실패, 새 연결 생성", serverInstanceId);
+        removeSessionFromMaps(session, serverInstanceId, userId);
         return null;
     }
 
-    private void removeSessionFromMaps(SessionInfo session, Long sshInfoId, Long userId) {
+    private void removeSessionFromMaps(SessionInfo session, Long serverInstanceId, Long userId) {
         session.client.closeQuietly();
-        activeSessionsById.remove(sshInfoId);
+        activeSessionsById.remove(serverInstanceId);
 
-        removeSessionFromUserMap(sshInfoId, userId);
+        removeSessionFromUserMap(serverInstanceId, userId);
     }
 
     private void ensureSessionLimitNotExceeded() {
@@ -226,15 +216,15 @@ public class SecureShellManager {
         }
     }
 
-    private void cleanupExistingSession(Long sshInfoId, Long userId) {
-        SessionInfo existingSession = activeSessionsById.get(sshInfoId);
+    private void cleanupExistingSession(Long serverInstanceId, Long userId) {
+        SessionInfo existingSession = activeSessionsById.get(serverInstanceId);
         if (existingSession != null) {
-            removeSessionFromMaps(existingSession, sshInfoId, userId);
+            removeSessionFromMaps(existingSession, serverInstanceId, userId);
         }
     }
 
-    private SecureShellClient createNewSshClient(Long sshInfoId, Long userId) {
-        SshInfoDTO sshConfig = getConnectionConfig(sshInfoId);
+    private SecureShellClient createNewSshClient(Long serverInstanceId, Long userId) {
+        SshInfoDTO sshConfig = getConnectionConfig(serverInstanceId);
         if (sshConfig == null)
             throw new CustomException(ExceptionCode.SSH_NOT_FOUND);
 
@@ -245,19 +235,19 @@ public class SecureShellManager {
                     sshConfig.remoteKeyPath()
             );
 
-            registerNewSession(newClient, sshInfoId, userId);
+            registerNewSession(newClient, serverInstanceId, userId);
             return newClient;
         } catch (Exception e) {
             throw new CustomException(ExceptionCode.SSH_CONNECT_FAIL);
         }
     }
 
-    private void registerNewSession(SecureShellClient client, Long sshInfoId, Long userId) {
+    private void registerNewSession(SecureShellClient client, Long serverInstanceId, Long userId) {
         SessionInfo newSession = new SessionInfo(userId, client);
-        activeSessionsById.put(sshInfoId, newSession);
+        activeSessionsById.put(serverInstanceId, newSession);
 
         userSessionMap.computeIfAbsent(userId, k -> ConcurrentHashMap.newKeySet())
-                .add(sshInfoId);
+                .add(serverInstanceId);
     }
 
     private Set<Long> findUsersWithoutActiveSessions() {
@@ -367,18 +357,19 @@ public class SecureShellManager {
                         activeSessionsById.get(sessionId).lastAccessTime));
     }
 
-    private SshInfoDTO getConnectionConfig(Long sshInfoId) {
-        return retrieveCachedSshInfo(sshInfoId)
-                .orElseGet(() -> fetchConfigFromDatabase(sshInfoId)
-                        .map(sshInfo -> {
-                            cacheConnectionConfig(sshInfoId, sshInfo);
-                            return new SshInfoDTO(sshInfo);
+    private SshInfoDTO getConnectionConfig(Long serverInstanceId) {
+        return retrieveCachedSshInfo(serverInstanceId)
+                .orElseGet(() -> fetchConfigFromDatabase(serverInstanceId)
+                        .map(serverInstance -> {
+                            cacheConnectionConfig(serverInstanceId, serverInstance);
+                            return new SshInfoDTO(serverInstance);
                         })
-                        .orElseThrow(() -> new CustomException(ExceptionCode.SSH_NOT_FOUND)));
+                        .orElseThrow(() -> new CustomException(ExceptionCode.SSH_NOT_FOUND))
+                );
     }
 
-    private Optional<SshInfoDTO> retrieveCachedSshInfo(Long sshInfoId) {
-        String cachedConfig  = redisService.getValueInString(REDIS_KEY_SSH, sshInfoId.toString());
+    private Optional<SshInfoDTO> retrieveCachedSshInfo(Long serverInstanceId) {
+        String cachedConfig  = redisService.getValueInString(REDIS_KEY_SSH, serverInstanceId.toString());
         if (cachedConfig  == null)
             return Optional.empty();
 
@@ -393,18 +384,18 @@ public class SecureShellManager {
         return Optional.of(new SshInfoDTO(parts[0], parts[1], parts[2]));
     }
 
-    private Optional<SshInfo> fetchConfigFromDatabase(Long sshInfoId) {
-        return sshInfoRepository.findById(sshInfoId);
+    private Optional<ServerInstance> fetchConfigFromDatabase(Long serverInstanceId) {
+        return serverInstanceRepository.findById(serverInstanceId);
     }
 
-    private void cacheConnectionConfig(Long sshInfoId, SshInfo sshInfo) {
+    private void cacheConnectionConfig(Long serverInstanceId, ServerInstance serverInstance) {
         String configString = String.join(
                 DELIMITER,
-                sshInfo.getRemoteHost(),
-                sshInfo.getRemoteName(),
-                sshInfo.getRemoteKeyPath()
+                serverInstance.getRemoteHost(),
+                serverInstance.getRemoteName(),
+                serverInstance.getRemoteKeyPath()
         );
 
-        redisService.storeValue(REDIS_KEY_SSH, sshInfoId.toString(), configString, REDIS_EXP_SSH);
+        redisService.storeValue(REDIS_KEY_SSH, serverInstanceId.toString(), configString, REDIS_EXP_SSH);
     }
 }

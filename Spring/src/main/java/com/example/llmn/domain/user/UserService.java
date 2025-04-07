@@ -10,11 +10,11 @@ import com.example.llmn.integration.email.model.EmailVerificationTemplate;
 import com.example.llmn.security.JWTProvider;
 import com.example.llmn.integration.email.EmailService;
 import com.example.llmn.domain.metric.MetricRepository;
-import com.example.llmn.domain.remote.SshInfo;
+import com.example.llmn.domain.remote.ServerInstance;
 import com.example.llmn.domain.alarm.AlarmRepository;
 import com.example.llmn.domain.project.ProjectRepository;
 import com.example.llmn.domain.remote.SecureShellManager;
-import com.example.llmn.domain.remote.SshInfoRepository;
+import com.example.llmn.domain.remote.ServerInstanceRepository;
 import com.example.llmn.domain.summary.SummaryRepository;
 import com.example.llmn.integration.redis.RedisService;
 import lombok.RequiredArgsConstructor;
@@ -42,7 +42,7 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
     private final UserRepository userRepository;
     private final ProjectRepository projectRepository;
-    private final SshInfoRepository sshInfoRepository;
+    private final ServerInstanceRepository serverInstanceRepository;
     private final MetricRepository metricRepository;
     private final AlarmRepository alarmRepository;
     private final OpenAiKeyService openAiKeyService;
@@ -59,8 +59,8 @@ public class UserService {
 
         User user = saveUser(requestDTO);
 
-        List<SshInfo> sshInfos = sshConfigService.createSshConfigurations(requestDTO.sshInfos(), user);
-        sshConfigService.setMonitoringTarget(requestDTO.monitoringSshHost(), sshInfos, user);
+        List<ServerInstance> serverInstances = sshConfigService.createSshConfigurations(requestDTO.sshInfos(), user);
+        sshConfigService.setMonitoringTarget(requestDTO.monitoringSshHost(), serverInstances, user);
 
         openAiKeyService.encryptAndSaveOpenAIKey(requestDTO.openAiKey(), user);
     }
@@ -85,14 +85,14 @@ public class UserService {
         userValidator.validateSshInfosNotEmpty(requestDTO.sshInfos());
         userValidator.validateMonitoringSshHostSelected(requestDTO);
 
-        List<SshInfo> sshInfos = sshInfoRepository.findByUserId(userId);
-        sshConfigService.updateExistingSshConfigurations(sshInfos, requestDTO.sshInfos());
-        List<SshInfo> newSshHosts = sshConfigService.addNewSshConfigurations(sshInfos, requestDTO.sshInfos(), user);
+        List<ServerInstance> serverInstances = serverInstanceRepository.findByUserId(userId);
+        sshConfigService.updateExistingSshConfigurations(serverInstances, requestDTO.sshInfos());
+        List<ServerInstance> newSshHosts = sshConfigService.addNewSshConfigurations(serverInstances, requestDTO.sshInfos(), user);
 
-        SshInfo monitoringSshInfo = findMonitoringSshInfo(sshInfos, newSshHosts, requestDTO.monitoringSshHost());
-        user.updateConfiguration(requestDTO.nickName(), requestDTO.receivingAlarm(), monitoringSshInfo.getId());
+        ServerInstance monitoringServerInstance = findMonitoringServerInstance(serverInstances, newSshHosts, requestDTO.monitoringSshHost());
+        user.updateConfiguration(requestDTO.nickName(), requestDTO.receivingAlarm(), monitoringServerInstance.getId());
 
-        cacheUserSshInfo(userId, monitoringSshInfo);
+        cacheUserSshInfo(userId, monitoringServerInstance);
     }
 
     @Transactional
@@ -100,8 +100,8 @@ public class UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new CustomException(ExceptionCode.USER_NOT_FOUND));
 
-        SshInfo monitoringSshInfo = sshConfigService.findMonitoringSshConfig(userId, monitoringSshHost);
-        user.updateMonitoringSshInfo(monitoringSshInfo.getId());
+        ServerInstance monitoringServerInstance = sshConfigService.findMonitoringSshConfig(userId, monitoringSshHost);
+        user.updateMonitoringServerInstance(monitoringServerInstance.getId());
     }
 
     @Transactional
@@ -123,7 +123,7 @@ public class UserService {
         projectRepository.deleteByUserId(userId);
         summaryRepository.deleteByUserId(userId);
         metricRepository.deleteByUserId(userId);
-        sshInfoRepository.deleteByUserId(userId);
+        serverInstanceRepository.deleteByUserId(userId);
 
         redisService.removeValue(REDIS_KEY_REFRESH_TOKEN, userId.toString());
 
@@ -175,21 +175,21 @@ public class UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new CustomException(ExceptionCode.USER_NOT_FOUND));
 
-        List<SshInfo> sshInfos = sshInfoRepository.findByUserId(userId);
-        SshInfo selectedSshInfo = sshInfos.stream()
-                .filter(sshInfo -> sshInfo.getId().equals(user.getMonitoringSshId()))
+        List<ServerInstance> serverInstances = serverInstanceRepository.findByUserId(userId);
+        ServerInstance selectedServerInstance = serverInstances.stream()
+                .filter(serverInstance -> serverInstance.getId().equals(user.getMonitoringSshId()))
                 .findFirst()
                 .orElseThrow(() -> new CustomException(ExceptionCode.MONITORING_SSH_NOT_FOUND));
 
-        return FindCloudInfoRes.from(sshInfos, selectedSshInfo);
+        return FindCloudInfoRes.from(serverInstances, selectedServerInstance);
     }
 
     public FindConfigurationInfoRes findConfigurationInfo(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new CustomException(ExceptionCode.USER_NOT_FOUND));
 
-        List<SshInfo> sshInfos = sshInfoRepository.findByUserId(userId);
-        return FindConfigurationInfoRes.from(user, sshInfos);
+        List<ServerInstance> serverInstances = serverInstanceRepository.findByUserId(userId);
+        return FindConfigurationInfoRes.from(user, serverInstances);
     }
 
     private User saveUser(JoinReq joinRequestDTO) {
@@ -207,19 +207,20 @@ public class UserService {
         redisService.storeValue(getCodeTypeKey(codeType), email, verificationCode, REDIS_EXP_VERIFICATION_CODE_MS);
     }
 
-    private SshInfo findMonitoringSshInfo(List<SshInfo> sshInfos, List<SshInfo> addedSshHosts, String monitoringSshHost) {
-        return sshInfos.stream()
-                .filter(sshInfo -> sshInfo.getRemoteHost().equals(monitoringSshHost))
+    private ServerInstance findMonitoringServerInstance(List<ServerInstance> serverInstances, List<ServerInstance> newServerInstances,
+                                                        String monitoringServerInstance) {
+        return serverInstances.stream()
+                .filter(serverInstance -> serverInstance.getRemoteHost().equals(monitoringServerInstance))
                 .findFirst()
-                .orElseGet(() -> addedSshHosts.stream()
-                        .filter(sshInfo -> sshInfo.getRemoteHost().equals(monitoringSshHost))
+                .orElseGet(() -> newServerInstances.stream()
+                        .filter(serverInstance -> serverInstance.getRemoteHost().equals(monitoringServerInstance))
                         .findFirst()
                         .orElseThrow(() -> new CustomException(ExceptionCode.MONITORING_SSH_NOT_SELECT))
                 );
     }
 
-    private void cacheUserSshInfo(Long userId, SshInfo monitoringSshInfo) {
-        String combinedInfo = String.join(DELIMITER, monitoringSshInfo.getRemoteHost(), monitoringSshInfo.getRemoteName(), monitoringSshInfo.getRemoteKeyPath());
+    private void cacheUserSshInfo(Long userId, ServerInstance monitoringServerInstance) {
+        String combinedInfo = String.join(DELIMITER, monitoringServerInstance.getRemoteHost(), monitoringServerInstance.getRemoteName(), monitoringServerInstance.getRemoteKeyPath());
         redisService.storeValue(REDIS_KEY_SSH, userId.toString(), combinedInfo, REDIS_EXP_SSH);
     }
 

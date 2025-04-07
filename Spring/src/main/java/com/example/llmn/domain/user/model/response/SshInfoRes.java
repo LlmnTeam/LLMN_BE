@@ -1,6 +1,6 @@
 package com.example.llmn.domain.user.model.response;
 
-import com.example.llmn.domain.remote.SshInfo;
+import com.example.llmn.domain.remote.ServerInstance;
 
 public record SshInfoRes(
         Long id,
@@ -9,13 +9,13 @@ public record SshInfoRes(
         String remoteKeyPath,
         boolean isWorking
 ) {
-    public static SshInfoRes from(SshInfo sshInfo) {
+    public static SshInfoRes from(ServerInstance serverInstance) {
         return new SshInfoRes(
-                sshInfo.getId(),
-                sshInfo.getRemoteName(),
-                sshInfo.getRemoteHost(),
-                sshInfo.getRemoteKeyPath(),
-                sshInfo.isWorking()
+                serverInstance.getId(),
+                serverInstance.getRemoteName(),
+                serverInstance.getRemoteHost(),
+                serverInstance.getRemoteKeyPath(),
+                serverInstance.isWorking()
         );
     }
 }

@@ -10,15 +10,15 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface SshInfoRepository extends JpaRepository<SshInfo, Long> {
+public interface ServerInstanceRepository extends JpaRepository<ServerInstance, Long> {
 
-    @Query("SELECT s FROM SshInfo s WHERE s.user.id = :userId")
-    List<SshInfo> findByUserId(@Param("userId") Long userId);
+    @Query("SELECT s FROM ServerInstance s WHERE s.user.id = :userId")
+    List<ServerInstance> findByUserId(@Param("userId") Long userId);
 
-    @Query("SELECT s.remoteHost FROM SshInfo s WHERE s.id = :id")
+    @Query("SELECT s.remoteHost FROM ServerInstance s WHERE s.id = :id")
     Optional<String> findHostById(@Param("id") Long id);
 
     @Modifying
-    @Query("DELETE FROM SshInfo s WHERE s.user.id = :userId")
+    @Query("DELETE FROM ServerInstance s WHERE s.user.id = :userId")
     void deleteByUserId(Long userId);
 }

@@ -1,7 +1,5 @@
 package com.example.llmn.domain.metric;
 
-import com.example.llmn.domain.user.User;
-import com.example.llmn.domain.user.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;

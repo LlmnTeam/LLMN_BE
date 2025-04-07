@@ -207,8 +207,8 @@ public class LogScheduler {
         return project.getProjectName() + LOG_UPDATE_ALARM_SUFFIX;
     }
 
-    private Optional<PerformanceSummaryRes> requestPerformanceSummary(Long sshInfoId, Long userId) {
-        FindMetricHistoryRes metricHistory = metricService.findHistoricalMetrics(DEFAULT_METRIC_HISTORY_HOURS, sshInfoId);
+    private Optional<PerformanceSummaryRes> requestPerformanceSummary(Long serverInstanceId, Long userId) {
+        FindMetricHistoryRes metricHistory = metricService.findHistoricalMetrics(DEFAULT_METRIC_HISTORY_HOURS, serverInstanceId);
 
         String formattedMetricData = formatPerformanceMetricsData(metricHistory);
         PerformanceSummaryRes summaryResponse = sendSummaryRequest(performanceSummaryServiceUrl, formattedMetricData, PerformanceSummaryRes.class, userId);

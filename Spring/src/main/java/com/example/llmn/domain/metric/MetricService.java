@@ -2,9 +2,9 @@ package com.example.llmn.domain.metric;
 
 import com.example.llmn.domain.metric.model.response.FindCurrentMetricRes;
 import com.example.llmn.domain.metric.model.response.FindMetricHistoryRes;
-import com.example.llmn.domain.remote.SshInfo;
+import com.example.llmn.domain.remote.ServerInstance;
 import com.example.llmn.domain.remote.SecureShellManager;
-import com.example.llmn.domain.remote.SshInfoRepository;
+import com.example.llmn.domain.remote.ServerInstanceRepository;
 import com.example.llmn.domain.user.UserRepository;
 import com.example.llmn.integration.redis.RedisService;
 import lombok.RequiredArgsConstructor;
@@ -30,25 +30,25 @@ public class MetricService {
 
     private final MetricRepository metricRepository;
     private final UserRepository userRepository;
-    private final SshInfoRepository sshInfoRepository;
+    private final ServerInstanceRepository serverInstanceRepository;
     private final RedisService redisService;
     private final SecureShellManager secureShellManager;
 
-    public FindCurrentMetricRes findCurrentMetricsForHost(Long sshInfoId) {
-        return retrieveMetricsFromCache(sshInfoId)
+    public FindCurrentMetricRes findCurrentMetricsForHost(Long serverInstanceId) {
+        return retrieveMetricsFromCache(serverInstanceId)
                 .orElseGet(() -> {
-                    Map<String, Double> cpuAndMemoryStats = gatherCpuAndMemoryData(sshInfoId);
-                    Map<String, Double> networkStats = gatherNetworkData(sshInfoId);
+                    Map<String, Double> cpuAndMemoryStats = gatherCpuAndMemoryData(serverInstanceId);
+                    Map<String, Double> networkStats = gatherNetworkData(serverInstanceId);
                     FindCurrentMetricRes metricRes = FindCurrentMetricRes.from(cpuAndMemoryStats, networkStats);
 
-                    storeCurrentMetricsInCache(sshInfoId, metricRes);
+                    storeCurrentMetricsInCache(serverInstanceId, metricRes);
                     return metricRes;
                 });
     }
 
-    public FindMetricHistoryRes findHistoricalMetrics(int minusHour, Long sshInfoId) {
+    public FindMetricHistoryRes findHistoricalMetrics(int minusHour, Long serverInstanceId) {
         LocalDateTime startTime = getCurrentHourStartMinusHours(minusHour);
-        List<Metric> metrics = metricRepository.findMetricsAfter(startTime, sshInfoId);
+        List<Metric> metrics = metricRepository.findMetricsAfter(startTime, serverInstanceId);
 
         return FindMetricHistoryRes.from(metrics);
     }
@@ -57,20 +57,20 @@ public class MetricService {
         return userRepository.findByMonitoringSshIdIsNotNull().stream()
                 .flatMap(user -> {
                     Long monitoringSshId = user.getMonitoringSshId();
-                    List<SshInfo> sshInfos = sshInfoRepository.findByUserId(user.getId());
+                    List<ServerInstance> serverInstances = serverInstanceRepository.findByUserId(user.getId());
 
-                    return sshInfos.stream()
-                            .filter(sshInfo -> sshInfo.isMonitoringSsh(monitoringSshId))
-                            .map(sshInfo -> Optional.ofNullable(gatherHostMetrics(sshInfo)))
+                    return serverInstances.stream()
+                            .filter(serverInstance -> serverInstance.isMonitoringServerInstance(monitoringSshId))
+                            .map(serverInstance -> Optional.ofNullable(gatherHostMetrics(serverInstance)))
                             .filter(Optional::isPresent)
                             .map(Optional::get);
                 })
                 .toList();
     }
 
-    private Metric gatherHostMetrics(SshInfo sshInfo) {
-        Map<String, Double> cpuAndMemoryStats = gatherCpuAndMemoryData(sshInfo.getId());
-        Map<String, Double> networkStats = gatherNetworkData(sshInfo.getId());
+    private Metric gatherHostMetrics(ServerInstance serverInstance) {
+        Map<String, Double> cpuAndMemoryStats = gatherCpuAndMemoryData(serverInstance.getId());
+        Map<String, Double> networkStats = gatherNetworkData(serverInstance.getId());
 
         if (hasNoValidMetricData(cpuAndMemoryStats, networkStats))
             return null;
@@ -78,7 +78,7 @@ public class MetricService {
         storeNetworkStatsInCache(networkStats);
 
         return Metric.builder()
-                .sshInfo(sshInfo)
+                .serverInstance(serverInstance)
                 .cpuUsage(cpuAndMemoryStats.get(KEY_CPU_USAGE))
                 .totalMemory(cpuAndMemoryStats.get(KEY_TOTAL_MEMORY))
                 .usedMemory(cpuAndMemoryStats.get(KEY_USED_MEMORY))
@@ -91,8 +91,8 @@ public class MetricService {
         return cpuAndMemoryStats.isEmpty() || networkStats.isEmpty();
     }
 
-    private Map<String, Double> gatherCpuAndMemoryData(Long sshInfoId) {
-        String topCommandOutput = secureShellManager.executeOneTimeCommand(CMD_CPU_MEMORY_STATS, sshInfoId);
+    private Map<String, Double> gatherCpuAndMemoryData(Long serverInstanceId) {
+        String topCommandOutput = secureShellManager.executeOneTimeCommand(CMD_CPU_MEMORY_STATS, serverInstanceId);
         String[] lines = topCommandOutput.split("\n");
 
         Map<String, Double> statsMap = new HashMap<>();
@@ -105,8 +105,8 @@ public class MetricService {
         return statsMap;
     }
 
-    private Map<String, Double> gatherNetworkData(Long sshInfoId) {
-        String networkCommandOutput = secureShellManager.executeOneTimeCommand(CMD_NETWORK_STATS, sshInfoId);
+    private Map<String, Double> gatherNetworkData(Long serverInstanceId) {
+        String networkCommandOutput = secureShellManager.executeOneTimeCommand(CMD_NETWORK_STATS, serverInstanceId);
         String[] lines = networkCommandOutput.split("\\n");
 
         Map<String, Double> currentNetworkStats = parseNetworkDataIntoMap(lines);
@@ -187,18 +187,18 @@ public class MetricService {
         return networkUsageMap;
     }
 
-    private Optional<FindCurrentMetricRes> retrieveMetricsFromCache(Long sshInfoId) {
-        String cachedMetricJson = redisService.getValueInString(REDIS_KEY_METRIC, sshInfoId.toString());
+    private Optional<FindCurrentMetricRes> retrieveMetricsFromCache(Long serverInstanceId) {
+        String cachedMetricJson = redisService.getValueInString(REDIS_KEY_METRIC, serverInstanceId.toString());
         if (cachedMetricJson == null)
             return Optional.empty();
 
         return Optional.ofNullable(convertJsonToMetricDTO(cachedMetricJson));
     }
 
-    private void storeCurrentMetricsInCache(Long sshInfoId, FindCurrentMetricRes metricRes) {
+    private void storeCurrentMetricsInCache(Long serverInstanceId, FindCurrentMetricRes metricRes) {
         String value = convertMetricDtoToJson(metricRes);
         if (isNotEmpty(value))
-            redisService.storeValue(REDIS_KEY_METRIC, sshInfoId.toString(), value, REDIS_EXP_METRIC_MS);
+            redisService.storeValue(REDIS_KEY_METRIC, serverInstanceId.toString(), value, REDIS_EXP_METRIC_MS);
     }
 
     private void storeNetworkStatsInCache(Map<String, Double> currentNetworkMetric) {

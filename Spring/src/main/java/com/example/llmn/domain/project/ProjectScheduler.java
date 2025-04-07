@@ -27,7 +27,7 @@ public class ProjectScheduler {
     @Transactional
     @Scheduled(cron = "0 8 * * * *")
     public void checkContainerStatus() {
-        List<Project> projects = projectRepository.findAllWithSshInfo();
+        List<Project> projects = projectRepository.findAllWithServerInstance();
         projects.forEach(project -> {
             ContainerStatus containerStatus = projectService.findContainerStatus(project.getContainerName(), project.getSshInfoId());
             project.updateContainerStatus(containerStatus);

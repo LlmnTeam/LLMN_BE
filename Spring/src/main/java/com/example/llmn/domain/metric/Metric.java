@@ -1,7 +1,7 @@
 package com.example.llmn.domain.metric;
 
 import com.example.llmn.common.entity.BaseEntity;
-import com.example.llmn.domain.remote.SshInfo;
+import com.example.llmn.domain.remote.ServerInstance;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -20,7 +20,7 @@ public class Metric extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "ssh_info_id")
-    private SshInfo sshInfo;
+    private ServerInstance serverInstance;
 
     @Column
     private Double cpuUsage;
@@ -38,8 +38,8 @@ public class Metric extends BaseEntity {
     private Double totalBytesSent;
 
     @Builder
-    public Metric(SshInfo sshInfo, Double cpuUsage, Double totalMemory, Double usedMemory, Double totalBytesReceived, Double totalBytesSent) {
-        this.sshInfo = sshInfo;
+    public Metric(ServerInstance serverInstance, Double cpuUsage, Double totalMemory, Double usedMemory, Double totalBytesReceived, Double totalBytesSent) {
+        this.serverInstance = serverInstance;
         this.cpuUsage = cpuUsage;
         this.totalMemory = totalMemory;
         this.usedMemory = usedMemory;

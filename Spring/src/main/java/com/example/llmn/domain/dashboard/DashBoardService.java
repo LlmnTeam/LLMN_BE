@@ -6,7 +6,7 @@ import com.example.llmn.domain.metric.model.response.FindMetricHistoryRes;
 import com.example.llmn.common.exceptions.CustomException;
 import com.example.llmn.common.exceptions.ExceptionCode;
 import com.example.llmn.domain.summary.SummaryType;
-import com.example.llmn.domain.remote.SshInfoRepository;
+import com.example.llmn.domain.remote.ServerInstanceRepository;
 import com.example.llmn.domain.summary.SummaryRepository;
 import com.example.llmn.domain.user.UserRepository;
 import com.example.llmn.domain.user.model.response.FindDashboardRes;
@@ -31,18 +31,18 @@ public class DashBoardService {
 
     private final SummaryRepository summaryRepository;
     private final UserRepository userRepository;
-    private final SshInfoRepository sshInfoRepository;
+    private final ServerInstanceRepository serverInstanceRepository;
     private final MetricService metricService;
 
     private static final String NO_SUMMARY_DATA = "요약된 내용이 존재하지 않습니다.";
 
     @Transactional
     public FindDashboardRes findDashboard(Long userId) {
-        Long sshInfoId = findMonitoringSshId(userId);
-        String remoteHost = findRemoteHost(sshInfoId);
+        Long serverInstanceId = findMonitoringSshId(userId);
+        String remoteHost = findRemoteHost(serverInstanceId);
 
-        FindCurrentMetricRes currentMetric = metricService.findCurrentMetricsForHost(sshInfoId);
-        FindMetricHistoryRes metricHistory = metricService.findHistoricalMetrics(24, sshInfoId);
+        FindCurrentMetricRes currentMetric = metricService.findCurrentMetricsForHost(serverInstanceId);
+        FindMetricHistoryRes metricHistory = metricService.findHistoricalMetrics(24, serverInstanceId);
 
         String hourlySummary = findLatestHourlySummary();
 
@@ -89,8 +89,8 @@ public class DashBoardService {
                 .orElseThrow(() -> new CustomException(ExceptionCode.USER_NOT_FOUND));
     }
 
-    private String findRemoteHost(Long sshInfoId) {
-        return sshInfoRepository.findHostById(sshInfoId)
+    private String findRemoteHost(Long serverInstanceId) {
+        return serverInstanceRepository.findHostById(serverInstanceId)
                 .orElseThrow(() -> new CustomException(ExceptionCode.SSH_NOT_FOUND));
     }
 

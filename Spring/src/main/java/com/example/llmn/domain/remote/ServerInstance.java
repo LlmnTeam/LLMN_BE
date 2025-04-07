@@ -12,7 +12,7 @@ import lombok.NoArgsConstructor;
 @Table(name = "ssh_tb")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Getter
-public class SshInfo extends BaseEntity {
+public class ServerInstance extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -35,7 +35,7 @@ public class SshInfo extends BaseEntity {
     private boolean isWorking;
 
     @Builder
-    public SshInfo(User user, String remoteHost, String remoteName, String remoteKeyPath) {
+    public ServerInstance(User user, String remoteHost, String remoteName, String remoteKeyPath) {
         this.user = user;
         this.remoteName = remoteName;
         this.remoteHost = remoteHost;
@@ -58,7 +58,7 @@ public class SshInfo extends BaseEntity {
         return user.getId();
     }
 
-    public boolean isMonitoringSsh(Long monitoringSshId) {
+    public boolean isMonitoringServerInstance(Long monitoringSshId) {
         return this.id.equals(monitoringSshId);
     }
 }

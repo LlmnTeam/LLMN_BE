@@ -7,9 +7,9 @@ import com.example.llmn.domain.log.LogService;
 import com.example.llmn.domain.project.model.request.CreateProjectReq;
 import com.example.llmn.domain.project.model.request.UpdateProjectReq;
 import com.example.llmn.domain.project.model.response.*;
-import com.example.llmn.domain.remote.SshInfo;
+import com.example.llmn.domain.remote.ServerInstance;
 import com.example.llmn.domain.summary.Summary;
-import com.example.llmn.domain.remote.SshInfoRepository;
+import com.example.llmn.domain.remote.ServerInstanceRepository;
 import com.example.llmn.domain.summary.SummaryRepository;
 import com.example.llmn.domain.user.User;
 import com.example.llmn.domain.docker.DockerService;
@@ -42,7 +42,7 @@ public class ProjectService {
     private final LogService logService;
     private final ProjectRepository projectRepository;
     private final SummaryRepository summaryRepository;
-    private final SshInfoRepository sshInfoRepository;
+    private final ServerInstanceRepository serverInstanceRepository;
     private final UserRepository userRepository;
 
     @Transactional
@@ -51,10 +51,10 @@ public class ProjectService {
         boolean isUrgent = containerStatus.isProjectUrgent();
 
         User user = userRepository.getReferenceById(userId);
-        SshInfo sshInfo = sshInfoRepository.getReferenceById(requestDTO.sshInfoId());
+        ServerInstance serverInstance = serverInstanceRepository.getReferenceById(requestDTO.sshInfoId());
         Project project = Project.builder()
                 .user(user)
-                .sshInfo(sshInfo)
+                .serverInstance(serverInstance)
                 .projectName(requestDTO.projectName())
                 .containerName(requestDTO.containerName())
                 .description(requestDTO.description())
@@ -69,13 +69,13 @@ public class ProjectService {
 
     @Transactional
     public void updateProject(UpdateProjectReq requestDTO, Long projectId, Long userId) {
-        Project project = projectRepository.findByIdWithUserAndSshInfo(projectId)
+        Project project = projectRepository.findByIdWithUserAndServerInstance(projectId)
                 .orElseThrow(() -> new CustomException(ExceptionCode.USER_NOT_FOUND));
 
         if (project.isNotOwnedBy(userId))
             throw new CustomException(ExceptionCode.USER_FORBIDDEN);
 
-        ContainerStatus containerStatus = findContainerStatus(requestDTO.containerName(), project.getSshInfo().getId());
+        ContainerStatus containerStatus = findContainerStatus(requestDTO.containerName(), project.getServerInstance().getId());
         project.updateProject(requestDTO.projectName(), requestDTO.containerName(), requestDTO.description(), containerStatus);
     }
 
@@ -103,12 +103,12 @@ public class ProjectService {
 
     @Transactional
     public FindCloudAndContainerInfoRes findCloudAndContainerInfo(Long userId) {
-        List<SshInfo> sshInfos = sshInfoRepository.findByUserId(userId);
-        List<CloudInstanceDTO> cloudInstanceDTOS = sshInfos.stream()
+        List<ServerInstance> serverInstances = serverInstanceRepository.findByUserId(userId);
+        List<ServerInstanceDTO> serverInstanceDTOS = serverInstances.stream()
                 .map(this::createCloudInstanceRes)
                 .toList();
 
-        return new FindCloudAndContainerInfoRes(cloudInstanceDTOS);
+        return new FindCloudAndContainerInfoRes(serverInstanceDTOS);
     }
 
     // 수정 시 사용할 API
@@ -116,15 +116,15 @@ public class ProjectService {
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new CustomException(ExceptionCode.USER_NOT_FOUND));
 
-        List<SshInfo> sshInfos = sshInfoRepository.findByUserId(userId);
-        List<ContainerDTO> selectableContainers = findSelectableContainers(sshInfos);
+        List<ServerInstance> serverInstances = serverInstanceRepository.findByUserId(userId);
+        List<ContainerDTO> selectableContainers = findSelectableContainers(serverInstances);
 
         return new FindProjectInfoByIdRes(project, selectableContainers);
     }
 
     @Transactional
     public FindProjectListRes findProjectList(Long userId, boolean isUsingCache) {
-        List<Project> projects = projectRepository.findByUserIdWithSshInfo(userId);
+        List<Project> projects = projectRepository.findByUserIdWithServerInstance(userId);
 
         Map<String, Map<String, String>> containersResourceMap = dockerService.findContainersResourceUsage(projects, userId, isUsingCache);
         List<String> runningContainers = new ArrayList<>(containersResourceMap.keySet());
@@ -134,7 +134,7 @@ public class ProjectService {
     }
 
     public FindProjectByIdRes findProjectById(Long projectId) {
-        Project project = projectRepository.findByIdWithSshInfo(projectId)
+        Project project = projectRepository.findByIdWithServerInstance(projectId)
                 .orElseThrow(() -> new CustomException(ExceptionCode.USER_NOT_FOUND));
 
         String recentLog = logService.findLatestTwoLogs(project.getContainerName(), project.getSshInfoRemoteHost());
@@ -161,7 +161,7 @@ public class ProjectService {
     }
 
     public FindProjectLogListRes findProjectLogList(Long projectId) {
-        Project project = projectRepository.findByIdWithSshInfo(projectId)
+        Project project = projectRepository.findByIdWithServerInstance(projectId)
                 .orElseThrow(() -> new CustomException(ExceptionCode.PROJECT_NOT_FOUND));
 
         List<String> logFileList = logService.findLogFilesByContainerName(project.getContainerName(), project.getSshInfoRemoteHost());
@@ -189,23 +189,23 @@ public class ProjectService {
         return requestDTO.containerName() != null ? ContainerStatus.NOT_WORKING : ContainerStatus.NOT_CONNECTED;
     }
 
-    private CloudInstanceDTO createCloudInstanceRes(SshInfo sshInfo) {
-        String cloudName = getCloudName(sshInfo);
-        List<ContainerDTO> runningContainerResList = dockerService.findRunningContainerList(sshInfo.getId()).stream()
+    private ServerInstanceDTO createCloudInstanceRes(ServerInstance serverInstance) {
+        String cloudName = getCloudName(serverInstance);
+        List<ContainerDTO> runningContainerResList = dockerService.findRunningContainerList(serverInstance.getId()).stream()
                 .map(ContainerDTO::new)
                 .toList();
 
-        return new CloudInstanceDTO(cloudName, sshInfo.getId(), runningContainerResList);
+        return new ServerInstanceDTO(cloudName, serverInstance.getId(), runningContainerResList);
     }
 
-    private String getCloudName(SshInfo sshInfo) {
-        String remoteName = sshInfo.getRemoteName() != null ? sshInfo.getRemoteName() : "Unknown Name";
-        String remoteHost = sshInfo.getRemoteHost() != null ? sshInfo.getRemoteHost() : "Unknown Host";
+    private String getCloudName(ServerInstance serverInstance) {
+        String remoteName = serverInstance.getRemoteName() != null ? serverInstance.getRemoteName() : "Unknown Name";
+        String remoteHost = serverInstance.getRemoteHost() != null ? serverInstance.getRemoteHost() : "Unknown Host";
         return String.format("%s (%s)", remoteName, remoteHost);
     }
 
-    private List<ContainerDTO> findSelectableContainers(List<SshInfo> sshInfos) {
-        return sshInfos.stream()
+    private List<ContainerDTO> findSelectableContainers(List<ServerInstance> serverInstances) {
+        return serverInstances.stream()
                 .flatMap(sshInfo -> dockerService.findRunningContainerList(sshInfo.getId()).stream())
                 .map(ContainerDTO::new)
                 .toList();

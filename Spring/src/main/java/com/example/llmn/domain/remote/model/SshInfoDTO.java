@@ -1,16 +1,16 @@
 package com.example.llmn.domain.remote.model;
 
-import com.example.llmn.domain.remote.SshInfo;
+import com.example.llmn.domain.remote.ServerInstance;
 
 public record SshInfoDTO(String remoteHost,
                          String remoteName,
                          String remoteKeyPath) {
 
-    public SshInfoDTO(SshInfo sshInfo) {
+    public SshInfoDTO(ServerInstance serverInstance) {
         this(
-                sshInfo.getRemoteHost(),
-                sshInfo.getRemoteName(),
-                sshInfo.getRemoteKeyPath()
+                serverInstance.getRemoteHost(),
+                serverInstance.getRemoteName(),
+                serverInstance.getRemoteKeyPath()
         );
     }
 }

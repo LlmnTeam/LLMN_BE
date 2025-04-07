@@ -1,6 +1,6 @@
 package com.example.llmn.domain.user.model.response;
 
-import com.example.llmn.domain.remote.SshInfo;
+import com.example.llmn.domain.remote.ServerInstance;
 import com.example.llmn.domain.user.User;
 
 import java.util.List;
@@ -12,8 +12,8 @@ public record FindConfigurationInfoRes(
         Long monitoringSshId,
         boolean receivingAlarm
 ) {
-    public static FindConfigurationInfoRes from(User user, List<SshInfo> sshInfos) {
-        List<SshInfoRes> sshInfoResList = sshInfos.stream()
+    public static FindConfigurationInfoRes from(User user, List<ServerInstance> serverInstances) {
+        List<SshInfoRes> sshInfoResList = serverInstances.stream()
                 .map(SshInfoRes::from)
                 .collect(Collectors.toList());
 
