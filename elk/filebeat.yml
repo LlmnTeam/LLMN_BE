@@ -15,4 +15,4 @@ processors:
         ip: '${SERVER_IP:}'  # 환경 변수에서 서버 IP를 가져옴, 없으면 빈 값
       
 output.logstash:
-  hosts: ["15.164.216:5044"] # ElasticSearch가 있는 서버 IP
+  hosts: ["{ip 주소}:5044"] # ElasticSearch가 있는 서버 IP

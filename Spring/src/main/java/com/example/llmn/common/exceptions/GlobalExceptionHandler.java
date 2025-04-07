@@ -16,17 +16,16 @@ import java.io.IOException;
 
 @ControllerAdvice
 public class GlobalExceptionHandler {
+
     @ExceptionHandler(CustomException.class)
     public ResponseEntity<?> customError(CustomException e) {
-        return new ResponseEntity<>(e.body(), e.status());
+        return ResponseEntity.badRequest().body(ApiUtils.error(e.getMessage(), HttpStatus.BAD_REQUEST));
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<?> unknownServerError(Exception e){
-        String message = e.getMessage();
-        ApiUtils.ApiResult<?> apiResult = ApiUtils.error(message, HttpStatus.INTERNAL_SERVER_ERROR);
         e.printStackTrace(); // 콘솔에 찍기
-        return new ResponseEntity<>(apiResult, HttpStatus.INTERNAL_SERVER_ERROR);
+        return ResponseEntity.internalServerError().body(ApiUtils.error(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -48,9 +47,8 @@ public class GlobalExceptionHandler {
                 errorMessage = "유효하지 않은 값입니다. 허용된 값은 " + enumValues + " 입니다.";
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiUtils.error(errorMessage, HttpStatus.BAD_REQUEST));
             }
-        } else if (ex.getMessage().contains("Required request body is missing")) {
+        } else if (ex.getMessage().contains("Required request body is missing"))
             errorMessage = "요청 본문이 누락되었습니다.";
-        }
 
         return ResponseEntity.badRequest().body(ApiUtils.error(errorMessage, HttpStatus.BAD_REQUEST));
     }
@@ -58,13 +56,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MissingServletRequestParameterException.class)
     public ResponseEntity<?> handleMissingServletRequestParameterException(MissingServletRequestParameterException ex) {
         String errorMessage = "요청 파라미터 " + ex.getParameterName() + "가 누락되었습니다.";
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiUtils.error(errorMessage, HttpStatus.BAD_REQUEST));
+        return ResponseEntity.badRequest().body(ApiUtils.error(errorMessage, HttpStatus.BAD_REQUEST));
     }
 
-    // IOException 처리
     @ExceptionHandler(IOException.class)
     public ResponseEntity<?> handleIOException(IOException ex) {
         String errorMessage = "입출력 오류가 발생했습니다: " + ex.getMessage();
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ApiUtils.error(errorMessage, HttpStatus.INTERNAL_SERVER_ERROR));
+        return ResponseEntity.internalServerError().body(ApiUtils.error(errorMessage, HttpStatus.INTERNAL_SERVER_ERROR));
     }
 }

@@ -80,6 +80,24 @@ public class ElasticSearchService {
         }
     }
 
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public List<Map<String, Object>> convertSearchResultToMap(SearchResponse<Map> searchResponse) {
+        if (searchResponse.hits() == null || searchResponse.hits().hits() == null)
+            return Collections.emptyList();
+
+        return searchResponse
+                .hits().hits().stream()
+                .map(hit -> {
+                    Map<String, Object> map = hit.source();
+                    if (map != null)
+                        map.put(ES_FIELD_ID, hit.id());
+
+                    return map;
+                })
+                .filter(Objects::nonNull)
+                .toList();
+    }
+
     private SearchRequest buildUnprocessedDocsSearchRequest(String index, int size) {
         return new SearchRequest.Builder()
                 .index(index)

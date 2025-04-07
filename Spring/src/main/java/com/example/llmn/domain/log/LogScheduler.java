@@ -9,8 +9,6 @@ import com.example.llmn.domain.metric.MetricService;
 import com.example.llmn.domain.metric.model.response.*;
 import com.example.llmn.domain.openai.OpenAiKeyService;
 import com.example.llmn.domain.project.Project;
-import com.example.llmn.domain.remote.SshInfo;
-import com.example.llmn.domain.remote.SshInfoRepository;
 import com.example.llmn.domain.summary.Summary;
 import com.example.llmn.domain.summary.SummaryType;
 import com.example.llmn.domain.project.ProjectRepository;
@@ -84,7 +82,7 @@ public class LogScheduler {
                 MAX_LOG_RECORDS_PER_QUERY
         );
 
-        List<Map<String, Object>> rawLogDocuments = logService.convertElasticsearchResultToLogMap(searchResponse);
+        List<Map<String, Object>> rawLogDocuments = elasticSearchService.convertSearchResultToMap(searchResponse);
         List<Map<String, Object>> processedLogs = logService.standardizeLogFields(rawLogDocuments);
 
         elasticSearchService.updateDocuments(getCurrentLogIndexName(), processedLogs, elasticsearchUri);
@@ -183,7 +181,7 @@ public class LogScheduler {
     }
 
     private Optional<SummaryRes> requestLogSummaryFromService(String containerName, Long userId) {
-        String recentLogContent = logService.findRecentLogs(containerName, elasticsearchUri);
+        String recentLogContent = logService.findLogsWithinLast30Minutes(containerName, elasticsearchUri);
 
         String formattedLogData = formatLogSummaryRequestData(containerName, recentLogContent);
         SummaryRes summaryResponse = sendSummaryRequest(logSummaryServiceUrl, formattedLogData, SummaryRes.class, userId);

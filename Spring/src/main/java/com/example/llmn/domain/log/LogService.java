@@ -36,10 +36,6 @@ public class LogService {
 
     private final ElasticSearchService elasticSearchService;
 
-    private static final String CONTAINER_NAME_FIELD = "name";
-    private static final String UNKNOWN_CONTAINER = "unknown_container";
-    private static final String UNKNOWN_SERVER_IP = "unknown";
-
     @SuppressWarnings("rawtypes")
     public List<LogDataDTO> searchLog(Instant startTime, Instant endTime, String logLevel, String containerName,
                                       String serverIp, String elasticSearchHost) {
@@ -57,43 +53,18 @@ public class LogService {
         return mapSearchResultsToLogDTOs(response);
     }
 
-    public String findRecentLogs(String containerName, String serverIp) {
+    public String findLogsWithinLast30Minutes(String containerName, String serverIp) {
         return findLatestLogFile(containerName, serverIp)
                 .map(FileUtils::readFileAsString)
                 .map(this::extractRecentLogsFromContent)
                 .orElse(BLANK_STRING);
     }
 
-    public String findRecentLog( String containerName, String serverIp) {
-        String finalServerIp = serverIp.replace(".", "-"); // 파일명에 맞게 IP 형식 변환
-
-        String latestLogFile = findTextFiles(LOGS_DIRECTORY).stream()
-                .filter(logFile -> logFile.startsWith(containerName + "-" + finalServerIp + LOG_FILE_NAME_SUFFIX))
-                .max(this::compareLogFileDates) // 최신 파일 찾기
-                .orElse(null);
-
-        if (latestLogFile == null)
-            return BLANK_STRING;
-
-        return parseLastTwoLogs(readFileAsString(latestLogFile));
-    }
-
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    public List<Map<String, Object>> convertElasticsearchResultToLogMap(SearchResponse<Map> searchResponse){
-        if (searchResponse.hits() == null || searchResponse.hits().hits() == null)
-            return Collections.emptyList();
-
-        return searchResponse
-                .hits().hits().stream()
-                .map(hit -> {
-                    Map<String, Object> logMap = hit.source();
-                    if (logMap != null)
-                        logMap.put(ES_FIELD_ID, hit.id());
-
-                    return logMap;
-                })
-                .filter(Objects::nonNull)
-                .toList();
+    public String findLatestTwoLogs(String containerName, String serverIp) {
+        return findLatestLogFile(containerName, serverIp)
+                .map(FileUtils::readFileAsString)
+                .map(this::parseLastTwoLogs)
+                .orElse(BLANK_STRING);
     }
 
     public List<Map<String, Object>> standardizeLogFields(List<Map<String, Object>> logDocuments) {
@@ -239,9 +210,7 @@ public class LogService {
 
     private Optional<String> findLatestLogFile(String containerName, String serverIp) {
         List<String> logFiles = findTextFiles(LOGS_DIRECTORY);
-        String filePrefix = serverIp != null ?
-                containerName + "-" + serverIp.replace(".", "-") + "-log" :
-                containerName + "-";
+        String filePrefix = containerName + "-" + serverIp.replace(".", "-") + LOG_FILE_NAME_SUFFIX;
 
         return logFiles.stream()
                 .filter(logFile -> logFile.startsWith(filePrefix))
@@ -276,19 +245,9 @@ public class LogService {
     }
 
     private boolean isLogWithinTimeFrame(String log, LocalDateTime cutoffTime) {
-        String logTimestamp = extractTimestampFromLog(log);
+        String logTimestamp = log.substring(1, 17);
         LocalDateTime logTime = LocalDateTime.parse(logTimestamp, LOG_TEXT_FORMATTER);
         return logTime.isAfter(cutoffTime);
-    }
-
-    private String extractTimestampFromLog(String log) {
-        return log.substring(1, 17);
-    }
-
-    private int compareLogFileDates(String file1, String file2) {
-        LocalDateTime fileDateTime1 = parseDateTimeFromLogFile(file1);
-        LocalDateTime fileDateTime2 = parseDateTimeFromLogFile(file2);
-        return fileDateTime1.compareTo(fileDateTime2);
     }
 
     private String parseLastTwoLogs(String logContent) {

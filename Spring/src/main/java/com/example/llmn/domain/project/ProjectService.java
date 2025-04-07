@@ -137,7 +137,7 @@ public class ProjectService {
         Project project = projectRepository.findByIdWithSshInfo(projectId)
                 .orElseThrow(() -> new CustomException(ExceptionCode.USER_NOT_FOUND));
 
-        String recentLog = logService.findRecentLog(project.getContainerName(), project.getSshInfoRemoteHost());
+        String recentLog = logService.findLatestTwoLogs(project.getContainerName(), project.getSshInfoRemoteHost());
 
         Optional<Summary> latestSummaryOP = findLatestSummary(project);
         String summaryContent = getContentFromSummary(latestSummaryOP);
