@@ -126,7 +126,6 @@ public class SecureShellClient implements AutoCloseable {
                 closeQuietly(); // 기존 자원 정리
                 applyReconnectionDelay(attempt);  // 지수 백오프 지연 적용 (첫 시도는 지연 없음)
                 establishConnection(); // 연결 재수립
-
                 return true;
             } catch (Exception e) {
                 log.error("<SSHD> 연결 재시도 실패: {}", e.getMessage());
@@ -260,7 +259,6 @@ public class SecureShellClient implements AutoCloseable {
 
         while (isWithinTimeout(startTime)) {
             readAndAppendAvailableOutput(output);
-
             if (hasOutputAndCommandComplete(output)) {
                 return output.toString();
             }
@@ -385,12 +383,12 @@ public class SecureShellClient implements AutoCloseable {
     private void closeResource(Object resource, String resourceName) {
         if (resource == null) return;
         try {
-            if (resource instanceof AutoCloseable) {
-                ((AutoCloseable) resource).close();
-            } else if (resource instanceof ClientChannel) {
-                ((ClientChannel) resource).close(false);
-            } else if (resource instanceof ClientSession) {
-                ((ClientSession) resource).close(false);
+            if (resource instanceof ClientChannel channel) {
+                channel.close(false);
+            } else if (resource instanceof ClientSession session) {
+                session.close(false);
+            } else if (resource instanceof AutoCloseable autoCloseable) {
+                autoCloseable.close();
             }
         } catch (Exception e) {
             log.debug("<SSHD> 닫기 실패 {}: {}", resourceName, e.getMessage());
@@ -399,17 +397,13 @@ public class SecureShellClient implements AutoCloseable {
 
     private void logConnectionFailure(Exception e) {
         if (e instanceof java.net.ConnectException) {
-            log.error("<SSHD> 서버에 연결할 수 없습니다: 호스트={}, 포트={}",
-                    connectionConfig.getHost(), SSH_PORT);
+            log.error("<SSHD> 서버에 연결할 수 없습니다: 호스트={}, 포트={}", connectionConfig.getHost(), SSH_PORT);
         } else if (e instanceof java.net.SocketTimeoutException) {
-            log.error("<SSHD> 연결 시간 초과: 호스트={}, 제한 시간={}초",
-                    connectionConfig.getHost(), SSH_CONNECTION_TIMEOUT);
+            log.error("<SSHD> 연결 시간 초과: 호스트={}, 제한 시간={}초", connectionConfig.getHost(), SSH_CONNECTION_TIMEOUT);
         } else if (e.getMessage() != null && e.getMessage().contains("Auth fail")) {
-            log.error("<SSHD> 인증 실패: 사용자명={}, 키 경로={}",
-                    connectionConfig.getUsername(), connectionConfig.getPrivateKeyPath());
+            log.error("<SSHD> 인증 실패: 사용자명={}, 키 경로={}", connectionConfig.getUsername(), connectionConfig.getPrivateKeyPath());
         } else {
-            log.error("<SSHD> SSH 세션 연결 실패: 호스트={}, 사용자명={}",
-                    connectionConfig.getHost(), connectionConfig.getUsername(), e);
+            log.error("<SSHD> SSH 세션 연결 실패: 호스트={}, 사용자명={}", connectionConfig.getHost(), connectionConfig.getUsername(), e);
         }
     }
 }
