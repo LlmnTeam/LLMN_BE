@@ -255,31 +255,32 @@ public class SecureShellClient implements AutoCloseable {
     }
 
     private String readShellOutput() throws IOException, InterruptedException {
-        StringBuilder outputBuilder = new StringBuilder();
+        StringBuilder output = new StringBuilder();
         long startTime = System.currentTimeMillis();
 
-        while (System.currentTimeMillis() - startTime < COMMAND_TIMEOUT) {
-            readAndAppendAvailableOutput(outputBuilder);
+        while (isWithinTimeout(startTime)) {
+            readAndAppendAvailableOutput(output);
 
-            if (!outputBuilder.isEmpty() && isCommandExecutionCompleted(outputBuilder.toString()))
-                return outputBuilder.toString();
-
-            // 새로운 데이터가 없더라도, 누적된 출력이 있는 경우 재확인
-            if (!outputBuilder.isEmpty()) {
-                Thread.sleep(POLLING_INTERVAL_MS / 2);
-                if (isCommandExecutionCompleted(outputBuilder.toString())) {
-                    return outputBuilder.toString();
-                }
+            if (hasOutputAndCommandComplete(output)) {
+                return output.toString();
             }
 
             Thread.sleep(POLLING_INTERVAL_MS); // 정해진 간격만큼 대기 후 다음 루프 실행
         }
 
-        if (!outputBuilder.isEmpty()) {
-            return outputBuilder + "\n[명령어 실행 시간 초과]";
+        if (!output.isEmpty()) {
+            return output + "\n[명령어 실행 시간 초과]";
         }
 
         throw new CustomException(ExceptionCode.SSH_COMMAND_TIMEOUT);
+    }
+
+    private boolean isWithinTimeout(long startTime) {
+        return System.currentTimeMillis() - startTime < COMMAND_TIMEOUT;
+    }
+
+    private boolean hasOutputAndCommandComplete(StringBuilder output) {
+        return !output.isEmpty() && isCommandExecutionCompleted(output.toString());
     }
 
     private void readAndAppendAvailableOutput(StringBuilder outputBuilder) throws IOException {
