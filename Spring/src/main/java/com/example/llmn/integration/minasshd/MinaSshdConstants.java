@@ -1,5 +1,7 @@
 package com.example.llmn.integration.minasshd;
 
+import java.util.regex.Pattern;
+
 public class MinaSshdConstants {
 
     private MinaSshdConstants() {}
@@ -47,4 +49,12 @@ public class MinaSshdConstants {
     public static final int MAX_RECONNECT_ATTEMPTS = 5;
     public static final long INITIAL_RECONNECT_DELAY = 1000; // 1초
     public static final long MAX_RECONNECT_DELAY = 30000; // 최대 30초 지연
+
+    public static final Pattern[] SHELL_PROMPT_PATTERNS = {
+            Pattern.compile("[$#>]\\s*$"),              // 기본 프롬프트
+            Pattern.compile("@.*:.*[#$]\\s*$"),         // 사용자@호스트:경로$ 형식
+            Pattern.compile("\\]\\$\\s*$"),             // ]$ 형식
+            Pattern.compile("\\}\\s*$"),                // 중괄호 형식(zsh)
+            Pattern.compile("\\d+>\\s*$")               // 숫자> 형식
+    };
 }

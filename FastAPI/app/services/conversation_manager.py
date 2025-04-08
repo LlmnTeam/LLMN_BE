@@ -75,11 +75,11 @@ class ConversationManager:
             if num_messages_to_summarize <= 0:
                 return
             
-            # 오래된 메시지 추출 및 요약
+            # 오래된 메시지 추출
             messages_to_summarize = r.lrange(self.conversation_key, 0, num_messages_to_summarize - 1)
             conversation_text = "\n".join(messages_to_summarize)
             
-            # 요약 생성 및 저장
+            # 요약 생성
             summarization_prompt = self._create_summarization_prompt(conversation_text)
             summary_text = self._generate_summary_text(summarization_prompt, api_key)
             

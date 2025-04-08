@@ -261,13 +261,13 @@ public class SecureShellClient implements AutoCloseable {
         while (System.currentTimeMillis() - startTime < COMMAND_TIMEOUT) {
             readAndAppendAvailableOutput(outputBuilder);
 
-            if (!outputBuilder.isEmpty() && isCommandPromptReady(outputBuilder.toString()))
+            if (!outputBuilder.isEmpty() && isCommandExecutionCompleted(outputBuilder.toString()))
                 return outputBuilder.toString();
 
             // 새로운 데이터가 없더라도, 누적된 출력이 있는 경우 재확인
             if (!outputBuilder.isEmpty()) {
                 Thread.sleep(POLLING_INTERVAL_MS / 2);
-                if (isCommandPromptReady(outputBuilder.toString())) {
+                if (isCommandExecutionCompleted(outputBuilder.toString())) {
                     return outputBuilder.toString();
                 }
             }
@@ -281,7 +281,6 @@ public class SecureShellClient implements AutoCloseable {
 
         throw new CustomException(ExceptionCode.SSH_COMMAND_TIMEOUT);
     }
-
 
     private void readAndAppendAvailableOutput(StringBuilder outputBuilder) throws IOException {
         // shellOutputStream에 데이터가 있는 동안 반복하여 읽는다.
@@ -355,7 +354,7 @@ public class SecureShellClient implements AutoCloseable {
         return stream.toString(StandardCharsets.UTF_8);
     }
 
-    private boolean isCommandPromptReady(String result) {
+    private boolean isCommandExecutionCompleted(String result) {
         // 기본 셸 프롬프트 패턴들
         if (result.matches(".*[$#>]\\s*$") ||
                 result.contains(SHELL_PROMPT_UBUNTU) ||
@@ -363,15 +362,7 @@ public class SecureShellClient implements AutoCloseable {
             return true;
         }
 
-        // 추가 셸 프롬프트 패턴들
-        Pattern[] promptPatterns = {
-                Pattern.compile(".*@.*:.*[#$]\\s*$"), // 사용자@호스트:경로$ 형식
-                Pattern.compile(".*\\]\\$\\s*$"),     // ]$ 형식
-                Pattern.compile(".*\\}\\s*$"),        // 중괄호로 끝나는 프롬프트(zsh)
-                Pattern.compile(".*\\d+>\\s*$")       // 숫자> 형식
-        };
-
-        for (Pattern pattern : promptPatterns) {
+        for (Pattern pattern : SHELL_PROMPT_PATTERNS) {
             if (pattern.matcher(result).find()) {
                 return true;
             }

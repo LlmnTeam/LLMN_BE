@@ -59,7 +59,6 @@ async def generate_streaming_response(
 ) -> AsyncGenerator[str, None]:
     
     response_chunks: List[str] = []
-    
     try:
         # 응답을 실시간 스트리밍으로 전달
         async for chunk in rag_service.generate_text_streaming(question):
