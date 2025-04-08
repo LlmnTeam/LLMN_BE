@@ -163,7 +163,6 @@ public class LogService {
                 String formattedLogEntry = formatLogEntry(logEntry, timestamp);
                 writer.write(formattedLogEntry);
                 writer.newLine();
-                writer.newLine();
             }
         } catch (IOException e) {
             log.error("로그 파일에 기록하는 중 오류 발생", e);

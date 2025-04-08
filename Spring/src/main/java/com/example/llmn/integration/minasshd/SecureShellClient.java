@@ -37,6 +37,7 @@ public class SecureShellClient implements AutoCloseable {
     private OutputStream shellInputStream;
     private InputStream shellOutputStream;
     private Jedis redisClient;
+
     private final SshConnectionConfig connectionConfig;
     private final byte[] outputBuffer;
 
