@@ -149,7 +149,24 @@ public class MetricService {
         if (cpuMatcher.matches()) {
             Double userCpuUsage = Double.parseDouble(cpuMatcher.group(1));
             Double systemCpuUsage = Double.parseDouble(cpuMatcher.group(2));
-            Double totalCpuUsage = userCpuUsage + systemCpuUsage;
+            Double niceCpuUsage = Double.parseDouble(cpuMatcher.group(3));
+            Double idleCpuUsage = Double.parseDouble(cpuMatcher.group(4));
+            Double iowaitCpuUsage = Double.parseDouble(cpuMatcher.group(5));
+            Double hiCpuUsage = Double.parseDouble(cpuMatcher.group(6));
+            Double siCpuUsage = Double.parseDouble(cpuMatcher.group(7));
+            Double stealCpuUsage = Double.parseDouble(cpuMatcher.group(8));
+
+            cpuStatMap.put(KEY_CPU_USER, userCpuUsage);
+            cpuStatMap.put(KEY_CPU_SYSTEM, systemCpuUsage);
+            cpuStatMap.put(KEY_CPU_NICE, niceCpuUsage);
+            cpuStatMap.put(KEY_CPU_IDLE, idleCpuUsage);
+            cpuStatMap.put(KEY_CPU_IOWAIT, iowaitCpuUsage);
+            cpuStatMap.put(KEY_CPU_HI, hiCpuUsage);
+            cpuStatMap.put(KEY_CPU_SI, siCpuUsage);
+            cpuStatMap.put(KEY_CPU_STEAL, stealCpuUsage);
+
+            // 총 CPU 사용량 계산 (idle을 제외한 모든 상태의 합)
+            Double totalCpuUsage = 100.0 - idleCpuUsage;
             cpuStatMap.put(KEY_CPU_USAGE, totalCpuUsage);
         }
 
