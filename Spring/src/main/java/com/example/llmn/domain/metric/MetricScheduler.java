@@ -16,7 +16,7 @@ public class MetricScheduler {
     private final MetricRepository metricRepository;
     private final MetricService metricService;
 
-    @Scheduled(cron = "0 0/10 * * * *")
+    @Scheduled(cron = "0 0/10 * * * ?")
     @Transactional
     public void scheduleSystemMetricsCollection() {
         List<Metric> allMetrics = metricService.gatherMetricsForUsers();

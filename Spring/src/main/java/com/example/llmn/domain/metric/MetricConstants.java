@@ -26,14 +26,17 @@ public class MetricConstants {
     public static final String KEY_AVAILABLE_MEMORY = "availableMemory";
     public static final String KEY_MEMORY_USAGE_PERCENT = "memoryUsagePercent";
 
-    public static final String KEY_NETWORK_RECEIVED = "networkReceived";
-    public static final String KEY_NETWORK_SENT = "networkSent";
+    public static final String KEY_NETWORK_RECEIVED_DELTA_MB = "receivedDeltaMB";
+    public static final String KEY_NETWORK_SENT_PER_DELTA_MB = "sentDeltaMB";
+    public static final String KEY_NETWORK_RECEIVED_PER_MIN = "networkReceived";
+    public static final String KEY_NETWORK_SENT_PER_MIN = "networkSent";
 
     // 시스템 명령어
     public static final String CMD_CPU_MEMORY_STATS = "top -b -n1 | grep \"Cpu(s)\\|Mem\"";
     public static final String CMD_NETWORK_STATS = "cat /proc/net/dev";
 
     // 출력 파싱을 위한 정규식 패턴
+    public static final Pattern NET_IFACE_PATTERN = Pattern.compile("^(eth\\S*|ens\\S*|enp\\S*|wlan\\S*):.*");
     public static final Pattern PATTERN_CPU_LINE = Pattern.compile(
             "%Cpu\\(s\\):\\s+([\\d.]+)\\s+us," +
                     "\\s+([\\d.]+)\\s+sy," +               // group(2)
@@ -45,14 +48,8 @@ public class MetricConstants {
                     "\\s+([\\d.]+)\\s+st"
     );
 
-    public static final Pattern PATTERN_NETWORK_INTERFACE = Pattern.compile("^(eth|ens|enp|wlan)\\S*:"); // 주요 네트워크 인터페이스 패턴
-
     public static final Pattern PATTERN_MEM_LINE = Pattern.compile("MiB Mem :\\s+([\\d.]+)\\s+total,\\s+([\\d.]+)\\s+free,\\s+([\\d.]+)\\s+used,\\s+([\\d.]+)\\s+buff/cache.*");
     public static final Pattern PATTERN_SWAP_LINE = Pattern.compile("MiB Swap:.*?([\\d.]+)\\s+avail Mem.*");
 
-    public static final double DEFAULT_ZERO_VALUE = 0.0;
     public static final double BYTES_TO_MB_DIVISOR = 1024.0 * 1024.0;
-
-    public static final int NETWORK_RECEIVED_BYTES_INDEX = 1;
-    public static final int NETWORK_SENT_BYTES_INDEX = 9;
 }

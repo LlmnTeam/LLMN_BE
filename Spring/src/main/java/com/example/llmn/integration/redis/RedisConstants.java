@@ -29,4 +29,8 @@ public class RedisConstants {
 
     public static final int MAX_REDIS_PUBLISH_RETRIES = 3; // 재시도 횟수 줄임
     public static final long REDIS_RETRY_DELAY = 200; // 고정 지연 시간
+
+    public static final String REDIS_KEY_NETWORK_RX = "networkRx";
+    public static final String REDIS_KEY_NETWORK_TX = "networkTx";
+    public static final String REDIS_KEY_NETWORK_TIME = "networkTime";
 }

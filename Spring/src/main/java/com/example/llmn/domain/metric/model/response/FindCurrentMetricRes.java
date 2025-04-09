@@ -18,8 +18,8 @@ public record FindCurrentMetricRes(
                 cpuAndMemoryMetrics.getOrDefault(KEY_CPU_USAGE, DEFAULT_METRIC_VALUE),
                 cpuAndMemoryMetrics.getOrDefault(KEY_TOTAL_MEMORY, DEFAULT_METRIC_VALUE),
                 cpuAndMemoryMetrics.getOrDefault(KEY_USED_MEMORY, DEFAULT_METRIC_VALUE),
-                networkMetrics.getOrDefault(KEY_NETWORK_RECEIVED, DEFAULT_METRIC_VALUE),
-                networkMetrics.getOrDefault(KEY_NETWORK_SENT, DEFAULT_METRIC_VALUE)
+                networkMetrics.getOrDefault(KEY_NETWORK_RECEIVED_PER_MIN, DEFAULT_METRIC_VALUE),
+                networkMetrics.getOrDefault(KEY_NETWORK_SENT_PER_MIN, DEFAULT_METRIC_VALUE)
         );
     }
 }

@@ -1,5 +1,7 @@
 package com.example.llmn.domain.metric;
 
+import com.example.llmn.domain.metric.model.NetworkUsage;
+import com.example.llmn.domain.metric.model.PreviousNetworkData;
 import com.example.llmn.domain.metric.model.response.FindCurrentMetricRes;
 import com.example.llmn.domain.metric.model.response.FindMetricHistoryRes;
 import com.example.llmn.domain.remote.ServerInstance;
@@ -15,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static com.example.llmn.common.utils.ConverterUtils.convertStringToLong;
 import static com.example.llmn.common.utils.DateTimeUtils.getCurrentHourStartMinusHours;
@@ -80,8 +83,8 @@ public class MetricService {
                 .cpuUsage(cpuAndMemoryStats.get(KEY_CPU_USAGE))
                 .totalMemory(cpuAndMemoryStats.get(KEY_TOTAL_MEMORY))
                 .usedMemory(cpuAndMemoryStats.get(KEY_USED_MEMORY))
-                .totalBytesReceived(networkStats.get(KEY_NETWORK_RECEIVED))
-                .totalBytesSent(networkStats.get(KEY_NETWORK_SENT))
+                .totalBytesReceived(networkStats.get(KEY_NETWORK_RECEIVED_PER_MIN))
+                .totalBytesSent(networkStats.get(KEY_NETWORK_SENT_PER_MIN))
                 .build();
     }
 
@@ -105,43 +108,6 @@ public class MetricService {
         }
 
         return statsMap;
-    }
-
-    private Map<String, Double> gatherNetworkData(Long serverInstanceId) {
-        String networkCommandOutput = secureShellManager.executeOneTimeCommand(CMD_NETWORK_STATS, serverInstanceId);
-        String[] lines = networkCommandOutput.split("\\n");
-
-        Map<String, Double> currentNetworkStats = parseNetworkDataIntoMap(lines);
-
-        if (currentNetworkStats.isEmpty())
-            return Collections.emptyMap();
-
-        return computeNetworkUsageDelta(currentNetworkStats);
-    }
-
-    private Map<String, Double> parseNetworkDataIntoMap(String[] lines) {
-        Map<String, Double> networkStatMap = new HashMap<>();
-        for (String line : lines) {
-            networkStatMap.putAll(parseNetworkUsage(line.trim()));
-
-            // 최초로 찾은 유효한 인터페이스만 처리
-            if (!networkStatMap.isEmpty()) break;
-        }
-
-        return networkStatMap;
-    }
-
-    private Map<String, Double> computeNetworkUsageDelta(Map<String, Double> currentNetworkStats) {
-        Double lastReceivedMegabytes = redisService.getValueInDouble(REDIS_KEY_NETWORK_REC);
-        Double lastSentMegabytes = redisService.getValueInDouble(REDIS_KEY_NETWORK_TRANS);
-
-        Double megabytesReceivedDelta = currentNetworkStats.getOrDefault(KEY_NETWORK_RECEIVED, DEFAULT_ZERO_VALUE) - lastReceivedMegabytes;
-        Double megabytesSentDelta = currentNetworkStats.getOrDefault(KEY_NETWORK_SENT, DEFAULT_ZERO_VALUE) - lastSentMegabytes;
-
-        return Map.of(
-                KEY_NETWORK_RECEIVED, megabytesReceivedDelta,
-                KEY_NETWORK_SENT, megabytesSentDelta
-        );
     }
 
     private Map<String, Double> parseCpuUsage(String line) {
@@ -212,21 +178,92 @@ public class MetricService {
         }
     }
 
-    private Map<String, Double> parseNetworkUsage(String line) {
-        Map<String, Double> networkUsageMap = new HashMap<>();
+    private Map<String, Double> gatherNetworkData(Long serverInstanceId) {
+        String networkCommandOutput = secureShellManager.executeOneTimeCommand(CMD_NETWORK_STATS, serverInstanceId);
+        if (networkCommandOutput == null || networkCommandOutput.isBlank()) return Collections.emptyMap();
 
-        Matcher netMatcher = PATTERN_NETWORK_INTERFACE.matcher(line);
-        if (netMatcher.find()) {
-            String[] parts = line.split("\\s+");
+        NetworkUsage currentUsage = parseAllNetworkInterfaces(networkCommandOutput);
+        if (currentUsage == null) return Collections.emptyMap();
 
-            if (parts.length >= 10) {
-                long receivedBytes = convertStringToLong(parts[NETWORK_RECEIVED_BYTES_INDEX]);
-                long transmittedBytes = convertStringToLong(parts[NETWORK_SENT_BYTES_INDEX]);
-                networkUsageMap.put(KEY_NETWORK_RECEIVED, bytesToMegabytes(receivedBytes));
-                networkUsageMap.put(KEY_NETWORK_SENT, bytesToMegabytes(transmittedBytes));
+        PreviousNetworkData prevData = loadPreviousNetworkData();
+        long now = System.currentTimeMillis();
+
+        double deltaRx = computeDelta(currentUsage.rxMB(), prevData.rxMB());
+        double deltaTx = computeDelta(currentUsage.txMB(), prevData.txMB());
+
+        double[] mbPerMin = computeNetworkRate(deltaRx, deltaTx, prevData.timeMs(), now);
+        double mbpmRx = mbPerMin[0];
+        double mbpmTx = mbPerMin[1];
+
+        saveCurrentNetworkData(currentUsage, now);
+
+        Map<String, Double> result = new HashMap<>();
+        result.put(KEY_NETWORK_RECEIVED_DELTA_MB, deltaRx);    // 이전 대비 증가한 Rx(MB)
+        result.put(KEY_NETWORK_SENT_PER_DELTA_MB, deltaTx);    // 이전 대비 증가한 Tx(MB)
+        result.put(KEY_NETWORK_RECEIVED_PER_MIN, mbpmRx);      // 분당 Rx(MB/min)
+        result.put(KEY_NETWORK_SENT_PER_MIN, mbpmTx);          // 분당 Tx(MB/min)
+        return result;
+    }
+
+    private NetworkUsage parseAllNetworkInterfaces(String netDevOutput) {
+        String[] lines = netDevOutput.split("\\n");
+        long sumRxBytes = 0L;
+        long sumTxBytes = 0L;
+
+        for (String line : lines) {
+            String trimmedLine = line.trim();
+            Matcher matcher = NET_IFACE_PATTERN.matcher(trimmedLine);
+            if (!matcher.find()) continue;
+
+            String[] parts = trimmedLine.split(":"); // "eth0:  12345 0 0 ...  67890 0 ..."
+            if (parts.length < 2) continue;
+
+            String stats = parts[1].trim();
+            String[] tokens = stats.split("\\s+");
+            if (tokens.length < 10) continue;
+
+            long rx = convertStringToLong(tokens[0]);
+            long tx = convertStringToLong(tokens[8]);
+            sumRxBytes += rx;
+            sumTxBytes += tx;
+        }
+
+        if (sumRxBytes == 0 && sumTxBytes == 0) return null;
+        double rxMB = sumRxBytes / BYTES_TO_MB_DIVISOR;
+        double txMB = sumTxBytes / BYTES_TO_MB_DIVISOR;
+
+        return new NetworkUsage(rxMB, txMB);
+    }
+
+    private PreviousNetworkData loadPreviousNetworkData() {
+        double prevRxMB = redisService.getValueInDouble(REDIS_KEY_NETWORK_RX);
+        double prevTxMB = redisService.getValueInDouble(REDIS_KEY_NETWORK_TX);
+        long prevTimeMs = redisService.getValueInLong(REDIS_KEY_NETWORK_TIME);
+        return new PreviousNetworkData(prevRxMB, prevTxMB, prevTimeMs);
+    }
+
+    private double computeDelta(double current, double previous) {
+        double delta = current - previous;
+        return (delta < 0) ? 0 : delta;
+    }
+
+    private double[] computeNetworkRate(double deltaRx, double deltaTx, long prevTimeMs, long now) {
+        double rateRx = 0.0;
+        double rateTx = 0.0;
+        if (prevTimeMs > 0 && now > prevTimeMs) {
+            double elapsedMin = (now - prevTimeMs) / 60000.0;
+            if (elapsedMin > 0) {
+                rateRx = deltaRx / elapsedMin;
+                rateTx = deltaTx / elapsedMin;
             }
         }
-        return networkUsageMap;
+        return new double[]{rateRx, rateTx};
+    }
+
+    private void saveCurrentNetworkData(NetworkUsage currentUsage, long now) {
+        redisService.storeValue(REDIS_KEY_NETWORK_RX, String.valueOf(currentUsage.rxMB()));
+        redisService.storeValue(REDIS_KEY_NETWORK_TX, String.valueOf(currentUsage.txMB()));
+        redisService.storeValue(REDIS_KEY_NETWORK_TIME, String.valueOf(now));
     }
 
     private Optional<FindCurrentMetricRes> retrieveMetricsFromCache(Long serverInstanceId) {
@@ -244,11 +281,7 @@ public class MetricService {
     }
 
     private void storeNetworkStatsInCache(Map<String, Double> currentNetworkMetric) {
-        redisService.storeValue(REDIS_KEY_NETWORK_REC, String.valueOf(currentNetworkMetric.get(KEY_NETWORK_RECEIVED)));
-        redisService.storeValue(REDIS_KEY_NETWORK_TRANS, String.valueOf(currentNetworkMetric.get(KEY_NETWORK_SENT)));
-    }
-
-    private double bytesToMegabytes(long bytes) {
-        return bytes / BYTES_TO_MB_DIVISOR;
+        redisService.storeValue(REDIS_KEY_NETWORK_REC, String.valueOf(currentNetworkMetric.get(KEY_NETWORK_RECEIVED_PER_MIN)));
+        redisService.storeValue(REDIS_KEY_NETWORK_TRANS, String.valueOf(currentNetworkMetric.get(KEY_NETWORK_SENT_PER_MIN)));
     }
 }
