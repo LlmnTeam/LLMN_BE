@@ -58,6 +58,11 @@ public class RedisService {
         return value != null ? Double.parseDouble(value) : 0.0;
     }
 
+    public Long getValueInLong(String key){
+        String value = redisTemplate.opsForValue().get(key);
+        return value != null ? Long.parseLong(value) : 0L;
+    }
+
     public Long getTTL(String type, String id) {
         Long ttl = redisTemplate.getExpire(buildKey(type, id), TimeUnit.SECONDS);
         return ttl != null ? ttl : -2L;  // TTL이 존재하지 않으면 -2 반환
