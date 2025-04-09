@@ -10,7 +10,8 @@ import java.util.Date;
 
 public class DateTimeUtils {
 
-    private DateTimeUtils() {}
+    private DateTimeUtils() {
+    }
 
     public static final String LOG_TITLE_FORMAT = "yyyy-MM-dd_HH";
     public static final String LOG_TEXT_FORMAT = "yyyy-MM-dd_HH:mm";
@@ -24,12 +25,12 @@ public class DateTimeUtils {
         return new SimpleDateFormat(format).format(date);
     }
 
-    public static String formatLocalDateTime(LocalDateTime localDateTime, DateTimeFormatter formatter){
+    public static String formatLocalDateTime(LocalDateTime localDateTime, DateTimeFormatter formatter) {
         return localDateTime.format(formatter);
     }
 
     public static String formatLocalDateTime(LocalDateTime localDateTime) {
-        if(localDateTime == null){
+        if (localDateTime == null) {
             return null;
         }
 
@@ -50,12 +51,12 @@ public class DateTimeUtils {
         return LocalDate.now().format(SIMPLE_DATE_FORMATTER);
     }
 
-    public static LocalDateTime getThirtyMinutesAgoTime(){
+    public static LocalDateTime getThirtyMinutesAgoTime() {
         return LocalDateTime.now().minus(30, ChronoUnit.MINUTES);
     }
 
-    public static LocalDateTime getCurrentHourStartMinusHours(int minusHour){
-        return  LocalDateTime.now()
+    public static LocalDateTime getCurrentHourStartMinusHours(int minusHour) {
+        return LocalDateTime.now()
                 .withMinute(0)
                 .withSecond(0)
                 .withNano(0)

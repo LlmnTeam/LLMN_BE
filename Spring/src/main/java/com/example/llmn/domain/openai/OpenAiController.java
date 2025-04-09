@@ -18,13 +18,13 @@ public class OpenAiController {
     private final OpenAiKeyService openAiKeyService;
 
     @PostMapping("/accounts/validate/key")
-    public ResponseEntity<?> validateOpenAIKey(@RequestBody @Valid ValidateOpenAIKeyReq requestDTO){
+    public ResponseEntity<?> validateOpenAIKey(@RequestBody @Valid ValidateOpenAIKeyReq requestDTO) {
         ValidateOpenAIKeyRes responseDTO = openAiKeyService.validateOpenAIKey(requestDTO.apiKey());
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 
     @PatchMapping("/accounts/apiKey")
-    public ResponseEntity<?> updateApiKey(@RequestBody @Valid UpdateApiKeyReq requestDTO){
+    public ResponseEntity<?> updateApiKey(@RequestBody @Valid UpdateApiKeyReq requestDTO) {
         openAiKeyService.updateOpenAIKey(requestDTO.apiKey(), requestDTO.email());
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, null));
     }

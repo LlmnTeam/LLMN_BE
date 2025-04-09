@@ -2,7 +2,8 @@ package com.example.llmn.domain.docker;
 
 public class DockerConstants {
 
-    private DockerConstants(){}
+    private DockerConstants() {
+    }
 
     public static final String DOCKER_RESOURCE_KEY_CPU = "CPU";
     public static final String DOCKER_RESOURCE_KEY_MEMORY = "Memory";

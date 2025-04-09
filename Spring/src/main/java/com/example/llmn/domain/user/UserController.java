@@ -22,7 +22,7 @@ public class UserController {
     private final UserService userService;
 
     @PostMapping("/accounts")
-    public ResponseEntity<?> join(@RequestBody @Valid JoinReq requestDTO){
+    public ResponseEntity<?> join(@RequestBody @Valid JoinReq requestDTO) {
         userService.join(requestDTO);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.CREATED, null));
     }
@@ -35,13 +35,13 @@ public class UserController {
     }
 
     @PostMapping("/accounts/check/nick")
-    public ResponseEntity<?> checkNickname(@RequestBody @Valid CheckNickReq requestDTO){
+    public ResponseEntity<?> checkNickname(@RequestBody @Valid CheckNickReq requestDTO) {
         CheckNickNameRes responseDTO = userService.checkNickNameDuplicate(requestDTO);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
 
     @PostMapping("/accounts/verify/code")
-    public ResponseEntity<?> verifyCode(@RequestBody @Valid VerifyCodeReq requestDTO, @RequestParam String codeType){
+    public ResponseEntity<?> verifyCode(@RequestBody @Valid VerifyCodeReq requestDTO, @RequestParam String codeType) {
         VerifyEmailCodeRes responseDTO = userService.verifyCode(requestDTO, codeType);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
@@ -53,7 +53,7 @@ public class UserController {
     }
 
     @PostMapping("/accounts/validate/ssh")
-    public ResponseEntity<?> checkSshConnect(@RequestBody @Valid VerifySshConnectReq requestDTO){
+    public ResponseEntity<?> checkSshConnect(@RequestBody @Valid VerifySshConnectReq requestDTO) {
         VerifySshConnectRes responseDTO = userService.checkSshConnect(requestDTO);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));
     }
@@ -90,20 +90,20 @@ public class UserController {
     }
 
     @PostMapping("/accounts/recovery/reset")
-    public ResponseEntity<?> resetPassword(@RequestBody @Valid ResetPasswordReq requestDTO){
+    public ResponseEntity<?> resetPassword(@RequestBody @Valid ResetPasswordReq requestDTO) {
         userService.resetPassword(requestDTO);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, null));
     }
 
     @DeleteMapping("/accounts/withdraw")
-    public ResponseEntity<?> withdrawMember(@AuthenticationPrincipal CustomUserDetails userDetails){
+    public ResponseEntity<?> withdrawMember(@AuthenticationPrincipal CustomUserDetails userDetails) {
         userService.withdrawMember(userDetails.getUser().getId());
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, null));
     }
 
     // nickName을 응답으로 주는 이유는, 토큰 검증 시 닉네임도 함께 받고 싶다는 프론트의 요구사항 (SSR을 사용할 때 필요하고 함)
     @PostMapping("/validate/accessToken")
-    public ResponseEntity<?> validateAccessToken(@CookieValue String accessToken){
+    public ResponseEntity<?> validateAccessToken(@CookieValue String accessToken) {
         Long userId = userService.checkAccessToken(accessToken);
         ValidateAccessTokenRes responseDTO = userService.findNickName(userId);
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, responseDTO));

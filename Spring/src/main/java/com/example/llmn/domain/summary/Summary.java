@@ -31,7 +31,7 @@ public class Summary extends BaseEntity {
     @Enumerated(EnumType.STRING)
     private SummaryType summaryType;
 
-    @Column(columnDefinition="TEXT")
+    @Column(columnDefinition = "TEXT")
     private String content;
 
     @Column
@@ -46,7 +46,7 @@ public class Summary extends BaseEntity {
         this.isChecked = false;
     }
 
-    public void check(){
+    public void check() {
         this.isChecked = !isChecked;
     }
 }

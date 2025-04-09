@@ -14,7 +14,8 @@ import java.util.Map;
 @Slf4j
 public class JsonUtils {
 
-    private JsonUtils() {}
+    private JsonUtils() {
+    }
 
     private static final String EMPTY_JSON = "{}";
     private static final ObjectMapper objectMapper = new ObjectMapper();
@@ -29,7 +30,7 @@ public class JsonUtils {
         }
     }
 
-    public static String convertMapToJson(Map<String, Map<String, String>> map){
+    public static String convertMapToJson(Map<String, Map<String, String>> map) {
         try {
             return objectMapper.writeValueAsString(map);
         } catch (JsonProcessingException e) {
@@ -40,7 +41,8 @@ public class JsonUtils {
 
     public static Map<String, Map<String, String>> convertJsonToMap(String json) {
         try {
-            return objectMapper.readValue(json, new TypeReference<Map<String, Map<String, String>>>() {});
+            return objectMapper.readValue(json, new TypeReference<Map<String, Map<String, String>>>() {
+            });
         } catch (JsonProcessingException e) {
             log.error("JSON 문자열을 맵으로 변환하는 중 오류 발생: {}", json, e);
             return Collections.emptyMap();
@@ -56,7 +58,7 @@ public class JsonUtils {
         }
     }
 
-    public static String convertMetricDtoToJson(FindCurrentMetricRes metricRes){
+    public static String convertMetricDtoToJson(FindCurrentMetricRes metricRes) {
         try {
             return objectMapper.writeValueAsString(metricRes);
         } catch (JsonProcessingException e) {

@@ -101,7 +101,7 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<?> unknownServerError(Exception e){
+    public ResponseEntity<?> unknownServerError(Exception e) {
         log.error("처리되지 않은 예외 발생:", e);
         return createErrorResponse("서버 내부 오류가 발생했습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
     }

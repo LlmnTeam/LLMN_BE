@@ -41,7 +41,7 @@ public class OpenAiKeyService {
     @Transactional
     public void updateOpenAIKey(String apiKey, String email) {
         Optional<OpenAiKey> existingKey = openAiKeyRepository.findByEmail(email);
-        User user= userRepository.findByEmail(email)
+        User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new CustomException(ExceptionCode.USER_NOT_FOUND));
 
         // 원본 키로 OpenAI API를 호출했을 때 처리가 잘 되는지 검증

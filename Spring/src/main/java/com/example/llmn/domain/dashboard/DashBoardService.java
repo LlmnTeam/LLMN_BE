@@ -94,7 +94,7 @@ public class DashBoardService {
                 .orElseThrow(() -> new CustomException(ExceptionCode.SSH_NOT_FOUND));
     }
 
-    private String findLatestHourlySummary(){
+    private String findLatestHourlySummary() {
         Pageable pageable = PageRequest.of(0, 1, Sort.by(Sort.Direction.DESC, SORT_BY_DATE));
         Page<String> page = summaryRepository.findContentByType(SummaryType.HOURLY, pageable);
         return page.hasContent() ? page.getContent().get(0) : NO_SUMMARY_DATA;

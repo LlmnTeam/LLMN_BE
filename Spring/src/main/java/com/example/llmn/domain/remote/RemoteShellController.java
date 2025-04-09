@@ -25,7 +25,7 @@ public class RemoteShellController {
     private final SshConfigService sshConfigService;
 
     @PostMapping("/command/init")
-    public ResponseEntity<?> initCommend(@AuthenticationPrincipal CustomUserDetails userDetails){
+    public ResponseEntity<?> initCommend(@AuthenticationPrincipal CustomUserDetails userDetails) {
         secureShellManager.initializeShellSession(userDetails.getUser().getId());
         return ResponseEntity.ok().body(ApiUtils.success(HttpStatus.OK, null));
     }

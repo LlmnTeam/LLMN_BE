@@ -28,7 +28,7 @@ public class RedisService {
         setOps.add(key, String.valueOf(value));
     }
 
-    public void setExpireValue(String type, String id, Long expirationTime){
+    public void setExpireValue(String type, String id, Long expirationTime) {
         redisTemplate.expire(buildKey(type, id), expirationTime, TimeUnit.MILLISECONDS);
     }
 
@@ -47,18 +47,20 @@ public class RedisService {
         return (storedValue == null) || !storedValue.equals(value);
     }
 
-    public void removeValue(String type, String id) { redisTemplate.delete(buildKey(type, id)); }
+    public void removeValue(String type, String id) {
+        redisTemplate.delete(buildKey(type, id));
+    }
 
-    public String getValueInString(String type, String id){
+    public String getValueInString(String type, String id) {
         return redisTemplate.opsForValue().get(buildKey(type, id));
     }
 
-    public Double getValueInDouble(String key){
+    public Double getValueInDouble(String key) {
         String value = redisTemplate.opsForValue().get(key);
         return value != null ? Double.parseDouble(value) : 0.0;
     }
 
-    public Long getValueInLong(String key){
+    public Long getValueInLong(String key) {
         String value = redisTemplate.opsForValue().get(key);
         return value != null ? Long.parseLong(value) : 0L;
     }
@@ -68,7 +70,7 @@ public class RedisService {
         return ttl != null ? ttl : -2L;  // TTL이 존재하지 않으면 -2 반환
     }
 
-    private String buildKey(String type, String id){
+    private String buildKey(String type, String id) {
         return type + ":" + id;
     }
 }

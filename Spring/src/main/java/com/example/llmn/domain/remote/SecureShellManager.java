@@ -311,7 +311,7 @@ public class SecureShellManager {
 
     private void validateUserSessionLimit(Long userId) {
         Set<Long> userSessions = userSessionMap.get(userId);
-        if (userSessions == null || userSessions.size() < MAX_SESSIONS_PER_USER){
+        if (userSessions == null || userSessions.size() < MAX_SESSIONS_PER_USER) {
             return;
         }
 
@@ -369,11 +369,11 @@ public class SecureShellManager {
     }
 
     private Optional<SshInfoDTO> retrieveCachedSshInfo(Long serverInstanceId) {
-        String cachedConfig  = redisService.getValueInString(REDIS_KEY_SSH, serverInstanceId.toString());
-        if (cachedConfig  == null)
+        String cachedConfig = redisService.getValueInString(REDIS_KEY_SSH, serverInstanceId.toString());
+        if (cachedConfig == null)
             return Optional.empty();
 
-        return parseConfigString(cachedConfig );
+        return parseConfigString(cachedConfig);
     }
 
     private Optional<SshInfoDTO> parseConfigString(String sshInfoStr) {

@@ -5,7 +5,8 @@ import java.util.Optional;
 
 public class MapUtils {
 
-    private MapUtils() {}
+    private MapUtils() {
+    }
 
     public static String extractStringFromMap(Map<String, Object> map, String key, String defaultValue) {
         return Optional.ofNullable((String) map.get(key)).orElse(defaultValue);

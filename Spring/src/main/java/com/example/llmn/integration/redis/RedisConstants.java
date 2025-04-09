@@ -2,7 +2,8 @@ package com.example.llmn.integration.redis;
 
 public class RedisConstants {
 
-    private RedisConstants() {}
+    private RedisConstants() {
+    }
 
     public static final int REDIS_PORT = 6379;
     public static final String REDIS_HOST = "redis";

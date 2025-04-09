@@ -13,7 +13,8 @@ import java.util.Collection;
 
 public class KeyPairUtils {
 
-    private KeyPairUtils() {}
+    private KeyPairUtils() {
+    }
 
     private static final FilePasswordProvider DEFAULT_PASSWORD_PROVIDER = FilePasswordProvider.EMPTY;
 

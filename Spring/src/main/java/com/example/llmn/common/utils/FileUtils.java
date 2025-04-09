@@ -19,7 +19,8 @@ import java.util.stream.Stream;
 @Slf4j
 public class FileUtils {
 
-    private FileUtils() {}
+    private FileUtils() {
+    }
 
     public static final String LOGS_DIRECTORY = "logs";
 
@@ -39,7 +40,7 @@ public class FileUtils {
             if (!Files.exists(path)) {
                 Files.createDirectories(path);
             }
-        } catch (IOException e){
+        } catch (IOException e) {
             log.error("{}에 대한 디렉토리 생성 실패", directoryName);
             throw new CustomException(ExceptionCode.CREATE_DIR_FAIL);
         }
@@ -64,7 +65,7 @@ public class FileUtils {
 
         try {
             return new UrlResource(path.toUri());
-        } catch (IOException e){
+        } catch (IOException e) {
             throw new CustomException(ExceptionCode.CONVERT_TO_FILE_FAIL);
         }
     }
@@ -79,11 +80,11 @@ public class FileUtils {
         return listTextFilesInDirectory(path);
     }
 
-    public static Path getFilePath(String directoryName, MultipartFile file){
+    public static Path getFilePath(String directoryName, MultipartFile file) {
         String fileName = file.getOriginalFilename();
         return Paths.get(directoryName + File.separator + fileName);
     }
-    
+
 
     private static String readAllLinesAsString(Path path) {
         try {

@@ -7,7 +7,6 @@ import com.example.llmn.domain.alarm.model.request.ReadAlarmReq;
 import com.example.llmn.domain.user.User;
 import com.example.llmn.domain.user.UserRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,12 +22,11 @@ public class AlarmService {
     private final UserRepository userRepository;
 
     @Transactional
-    public void generateAlarm(Long receiverId, String content, AlarmType alarmType){
+    public void generateAlarm(Long receiverId, String content, AlarmType alarmType) {
         User receiver = userRepository.findById(receiverId)
                 .orElseThrow(() -> new CustomException(ExceptionCode.USER_NOT_FOUND));
 
-        if(receiver.doesNotReceivingAlarm())
-            return;
+        if (receiver.doesNotReceivingAlarm()) return;
 
         Alarm alarm = Alarm.builder()
                 .receiver(receiver)
@@ -50,18 +48,8 @@ public class AlarmService {
         List<Alarm> alarms = alarmRepository.findByIdsWithUser(alarmIds);
 
         for (Alarm alarm : alarms) {
-            if (alarm.isNotOwnedBy(userId))
-                continue;
-
+            if (alarm.isNotOwnedBy(userId)) continue;
             alarm.updateIsRead(true, LocalDateTime.now());
         }
-    }
-
-    @Transactional
-    @Scheduled(cron = "0 5 0 * * *")
-    public void deleteReadAlarm(){
-        LocalDateTime previousDate = LocalDateTime.now().minusDays(3);
-        List<Alarm> readAlarm = alarmRepository.findReadBeforeDate(previousDate);
-        alarmRepository.deleteAll(readAlarm);
     }
 }

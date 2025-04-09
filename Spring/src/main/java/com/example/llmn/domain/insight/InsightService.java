@@ -39,7 +39,7 @@ public class InsightService {
         );
     }
 
-    public FindSummaryRes findSummaryByType(SummaryType type, Long userId, Pageable pageable){
+    public FindSummaryRes findSummaryByType(SummaryType type, Long userId, Pageable pageable) {
         List<Summary> summaries = summaryRepository.findByType(type, userId, pageable).getContent();
         return FindSummaryRes.from(summaries);
     }

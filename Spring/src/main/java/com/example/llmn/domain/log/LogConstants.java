@@ -2,7 +2,8 @@ package com.example.llmn.domain.log;
 
 public class LogConstants {
 
-    private LogConstants() {}
+    private LogConstants() {
+    }
 
     public static final String LOG_FORMAT = "[%s]\n%s";
 

@@ -43,18 +43,18 @@ public class ServerInstance extends BaseEntity {
         this.isWorking = true;
     }
 
-    public void updateSshInfo(String remoteHost, String remoteName, String remoteKeyPath, boolean isWorking){
+    public void updateSshInfo(String remoteHost, String remoteName, String remoteKeyPath, boolean isWorking) {
         this.remoteHost = remoteHost;
         this.remoteName = remoteName;
         this.remoteKeyPath = remoteKeyPath;
         this.isWorking = isWorking;
     }
 
-    public void updateIsWorking(boolean isWorking){
+    public void updateIsWorking(boolean isWorking) {
         this.isWorking = isWorking;
     }
 
-    public long getUserId(){
+    public long getUserId() {
         return user.getId();
     }
 

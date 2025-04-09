@@ -146,7 +146,7 @@ public class DockerService {
                 .toList();
     }
 
-    private String buildContainerCommand(String commandType,String containerName) {
+    private String buildContainerCommand(String commandType, String containerName) {
         return commandType + containerName;
     }
 

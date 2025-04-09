@@ -5,7 +5,8 @@ import java.util.stream.Collectors;
 
 public class ConverterUtils {
 
-    private ConverterUtils() {}
+    private ConverterUtils() {
+    }
 
     public static String convertEnumToString(Class<? extends Enum<?>> e) {
         return Arrays.stream(e.getEnumConstants())

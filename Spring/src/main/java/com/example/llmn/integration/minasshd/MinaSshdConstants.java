@@ -4,7 +4,8 @@ import java.util.regex.Pattern;
 
 public class MinaSshdConstants {
 
-    private MinaSshdConstants() {}
+    private MinaSshdConstants() {
+    }
 
     // 시간 제한 설정 (초 단위)
     public static final int SSH_AUTH_TIMEOUT = 10;

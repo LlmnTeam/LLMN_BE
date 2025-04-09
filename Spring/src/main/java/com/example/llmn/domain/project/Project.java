@@ -55,18 +55,18 @@ public class Project extends BaseEntity {
         this.isUrgent = isUrgent;
     }
 
-    public void updateProject(String projectName, String containerName, String description, ContainerStatus containerStatus){
+    public void updateProject(String projectName, String containerName, String description, ContainerStatus containerStatus) {
         this.projectName = projectName;
         this.containerName = containerName;
         this.description = description;
         this.containerStatus = containerStatus;
     }
 
-    public void updateIsUrgent(boolean isUrgent){
+    public void updateIsUrgent(boolean isUrgent) {
         this.isUrgent = isUrgent;
     }
 
-    public void updateContainerStatus(ContainerStatus containerStatus){
+    public void updateContainerStatus(ContainerStatus containerStatus) {
         this.containerStatus = containerStatus;
     }
 
@@ -74,15 +74,15 @@ public class Project extends BaseEntity {
         return serverInstance.getId();
     }
 
-    public String getSshInfoRemoteHost(){
+    public String getSshInfoRemoteHost() {
         return serverInstance.getRemoteHost();
     }
 
-    public boolean isConnected(){
+    public boolean isConnected() {
         return containerStatus.equals(ContainerStatus.WORKING);
     }
-    
-    public boolean isNotOwnedBy(Long userId){
+
+    public boolean isNotOwnedBy(Long userId) {
         return !user.getId().equals(userId);
     }
 

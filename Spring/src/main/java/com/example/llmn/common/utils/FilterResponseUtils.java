@@ -8,7 +8,8 @@ import java.io.IOException;
 
 public class FilterResponseUtils {
 
-    private FilterResponseUtils() {}
+    private FilterResponseUtils() {
+    }
 
     public static void unAuthorized(HttpServletResponse resp, CustomException e) throws IOException {
         forbidden(resp, e);

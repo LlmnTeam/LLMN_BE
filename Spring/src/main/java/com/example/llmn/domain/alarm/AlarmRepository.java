@@ -18,6 +18,9 @@ public interface AlarmRepository extends JpaRepository<Alarm, Long> {
     @Query("SELECT a FROM Alarm a WHERE a.readDate <= :date AND a.isRead = TRUE")
     List<Alarm> findReadBeforeDate(@Param("date") LocalDateTime date);
 
+    @Query("SELECT a FROM Alarm a WHERE a.readDate <= :date AND a.isRead = FALSE ")
+    List<Alarm> findUnreadBeforeDate(@Param("date") LocalDateTime date);
+
     @EntityGraph(attributePaths = {"receiver"})
     @Query("SELECT a FROM Alarm a WHERE a.id IN :ids")
     List<Alarm> findByIdsWithUser(@Param("ids") List<Long> ids);

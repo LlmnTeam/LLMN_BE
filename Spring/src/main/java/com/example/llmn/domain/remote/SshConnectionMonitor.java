@@ -20,7 +20,7 @@ public class SshConnectionMonitor {
     private final SecureShellManager secureShellManager;
 
     @Scheduled(cron = "0 32 12 * * *")
-    public void checkSshConnection(){
+    public void checkSshConnection() {
         List<ServerInstance> serverInstances = serverInstanceRepository.findAll();
         serverInstances.forEach(sshInfo -> {
             boolean isWorking = checkConnectionValid(sshInfo.getId(), sshInfo.getUserId());

@@ -3,7 +3,7 @@ package com.example.llmn.common.exceptions;
 import com.example.llmn.common.utils.ApiUtils;
 import org.springframework.http.HttpStatus;
 
-public class CustomException extends RuntimeException{
+public class CustomException extends RuntimeException {
 
     private ExceptionCode exceptionCode;
     private String message;
@@ -18,11 +18,11 @@ public class CustomException extends RuntimeException{
         this.message = message;
     }
 
-    public ApiUtils.ApiResult<?> body(){
+    public ApiUtils.ApiResult<?> body() {
         return ApiUtils.error(message, exceptionCode.getHttpStatus());
     }
 
-    public HttpStatus status(){
+    public HttpStatus status() {
         return exceptionCode.getHttpStatus();
     }
 }

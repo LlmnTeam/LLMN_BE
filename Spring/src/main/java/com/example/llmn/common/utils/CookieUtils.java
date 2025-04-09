@@ -12,7 +12,8 @@ import java.util.Set;
 
 public class CookieUtils {
 
-    private CookieUtils() {}
+    private CookieUtils() {
+    }
 
     private static final String KEY_REFRESH_TOKEN = "refreshToken";
 
