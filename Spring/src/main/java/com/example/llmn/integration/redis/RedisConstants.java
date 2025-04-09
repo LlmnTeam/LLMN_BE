@@ -19,7 +19,7 @@ public class RedisConstants {
     public static final String REDIS_KEY_RESOURCE = "resource";
 
     public static final String REDIS_KEY_METRIC = "metric";
-    public static final Long REDIS_EXP_METRIC_MS = 10 * 60 * 1000L; // 10분
+    public static final Long REDIS_EXP_METRIC_MS = 60 * 1000L; // 1분
 
     public static final Long REDIS_EXP_RESOURCE = 10 * 60 * 1000L; // 10분
     public static final Long REDIS_EXP_SSH = 60L * 60 * 24 * 30; // 30일

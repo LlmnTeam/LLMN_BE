@@ -74,13 +74,13 @@ public class DashBoardService {
 
     private String formatNetworkReceived(FindCurrentMetricRes currentMetric) {
         return Optional.ofNullable(currentMetric)
-                .map(metric -> String.format("%.2f MB", metric.networkReceived()))
+                .map(metric -> String.format("%.3f MB/min", metric.networkReceived()))
                 .orElse(NOT_AVAILABLE);
     }
 
     private String formatNetworkSent(FindCurrentMetricRes currentMetric) {
         return Optional.ofNullable(currentMetric)
-                .map(metric -> String.format("%.2f MB", metric.networkSent()))
+                .map(metric -> String.format("%.3f MB/min", metric.networkSent()))
                 .orElse(NOT_AVAILABLE);
     }
 
