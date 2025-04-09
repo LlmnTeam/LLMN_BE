@@ -34,11 +34,21 @@ public class MetricConstants {
     public static final String CMD_NETWORK_STATS = "cat /proc/net/dev";
 
     // 출력 파싱을 위한 정규식 패턴
-    public static final Pattern PATTERN_CPU_LINE = Pattern.compile("%Cpu\\(s\\):\\s+([\\d.]+)\\s+us,\\s+([\\d.]+)\\s+sy,.*");
+    public static final Pattern PATTERN_CPU_LINE = Pattern.compile(
+            "%Cpu\\(s\\):\\s+([\\d.]+)\\s+us," +
+                    "\\s+([\\d.]+)\\s+sy," +               // group(2)
+                    "\\s+([\\d.]+)\\s+ni," +               // group(3)
+                    "\\s+([\\d.]+)\\s+id," +               // group(4)
+                    "\\s+([\\d.]+)\\s+wa," +               // group(5)
+                    "\\s+([\\d.]+)\\s+hi," +               // group(6)
+                    "\\s+([\\d.]+)\\s+si," +               // group(7)
+                    "\\s+([\\d.]+)\\s+st"
+    );
+
     public static final Pattern PATTERN_NETWORK_INTERFACE = Pattern.compile("^(eth|ens|enp|wlan)\\S*:"); // 주요 네트워크 인터페이스 패턴
 
-    public static final Pattern PATTERN_MEMORY_LINE = Pattern.compile("MiB Mem :\\s+([\\d.]+)\\s+total,\\s+([\\d.]+)\\s+free,\\s+([\\d.]+)\\s+used,\\s+([\\d.]+)\\s+buff/cache.*");
-    public static final Pattern PATTERN_SWAP_LINE = Pattern.compile("MiB Swap:.*([\\d.]+)\\s+avail Mem.*");
+    public static final Pattern PATTERN_MEM_LINE = Pattern.compile("MiB Mem :\\s+([\\d.]+)\\s+total,\\s+([\\d.]+)\\s+free,\\s+([\\d.]+)\\s+used,\\s+([\\d.]+)\\s+buff/cache.*");
+    public static final Pattern PATTERN_SWAP_LINE = Pattern.compile("MiB Swap:.*?([\\d.]+)\\s+avail Mem.*");
 
     public static final double DEFAULT_ZERO_VALUE = 0.0;
     public static final double BYTES_TO_MB_DIVISOR = 1024.0 * 1024.0;

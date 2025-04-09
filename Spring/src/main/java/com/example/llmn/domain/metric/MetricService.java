@@ -72,9 +72,7 @@ public class MetricService {
         Map<String, Double> cpuAndMemoryStats = gatherCpuAndMemoryData(serverInstance.getId());
         Map<String, Double> networkStats = gatherNetworkData(serverInstance.getId());
 
-        if (hasNoValidMetricData(cpuAndMemoryStats, networkStats))
-            return null;
-
+        if (hasNoValidMetricData(cpuAndMemoryStats, networkStats)) return null;
         storeNetworkStatsInCache(networkStats);
 
         return Metric.builder()
@@ -96,10 +94,14 @@ public class MetricService {
         String[] lines = topCommandOutput.split("\n");
 
         Map<String, Double> statsMap = new HashMap<>();
+        Double totalMemoryMB = null;
+
         for (String line : lines) {
             line = line.trim();
-            statsMap.putAll(parseCpuUsage(line));
-            statsMap.putAll(parseMemoryUsage(line));
+
+            if (line.startsWith("%Cpu")) statsMap.putAll(parseCpuUsage(line));
+            else if (line.startsWith("MiB Mem")) totalMemoryMB = parseMemLine(line, statsMap);
+            else if (line.startsWith("MiB Swap")) parseSwapLine(line, statsMap, totalMemoryMB);
         }
 
         return statsMap;
@@ -122,8 +124,8 @@ public class MetricService {
         for (String line : lines) {
             networkStatMap.putAll(parseNetworkUsage(line.trim()));
 
-            if (!networkStatMap.isEmpty()) // 최초로 찾은 유효한 인터페이스만 처리
-                break;
+            // 최초로 찾은 유효한 인터페이스만 처리
+            if (!networkStatMap.isEmpty()) break;
         }
 
         return networkStatMap;
@@ -173,18 +175,41 @@ public class MetricService {
         return cpuStatMap;
     }
 
-    private Map<String, Double> parseMemoryUsage(String line) {
-        Map<String, Double> memoryStatMap = new HashMap<>();
-
-        Matcher memMatcher = PATTERN_MEMORY_LINE.matcher(line);
+    private Double parseMemLine(String line, Map<String, Double> statsMap) {
+        Matcher memMatcher = PATTERN_MEM_LINE.matcher(line);
         if (memMatcher.matches()) {
-            Double totalMemoryMB = Double.parseDouble(memMatcher.group(1));
-            Double usedMemoryMB = Double.parseDouble(memMatcher.group(3));
-            memoryStatMap.put(KEY_TOTAL_MEMORY, totalMemoryMB);
-            memoryStatMap.put(KEY_USED_MEMORY, usedMemoryMB);
-        }
+            Double totalMemoryMB = Double.parseDouble(memMatcher.group(1)); // 총 메모리
+            Double freeMemoryMB = Double.parseDouble(memMatcher.group(2)); // 사용되지 않은 메모리
+            Double usedMemoryMB = Double.parseDouble(memMatcher.group(3)); // 초기 사용 메모리 값
+            Double buffCacheMemoryMB = Double.parseDouble(memMatcher.group(4)); // 버퍼, 캐시
 
-        return memoryStatMap;
+            statsMap.put(KEY_TOTAL_MEMORY, totalMemoryMB);
+            statsMap.put(KEY_FREE_MEMORY, freeMemoryMB);
+            statsMap.put(KEY_USED_MEMORY, usedMemoryMB);
+            statsMap.put(KEY_BUFFCACHE_MEMORY, buffCacheMemoryMB);
+
+            return totalMemoryMB;
+        }
+        return null;
+    }
+
+    private void parseSwapLine(String line, Map<String, Double> statsMap, Double totalMemoryMB) {
+        Matcher swapMatcher = PATTERN_SWAP_LINE.matcher(line);
+        if (swapMatcher.matches()) {
+            Double availableMemoryMB = Double.parseDouble(swapMatcher.group(1)); // 실제 사용 가능한 메모리
+            statsMap.put(KEY_AVAILABLE_MEMORY, availableMemoryMB);
+
+            if (totalMemoryMB != null) {
+                // 실제 사용 중인 메모리 = 총 메모리 - 사용 가능한 메모리
+                Double actualUsedMemory = totalMemoryMB - availableMemoryMB;
+
+                // 메모리 사용률(%) = (실제 사용 메모리 / 총 메모리) * 100
+                Double usagePercent = (actualUsedMemory / totalMemoryMB) * 100.0;
+
+                statsMap.put(KEY_MEMORY_USAGE_PERCENT, usagePercent);
+                statsMap.put(KEY_USED_MEMORY, actualUsedMemory); // 초기 사용 메모리 값을 실제 사용 메모리로 업데이트
+            }
+        }
     }
 
     private Map<String, Double> parseNetworkUsage(String line) {
