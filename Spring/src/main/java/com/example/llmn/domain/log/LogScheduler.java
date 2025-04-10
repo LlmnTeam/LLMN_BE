@@ -75,18 +75,24 @@ public class LogScheduler {
     @Scheduled(fixedRate = 60000)
     @SuppressWarnings("rawtypes")
     public void collectAndPersistLogs() {
-        SearchResponse<Map> searchResponse = elasticSearchService.searchUnprocessedDocuments(
-                getCurrentLogIndexName(),
-                elasticsearchUri,
-                Map.class,
-                MAX_LOG_RECORDS_PER_QUERY
-        );
+        try {
+            SearchResponse<Map> searchResponse = elasticSearchService.searchUnprocessedDocuments(
+                    getCurrentLogIndexName(),
+                    elasticsearchUri,
+                    Map.class,
+                    MAX_LOG_RECORDS_PER_QUERY
+            );
 
-        List<Map<String, Object>> rawLogDocuments = elasticSearchService.convertSearchResultToMap(searchResponse);
-        List<Map<String, Object>> processedLogs = logService.standardizeLogFields(rawLogDocuments);
+            if (searchResponse != null && searchResponse.hits() != null) {
+                List<Map<String, Object>> rawLogDocuments = elasticSearchService.convertSearchResultToMap(searchResponse);
+                List<Map<String, Object>> processedLogs = logService.standardizeLogFields(rawLogDocuments);
 
-        elasticSearchService.updateDocuments(getCurrentLogIndexName(), processedLogs, elasticsearchUri);
-        logService.persistLogsToFiles(processedLogs);
+                elasticSearchService.updateDocuments(getCurrentLogIndexName(), processedLogs, elasticsearchUri);
+                logService.persistLogsToFiles(processedLogs);
+            }
+        } catch (Exception e) {
+            log.error("로그 수집 및 저장 중 오류 발생: {}", e.getMessage(), e);
+        }
     }
 
     @Transactional
@@ -94,7 +100,7 @@ public class LogScheduler {
     public void scheduleProjectLogSummaries() {
         List<User> users = userRepository.findAll();
         for (User user : users) {
-            List<Project> activeProjects = projectRepository.findByUserId(user.getId()).stream()
+            List<Project> activeProjects = projectRepository.findByUserIdWithServerInstance(user.getId()).stream()
                     .filter(Project::isConnected)
                     .toList();
 
@@ -172,7 +178,7 @@ public class LogScheduler {
     }
 
     private void generateProjectSummary(Project project, Long userId) {
-        requestLogSummaryFromService(project.getContainerName(), userId)
+        requestLogSummaryFromService(project.getContainerName(), userId, project.getServerIp())
                 .ifPresent(summaryRes -> {
                     saveSummary(project.getUser(), project, summaryRes.logSummary(), SummaryType.LOG);
                     checkForUrgentIssuesInSummary(project, summaryRes);
@@ -180,8 +186,8 @@ public class LogScheduler {
                 });
     }
 
-    private Optional<SummaryRes> requestLogSummaryFromService(String containerName, Long userId) {
-        String recentLogContent = logService.findLogsWithinLast30Minutes(containerName, elasticsearchUri);
+    private Optional<SummaryRes> requestLogSummaryFromService(String containerName, Long userId, String serverIp) {
+        String recentLogContent = logService.findLogsWithinLast30Minutes(containerName, serverIp);
 
         String formattedLogData = formatLogSummaryRequestData(containerName, recentLogContent);
         SummaryRes summaryResponse = sendSummaryRequest(logSummaryServiceUrl, formattedLogData, SummaryRes.class, userId);

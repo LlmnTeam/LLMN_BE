@@ -62,16 +62,6 @@ public class JwtAuthenticationFilter extends BasicAuthenticationFilter {
         // 3rd 엑세스 토큰에 인증 정보가 없음 => 리프레쉬 토큰 검증
         if (user == null) {
             user = authenticateRefreshToken(refreshToken);
-
-            // 액세스 토큰과 리프레시 토큰 갱신 (재발급 로직)
-            /*if (user != null) {
-                accessToken = JWTProvider.createAccessToken(user);
-                refreshToken = JWTProvider.createRefreshToken(user);
-
-                updateToken(user, accessToken, refreshToken);
-                CookieUtils.setCookieToResponse(ACCESS_TOKEN_COOKIE_KEY, accessToken, JWTProvider.ACCESS_EXP_SEC, false, false, response);
-                CookieUtils.setCookieToResponse(REFRESH_TOKEN_COOKIE_KEY, refreshToken, JWTProvider.REFRESH_EXP_SEC, false, true, response);
-            }*/
         }
 
         // 엑세스 토큰과 리프레쉬 토큰 모두 검증 실패 (만료 됐거나 잘못된 형식)
@@ -148,13 +138,5 @@ public class JwtAuthenticationFilter extends BasicAuthenticationFilter {
             }
         }
         return null;
-    }
-
-    private void updateToken(User user, String accessToken, String refreshToken){
-        // 리프레쉬 토큰 갱신
-        redisService.storeValue(REDIS_KEY_REFRESH_TOKEN, String.valueOf(user.getId()), refreshToken, JWTProvider.REFRESH_EXP_MILLI);
-
-        // 엑세스 토큰 갱신
-        redisService.storeValue(REDIS_KEY_ACCESS_TOKEN, String.valueOf(user.getId()), accessToken, JWTProvider.ACCESS_EXP_MILLI);
     }
 }

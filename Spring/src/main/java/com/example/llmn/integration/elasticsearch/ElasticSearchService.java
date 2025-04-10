@@ -32,6 +32,9 @@ public class ElasticSearchService {
         } catch (ElasticsearchException e) {
             createIndex(index, elasticSearchHost);
             return new SearchResponse.Builder<T>().build();
+        } catch (java.net.ConnectException e) {
+            log.error("<ElasticSearch> 연결 실패: {}", elasticSearchHost, e);
+            return new SearchResponse.Builder<T>().build();
         } catch (IOException e) {
             log.error("<ElasticSearch> {} 인덱스 검색 실패", index, e);
             return new SearchResponse.Builder<T>().build();

@@ -70,11 +70,11 @@ public class Project extends BaseEntity {
         this.containerStatus = containerStatus;
     }
 
-    public Long getSshInfoId() {
+    public Long getServerInstanceId() {
         return serverInstance.getId();
     }
 
-    public String getSshInfoRemoteHost() {
+    public String getServerIp() {
         return serverInstance.getRemoteHost();
     }
 

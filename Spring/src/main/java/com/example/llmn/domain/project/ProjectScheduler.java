@@ -29,7 +29,7 @@ public class ProjectScheduler {
     public void checkContainerStatus() {
         List<Project> projects = projectRepository.findAllWithServerInstance();
         projects.forEach(project -> {
-            ContainerStatus containerStatus = projectService.findContainerStatus(project.getContainerName(), project.getSshInfoId());
+            ContainerStatus containerStatus = projectService.findContainerStatus(project.getContainerName(), project.getServerInstanceId());
             project.updateContainerStatus(containerStatus);
         });
     }

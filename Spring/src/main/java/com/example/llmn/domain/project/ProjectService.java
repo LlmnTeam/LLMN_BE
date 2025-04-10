@@ -137,7 +137,7 @@ public class ProjectService {
         Project project = projectRepository.findByIdWithServerInstance(projectId)
                 .orElseThrow(() -> new CustomException(ExceptionCode.USER_NOT_FOUND));
 
-        String recentLog = logService.findLatestTwoLogs(project.getContainerName(), project.getSshInfoRemoteHost());
+        String recentLog = logService.findLatestTwoLogs(project.getContainerName(), project.getServerIp());
 
         Optional<Summary> latestSummaryOP = findLatestSummary(project);
         String summaryContent = getContentFromSummary(latestSummaryOP);
@@ -164,7 +164,7 @@ public class ProjectService {
         Project project = projectRepository.findByIdWithServerInstance(projectId)
                 .orElseThrow(() -> new CustomException(ExceptionCode.PROJECT_NOT_FOUND));
 
-        List<String> logFileList = logService.findLogFilesByContainerName(project.getContainerName(), project.getSshInfoRemoteHost());
+        List<String> logFileList = logService.findLogFilesByContainerName(project.getContainerName(), project.getServerIp());
         return new FindProjectLogListRes(logFileList);
     }
 
