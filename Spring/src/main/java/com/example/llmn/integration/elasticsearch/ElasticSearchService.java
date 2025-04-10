@@ -92,9 +92,7 @@ public class ElasticSearchService {
                 .hits().hits().stream()
                 .map(hit -> {
                     Map<String, Object> map = hit.source();
-                    if (map != null)
-                        map.put(ES_FIELD_ID, hit.id());
-
+                    if (map != null) map.put(ES_FIELD_ID, hit.id());
                     return map;
                 })
                 .filter(Objects::nonNull)

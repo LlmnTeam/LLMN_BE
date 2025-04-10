@@ -103,6 +103,11 @@ public class LogService {
 
         return findTextFiles(LOGS_DIRECTORY).stream()
                 .filter(logFile -> logFile.startsWith(containerName + "-" + finalServerIp + LOG_FILE_NAME_SUFFIX))
+                .sorted((file1, file2) -> {
+                    LocalDateTime dateTime1 = extractDateTimeFromLogFileName(file1);
+                    LocalDateTime dateTime2 = extractDateTimeFromLogFileName(file2);
+                    return dateTime2.compareTo(dateTime1); // 파일명은 최신순
+                })
                 .toList();
     }
 
