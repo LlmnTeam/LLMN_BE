@@ -5,7 +5,7 @@ public class LogConstants {
     private LogConstants() {
     }
 
-    public static final String LOG_FORMAT = "[%s]\n%s";
+    public static final String LOG_FORMAT = "[%s] %s\n%s";
 
     public static final String LOGS_DIRECTORY = "logs";
     public static final String LOG_FILE_NAME_SUFFIX = "-log";

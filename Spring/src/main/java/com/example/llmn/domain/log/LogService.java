@@ -175,9 +175,10 @@ public class LogService {
     }
 
     private String formatLogEntry(Map<String, Object> logEntry, String timestamp) {
+        String logLevel = extractStringFromMap(logEntry, ES_FIELD_LEVEL, LOG_LEVEL_UNKNOWN);
         return Optional.ofNullable(logEntry.get(ES_FIELD_MESSAGE))
                 .map(Object::toString)
-                .map(logMessage -> String.format(LOG_FORMAT, timestamp, logMessage))
+                .map(logMessage -> String.format(LOG_FORMAT, timestamp, logLevel, logMessage))
                 .orElse(EMPTY_LOG_RECORD_MESSAGE);
     }
 
