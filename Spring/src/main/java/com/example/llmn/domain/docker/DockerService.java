@@ -17,7 +17,7 @@ import java.util.stream.Collectors;
 import static com.example.llmn.common.utils.JsonUtils.*;
 import static com.example.llmn.domain.docker.DockerConstants.*;
 import static com.example.llmn.integration.redis.RedisConstants.REDIS_KEY_RESOURCE;
-import static com.example.llmn.integration.redis.RedisConstants.REDIS_EXP_RESOURCE;
+import static com.example.llmn.integration.redis.RedisConstants.REDIS_EXPIRY_RESOURCE_MS;
 
 @Service
 @RequiredArgsConstructor
@@ -135,7 +135,7 @@ public class DockerService {
     private void cacheResourceUsage(Long userId, Map<String, Map<String, String>> resourceUsage) {
         String value = convertMapToJson(resourceUsage);
         if (isNotEmpty(value)) {
-            redisService.storeValue(REDIS_KEY_RESOURCE, userId.toString(), value, REDIS_EXP_RESOURCE);
+            redisService.storeValue(REDIS_KEY_RESOURCE, userId.toString(), value, REDIS_EXPIRY_RESOURCE_MS);
         }
     }
 

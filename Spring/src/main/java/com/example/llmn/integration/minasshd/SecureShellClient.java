@@ -41,7 +41,7 @@ public class SecureShellClient implements AutoCloseable {
     private final SshConnectionConfig connectionConfig;
     private final byte[] outputBuffer;
 
-    private static final JedisPool jedisPool = new JedisPool(new JedisPoolConfig(), REDIS_HOST, REDIS_PORT, REDIS_TIMEOUT_SSH);
+    private static final JedisPool jedisPool = new JedisPool(new JedisPoolConfig(), REDIS_HOST, REDIS_PORT, REDIS_TIMEOUT_MS);
 
     public SecureShellClient(String host, String username, String privateKeyPath) {
         this.connectionConfig = new SshConnectionConfig(host, username, privateKeyPath);
@@ -297,18 +297,18 @@ public class SecureShellClient implements AutoCloseable {
     private void publishToRedis(String outputChunk) {
         if (redisClient == null) return;
 
-        for (int retries = 0; retries <= MAX_REDIS_PUBLISH_RETRIES; retries++) {
+        for (int retries = 0; retries <= REDIS_RETRY_MAX_PUBLISH_ATTEMPTS; retries++) {
             try {
                 redisClient.publish(REDIS_CHANNEL_SSH, outputChunk);
                 return; // 성공시 즉시 반환
             } catch (Exception e) {
-                if (retries == MAX_REDIS_PUBLISH_RETRIES) {
+                if (retries == REDIS_RETRY_MAX_PUBLISH_ATTEMPTS) {
                     log.warn("<SSHD> Redis 메시지 발행 최종 실패: {}", e.getMessage());
                     break;
                 }
 
                 try {
-                    Thread.sleep(REDIS_RETRY_DELAY);
+                    Thread.sleep(REDIS_RETRY_DELAY_MS);
                 } catch (InterruptedException ie) {
                     Thread.currentThread().interrupt();
                     break;

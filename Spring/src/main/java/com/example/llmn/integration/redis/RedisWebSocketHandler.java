@@ -17,22 +17,19 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import static com.example.llmn.integration.redis.RedisConstants.*;
+
 @Slf4j
 public class RedisWebSocketHandler extends TextWebSocketHandler implements DisposableBean {
 
     @Value("${spring.data.redis.host}")
     private String redisHost;
+
     private final List<WebSocketSession> sessions = new CopyOnWriteArrayList<>();
     private final AtomicBoolean running = new AtomicBoolean(true);
+
     private Thread redisSubscriberThread;
     private RedisMessageSubscriber subscriber;
-
-    private static final String REDIS_CHANNEL = RedisConstants.REDIS_CHANNEL_SSH;
-    private static final int REDIS_TIMEOUT = RedisConstants.REDIS_TIMEOUT_SSH;
-    private static final int REDIS_PORT = 6379;
-    private static final int MAX_RETRY_ATTEMPTS = 10;
-    private static final long INITIAL_RETRY_INTERVAL = 1000; // 1초
-    private static final long MAX_RETRY_INTERVAL = 30000; // 30초
 
     public RedisWebSocketHandler() {
         startRedisSubscription();
@@ -72,18 +69,18 @@ public class RedisWebSocketHandler extends TextWebSocketHandler implements Dispo
 
     private void connectToRedisWithRetry() {
         int attempts = 0;
-        long retryInterval = INITIAL_RETRY_INTERVAL;
+        long retryInterval = REDIS_RETRY_INITIAL_INTERVAL_MS;
 
         while (running.get()) {
             try {
-                log.info("Redis 연결 시도 중... (시도 {}/{})", attempts + 1, MAX_RETRY_ATTEMPTS);
+                log.info("Redis 연결 시도 중... (시도 {}/{})", attempts + 1, REDIS_RETRY_MAX_ATTEMPTS);
                 subscribeToRedis();
                 return;
             } catch (JedisConnectionException e) {
                 attempts++;
                 log.error("Redis 연결 실패: {}", e.getMessage());
 
-                if (attempts >= MAX_RETRY_ATTEMPTS)
+                if (attempts >= REDIS_RETRY_MAX_ATTEMPTS)
                     break;
 
                 try {
@@ -93,16 +90,16 @@ public class RedisWebSocketHandler extends TextWebSocketHandler implements Dispo
                     break;
                 }
 
-                retryInterval = Math.min(retryInterval * 2, MAX_RETRY_INTERVAL); // 지수 백오프 적용
+                retryInterval = Math.min(retryInterval * 2, REDIS_RETRY_MAX_INTERVAL_MS); // 지수 백오프 적용
             }
         }
     }
 
     private void subscribeToRedis() {
-        try (Jedis jedis = new Jedis(redisHost, REDIS_PORT, REDIS_TIMEOUT)) {
+        try (Jedis jedis = new Jedis(redisHost, REDIS_PORT, REDIS_TIMEOUT_MS)) {
             log.info("Redis 서버에 연결됨: {}:{}", redisHost, REDIS_PORT);
             jedis.ping(); // 연결 테스트
-            jedis.subscribe(subscriber, REDIS_CHANNEL);
+            jedis.subscribe(subscriber, REDIS_CHANNEL_SSH);
         } catch (JedisConnectionException e) {
             log.error("Redis 구독 중 오류 발생: {}", e.getMessage());
             throw e;

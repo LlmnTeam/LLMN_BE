@@ -17,7 +17,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import static com.example.llmn.common.utils.ConverterUtils.convertStringToLong;
 import static com.example.llmn.common.utils.DateTimeUtils.getCurrentHourStartMinusHours;
@@ -277,7 +276,7 @@ public class MetricService {
     private void storeCurrentMetricsInCache(Long serverInstanceId, FindCurrentMetricRes metricRes) {
         String value = convertMetricDtoToJson(metricRes);
         if (isNotEmpty(value))
-            redisService.storeValue(REDIS_KEY_METRIC, serverInstanceId.toString(), value, REDIS_EXP_METRIC_MS);
+            redisService.storeValue(REDIS_KEY_METRIC, serverInstanceId.toString(), value, REDIS_EXPIRY_METRIC_MS);
     }
 
     private void storeNetworkStatsInCache(Map<String, Double> currentNetworkMetric) {

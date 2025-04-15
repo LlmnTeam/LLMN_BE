@@ -19,7 +19,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import static com.example.llmn.common.constants.GlobalConstants.DELIMITER;
 import static com.example.llmn.integration.minasshd.MinaSshdConstants.*;
 import static com.example.llmn.integration.redis.RedisConstants.REDIS_KEY_SSH;
-import static com.example.llmn.integration.redis.RedisConstants.REDIS_EXP_SSH;
+import static com.example.llmn.integration.redis.RedisConstants.REDIS_EXPIRY_SSH_MS;
 
 @Service
 @RequiredArgsConstructor
@@ -396,6 +396,6 @@ public class SecureShellManager {
                 serverInstance.getRemoteKeyPath()
         );
 
-        redisService.storeValue(REDIS_KEY_SSH, serverInstanceId.toString(), configString, REDIS_EXP_SSH);
+        redisService.storeValue(REDIS_KEY_SSH, serverInstanceId.toString(), configString, REDIS_EXPIRY_SSH_MS);
     }
 }

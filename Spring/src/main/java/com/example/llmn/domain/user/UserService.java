@@ -204,7 +204,7 @@ public class UserService {
     }
 
     private void storeVerificationCode(String email, String codeType, String verificationCode) {
-        redisService.storeValue(getCodeTypeKey(codeType), email, verificationCode, REDIS_EXP_VERIFICATION_CODE_MS);
+        redisService.storeValue(getCodeTypeKey(codeType), email, verificationCode, REDIS_EXPIRY_VERIFICATION_CODE_MS);
     }
 
     private ServerInstance findMonitoringServerInstance(List<ServerInstance> serverInstances, List<ServerInstance> newServerInstances,
@@ -221,7 +221,7 @@ public class UserService {
 
     private void cacheUserSshInfo(Long userId, ServerInstance monitoringServerInstance) {
         String combinedInfo = String.join(DELIMITER, monitoringServerInstance.getRemoteHost(), monitoringServerInstance.getRemoteName(), monitoringServerInstance.getRemoteKeyPath());
-        redisService.storeValue(REDIS_KEY_SSH, userId.toString(), combinedInfo, REDIS_EXP_SSH);
+        redisService.storeValue(REDIS_KEY_SSH, userId.toString(), combinedInfo, REDIS_EXPIRY_SSH_MS);
     }
 
     private String getEmailByVerificationCode(ResetPasswordReq requestDTO) {
