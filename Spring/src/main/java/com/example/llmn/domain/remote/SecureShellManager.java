@@ -96,13 +96,12 @@ public class SecureShellManager {
     }
 
     public SecureShellClient getOrCreateSshClient(Long serverInstanceId, boolean isNewConnection, Long userId) {
-        if (!isNewConnection) {
+        if (!isNewConnection) { // 새로운 연결이 아니면 기존 세션 사용
             SecureShellClient existingClient = tryUseExistingSession(serverInstanceId, userId);
             if (existingClient != null) return existingClient;
         }
 
         ensureSessionLimitNotExceeded();
-
         cleanupExistingSession(serverInstanceId, userId);
 
         return createNewSshClient(serverInstanceId, userId);
@@ -171,9 +170,7 @@ public class SecureShellManager {
 
     private SecureShellClient tryUseExistingSession(Long serverInstanceId, Long userId) {
         SessionInfo existingSession = activeSessionsById.get(serverInstanceId);
-        if (existingSession == null) {
-            return null;
-        }
+        if (existingSession == null) return null;
 
         // 연결 끊김 확인 및 재연결 시도
         if (!existingSession.client.isConnected()) {
@@ -311,19 +308,15 @@ public class SecureShellManager {
 
     private void validateUserSessionLimit(Long userId) {
         Set<Long> userSessions = userSessionMap.get(userId);
-        if (userSessions == null || userSessions.size() < MAX_SESSIONS_PER_USER) {
-            return;
-        }
+        if (userSessions == null || userSessions.size() < MAX_SESSIONS_PER_USER) return;
 
-        cleanInvalidUserSessions(userSessions);
+        // limit를 넘음 => 유효하지 않은 UserSessions 정리
+        userSessions.removeIf(sessionId -> !activeSessionsById.containsKey(sessionId));
 
         // 정리 후에도 여전히 제한을 초과하는지 확인
-        if (userSessions.size() >= MAX_SESSIONS_PER_USER)
+        if (userSessions.size() >= MAX_SESSIONS_PER_USER) {
             handleSessionLimitExceeded(userSessions, userId);
-    }
-
-    private void cleanInvalidUserSessions(Set<Long> userSessions) {
-        userSessions.removeIf(sessionId -> !activeSessionsById.containsKey(sessionId));
+        }
     }
 
     private void handleSessionLimitExceeded(Set<Long> userSessions, Long userId) {

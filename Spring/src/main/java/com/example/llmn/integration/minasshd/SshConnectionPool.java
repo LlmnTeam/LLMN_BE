@@ -11,15 +11,15 @@ import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
+import static com.example.llmn.integration.minasshd.MinaSshdConstants.CONNECTION_IDLE_TIMEOUT;
+import static com.example.llmn.integration.minasshd.MinaSshdConstants.MAX_POOL_SIZE_PER_HOST;
+
 @Component
 @Slf4j
 public class SshConnectionPool {
 
     private final Map<String, Queue<PooledSshClient>> connectionPools = new ConcurrentHashMap<>();
     private final Map<String, Object> poolLocks = new ConcurrentHashMap<>();
-
-    private static final int MAX_POOL_SIZE_PER_HOST = 5;
-    private static final long CONNECTION_IDLE_TIMEOUT = 5 * 60 * 1000; // 5분
 
     private static class PooledSshClient {
         final SecureShellClient client;
@@ -35,7 +35,7 @@ public class SshConnectionPool {
         }
 
         boolean isIdle() {
-            return java.time.Duration.between(lastUsed, LocalDateTime.now()).toMillis() > SshConnectionPool.CONNECTION_IDLE_TIMEOUT;
+            return java.time.Duration.between(lastUsed, LocalDateTime.now()).toMillis() > CONNECTION_IDLE_TIMEOUT;
         }
     }
 
@@ -46,8 +46,7 @@ public class SshConnectionPool {
             Queue<PooledSshClient> pool = getOrCreatePool(poolKey);
 
             SecureShellClient validClient = findValidConnectionInPool(pool);
-            if (validClient != null)
-                return validClient;
+            if (validClient != null) return validClient;
 
             return createNewConnection(config);
         }
@@ -94,7 +93,7 @@ public class SshConnectionPool {
         while (!pool.isEmpty()) {
             pooledClient = pool.poll();
 
-            if (isConnectionValid(pooledClient)) {
+            if (pooledClient.client.isConnected()) {
                 pooledClient.markAsUsed();
                 return pooledClient.client;
             } else {
@@ -102,10 +101,6 @@ public class SshConnectionPool {
             }
         }
         return null;
-    }
-
-    private boolean isConnectionValid(PooledSshClient pooledClient) {
-        return pooledClient.client.isConnected();
     }
 
     private void closeClientQuietly(SecureShellClient client) {

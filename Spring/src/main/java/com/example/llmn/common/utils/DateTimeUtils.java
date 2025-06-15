@@ -41,10 +41,19 @@ public class DateTimeUtils {
         return timestamp != null ? Instant.parse(timestamp) : null;
     }
 
-    public static LocalDateTime parseDateTimeFromLogFile(String file) {
-        // 파일 이름에서 "log-" 뒤부터 ".txt" 앞까지의 부분 추출
-        String dateTimePart = file.substring(file.indexOf("log-") + 4, file.lastIndexOf("-"));
-        return LocalDateTime.parse(dateTimePart, LOG_FILE_FORMATTER);
+    public static LocalDateTime parseDateTimeFromLogFile(String fileName) {
+        String[] parts = fileName.split("-log-"); // -log- 이후의 문자열 추출
+        if (parts.length > 1) {
+            String datePart = parts[1];
+            if (datePart.endsWith(".txt")) { // .txt 제거
+                datePart = datePart.substring(0, datePart.length() - 4);
+            }
+
+            if (datePart.matches("\\d{4}-\\d{2}-\\d{2}.*")) { // 날짜 형식 체크
+                return LocalDateTime.parse(datePart, LOG_FILE_FORMATTER);
+            }
+        }
+        return LocalDateTime.MIN;
     }
 
     public static String getTodayDateInString() {

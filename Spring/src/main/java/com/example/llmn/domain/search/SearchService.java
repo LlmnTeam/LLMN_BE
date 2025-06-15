@@ -46,14 +46,21 @@ public class SearchService {
     private List<LogFileDTO> searchLogFiles(List<String> logFiles, String keyword, LocalDateTime startDate, LocalDateTime endDate, Map<String, Long> containerNameMap) {
         return logFiles.stream()
                 .filter(fileName -> isKeywordContain(fileName, keyword))
-                .filter(fileName -> isWithinDateRange(parseDateTimeFromLogFile(fileName), startDate, endDate))
+                .filter(fileName -> {
+                    LocalDateTime fileTime = parseDateTimeFromLogFile(fileName);
+                    return isWithinDateRange(fileTime, startDate, endDate);
+                })
                 .map(fileName -> createLogFileDTO(fileName, containerNameMap))
                 .toList();
     }
 
     private Map<String, Long> createContainerNameToProjectIdMap(List<Project> userProjects) {
         return userProjects.stream()
-                .collect(Collectors.toMap(Project::getContainerName, Project::getId));
+                .collect(Collectors.toMap(
+                        Project::getContainerName,
+                        Project::getId,
+                        (existingId, newId) -> newId
+                ));
     }
 
     private boolean isKeywordContain(String value, String keyword) {

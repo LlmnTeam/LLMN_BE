@@ -46,10 +46,13 @@ public class MinaSshdConstants {
     public static final String FAIL_COMMAND = "명령어 실행에 실패하였습니다.";
     public static final String DISCONNECTED = "연결이 끊어졌습니다. 재연결 시도 후에도 연결할 수 없습니다.";
 
-    public static final int MAX_COMMAND_RETRIES = 2;
     public static final int MAX_RECONNECT_ATTEMPTS = 5;
     public static final long INITIAL_RECONNECT_DELAY = 1000; // 1초
     public static final long MAX_RECONNECT_DELAY = 30000; // 최대 30초 지연
+
+    // SSHConnectionPool 변수들
+    public static final int MAX_POOL_SIZE_PER_HOST = 5;
+    public static final long CONNECTION_IDLE_TIMEOUT = 5 * 60 * 1000; // 5분
 
     public static final Pattern[] SHELL_PROMPT_PATTERNS = {
             Pattern.compile("[$#>]\\s*$"),              // 기본 프롬프트

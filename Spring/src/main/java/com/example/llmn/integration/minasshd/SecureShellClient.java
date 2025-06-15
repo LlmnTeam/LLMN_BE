@@ -14,6 +14,7 @@ import org.apache.sshd.common.channel.PtyMode;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisPoolConfig;
+import redis.clients.jedis.exceptions.JedisConnectionException;
 
 import java.io.*;
 import java.net.URI;
@@ -50,8 +51,7 @@ public class SecureShellClient implements AutoCloseable {
     }
 
     private <T> T executeWithRetryAndReconnect(Callable<T> action) throws IOException, InterruptedException {
-        if (!isConnected() && !attemptReconnect())
-            return null;
+        if (!isConnected() && !attemptReconnect()) return null;
 
         try {
             return action.call();
@@ -71,9 +71,7 @@ public class SecureShellClient implements AutoCloseable {
                 return readShellOutput();
             });
 
-            if (result == null)
-                return !isConnected() ? DISCONNECTED : FAIL_COMMAND;
-
+            if (result == null) return !isConnected() ? DISCONNECTED : FAIL_COMMAND;
             return result;
         } catch (IOException e) {
             return FAIL_COMMAND;
@@ -131,7 +129,7 @@ public class SecureShellClient implements AutoCloseable {
                 log.error("<SSHD> 연결 재시도 실패: {}", e.getMessage());
             }
         }
-        log.error("<SSHD> 재시도 실패: {}", connectionConfig.getHost());
+        log.error("<SSHD> 재시도 실패: {}", connectionConfig.host());
         return false;
     }
 
@@ -179,11 +177,11 @@ public class SecureShellClient implements AutoCloseable {
 
     private ClientSession establishSessionConnection() {
         try {
-            String privateKeyPath = connectionConfig.getPrivateKeyPath();
+            String privateKeyPath = connectionConfig.privateKeyPath();
             if (privateKeyPath.startsWith("file://"))
                 privateKeyPath = Paths.get(URI.create(privateKeyPath)).toString();
 
-            ConnectFuture connectFuture = sshClient.connect(connectionConfig.getUsername(), connectionConfig.getHost(), SSH_PORT);
+            ConnectFuture connectFuture = sshClient.connect(connectionConfig.username(), connectionConfig.host(), SSH_PORT);
             ClientSession session = connectFuture.verify(SSH_CONNECTION_TIMEOUT, TimeUnit.SECONDS).getSession();
 
             KeyPair keyPair = KeyPairUtils.loadKeyPair(privateKeyPath);
@@ -285,8 +283,7 @@ public class SecureShellClient implements AutoCloseable {
         // shellOutputStream에 데이터가 있는 동안 반복하여 읽는다.
         while (shellOutputStream.available() > 0) {
             int bytesRead = shellOutputStream.read(outputBuffer);
-            if (isEndOfStream(bytesRead))
-                break;
+            if (isEndOfStream(bytesRead)) break;
 
             String chunk = convertBytesToString(outputBuffer, bytesRead);
             outputBuilder.append(chunk);
@@ -295,25 +292,20 @@ public class SecureShellClient implements AutoCloseable {
     }
 
     private void publishToRedis(String outputChunk) {
-        if (redisClient == null) return;
-
-        for (int retries = 0; retries <= REDIS_RETRY_MAX_PUBLISH_ATTEMPTS; retries++) {
+        for (int attempt = 0; attempt <= REDIS_RETRY_MAX_PUBLISH_ATTEMPTS; attempt++) {
             try {
                 redisClient.publish(REDIS_CHANNEL_SSH, outputChunk);
-                return; // 성공시 즉시 반환
+                return;
+            } catch (JedisConnectionException e) { // 커넥션이 죽었다면, 재연결 후 => 재시도 루프
+                try { redisClient.close(); } catch (Exception ignored) {}
+                redisClient = jedisPool.getResource();
             } catch (Exception e) {
-                if (retries == REDIS_RETRY_MAX_PUBLISH_ATTEMPTS) {
-                    log.warn("<SSHD> Redis 메시지 발행 최종 실패: {}", e.getMessage());
-                    break;
-                }
-
-                try {
-                    Thread.sleep(REDIS_RETRY_DELAY_MS);
-                } catch (InterruptedException ie) {
-                    Thread.currentThread().interrupt();
-                    break;
-                }
+                log.warn("<SSHD> Redis publish 실패: {}", e.getMessage());
+                break;
             }
+
+            // 짧은 재시도 지연
+            try { Thread.sleep(REDIS_RETRY_DELAY_MS); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); break; }
         }
     }
 
@@ -345,8 +337,9 @@ public class SecureShellClient implements AutoCloseable {
                 TimeUnit.MINUTES.toMillis(5)
         );
 
-        if (channelEvents.contains(ClientChannelEvent.TIMEOUT))
+        if (channelEvents.contains(ClientChannelEvent.TIMEOUT)) {
             throw new CustomException(ExceptionCode.SSH_TIME_OUT);
+        }
     }
 
     private String convertToUtf8String(ByteArrayOutputStream stream) {
@@ -355,9 +348,7 @@ public class SecureShellClient implements AutoCloseable {
 
     private boolean isCommandExecutionCompleted(String result) {
         // 기본 셸 프롬프트 패턴들
-        if (result.matches(".*[$#>]\\s*$") ||
-                result.contains(SHELL_PROMPT_UBUNTU) ||
-                result.endsWith(SHELL_PROMPT_DOLLAR)) {
+        if (result.matches(".*[$#>]\\s*$") || result.contains(SHELL_PROMPT_UBUNTU) || result.endsWith(SHELL_PROMPT_DOLLAR)) {
             return true;
         }
 
@@ -372,10 +363,7 @@ public class SecureShellClient implements AutoCloseable {
 
     private void applyReconnectionDelay(int attempt) throws InterruptedException {
         if (attempt > 0) {
-            long delay = Math.min(
-                    INITIAL_RECONNECT_DELAY * (1L << (attempt - 1)),
-                    MAX_RECONNECT_DELAY
-            );
+            long delay = Math.min(INITIAL_RECONNECT_DELAY * (1L << (attempt - 1)), MAX_RECONNECT_DELAY);
             Thread.sleep(delay);
         }
     }
@@ -397,13 +385,13 @@ public class SecureShellClient implements AutoCloseable {
 
     private void logConnectionFailure(Exception e) {
         if (e instanceof java.net.ConnectException) {
-            log.error("<SSHD> 서버에 연결할 수 없습니다: 호스트={}, 포트={}", connectionConfig.getHost(), SSH_PORT);
+            log.error("<SSHD> 서버에 연결할 수 없습니다: 호스트={}, 포트={}", connectionConfig.host(), SSH_PORT);
         } else if (e instanceof java.net.SocketTimeoutException) {
-            log.error("<SSHD> 연결 시간 초과: 호스트={}, 제한 시간={}초", connectionConfig.getHost(), SSH_CONNECTION_TIMEOUT);
+            log.error("<SSHD> 연결 시간 초과: 호스트={}, 제한 시간={}초", connectionConfig.host(), SSH_CONNECTION_TIMEOUT);
         } else if (e.getMessage() != null && e.getMessage().contains("Auth fail")) {
-            log.error("<SSHD> 인증 실패: 사용자명={}, 키 경로={}", connectionConfig.getUsername(), connectionConfig.getPrivateKeyPath());
+            log.error("<SSHD> 인증 실패: 사용자명={}, 키 경로={}", connectionConfig.username(), connectionConfig.privateKeyPath());
         } else {
-            log.error("<SSHD> SSH 세션 연결 실패: 호스트={}, 사용자명={}", connectionConfig.getHost(), connectionConfig.getUsername(), e);
+            log.error("<SSHD> SSH 세션 연결 실패: 호스트={}, 사용자명={}", connectionConfig.host(), connectionConfig.username(), e);
         }
     }
 }
